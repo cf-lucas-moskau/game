@@ -32,6 +32,8 @@ class HeroView {
     this.root = new THREE.Group(); parent.add(this.root);
     this.body = lib.instance(this.look.model, this.look.height); this.root.add(this.body);
     mergeSkinned(this.body);
+    // per-hero material copy: the same hero can appear twice, and hit flashes must stay per unit
+    this.skin = []; this.body.traverse((o) => { if (o.isSkinnedMesh) { o.material = o.material.clone(); this.skin.push(o.material); } });
     this.mixer = new THREE.AnimationMixer(this.body);
     this.actions = {};
     for (const [k, name] of Object.entries(CLIPS)) { const c = lib.clip(this.look.model, name); if (c) this.actions[k] = this.mixer.clipAction(c); }
@@ -81,6 +83,8 @@ class HeroView {
     this.root.visible = !(e.dead && world.tick > e.respawnAt - 1);
     this.mixer.update(dt);
     for (const l of this.glows) l.intensity = 1 + Math.sin(now * 13 + this.id) * 0.25;
+    const fl = this.fx ? (this.fx.flash.get(this.id) || 0) : 0;
+    if (fl !== this.lastFlash) { for (const m of this.skin) m.emissive.setRGB(fl * 0.9, fl * 0.8, fl * 0.75); this.lastFlash = fl; }
   }
   dispose() { this.root.removeFromParent(); }
 }
@@ -307,6 +311,7 @@ export class UnitRenderer {
       const e = es[i];
       if (e.kind === KIND.HERO) {
         let v = this.heroViews.get(e.id); if (!v) { v = new HeroView(this.lib, e, this.parent); this.heroViews.set(e.id, v); }
+        v.fx = this.fx;
         v.update(e, alpha, dt, now, world); continue;
       }
       if (e.kind === KIND.PEBBLE) {

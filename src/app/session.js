@@ -18,11 +18,12 @@ export class GameSession {
    * @param o.net      { ping, jitter, loss } simulated network conditions
    * @param o.autopilot  drive the local player with a bot through the same input path (benchmarks)
    */
-  constructor({ canvas, lib, seed = 1, heroKey, quality, telemetry, difficulty = 'medium', net = {}, autopilot = false, fixedBuffer = null, skipSeconds = 0 }) {
+  constructor({ canvas, lib, seed = 1, heroKey, heroes = null, quality, telemetry, difficulty = 'medium', net = {}, autopilot = false, fixedBuffer = null, skipSeconds = 0 }) {
     const rng = new Rng(seed ^ 0x5eed);
     const pick = () => rng.pick(HERO_KEYS);
-    const roster = [{ playerId: 0, heroKey: heroKey || pick(), team: 0, isBot: false }];
-    for (let p = 1; p < 6; p++) roster.push({ playerId: p, heroKey: pick(), team: p < 3 ? 0 : 1, isBot: true });
+    const valid = (k) => HERO_KEYS.includes(k);
+    const roster = [{ playerId: 0, heroKey: (heroes && valid(heroes[0]) && heroes[0]) || heroKey || pick(), team: 0, isBot: false }];
+    for (let p = 1; p < 6; p++) roster.push({ playerId: p, heroKey: (heroes && valid(heroes[p]) && heroes[p]) || pick(), team: p < 3 ? 0 : 1, isBot: true });
     this.world = createMatch({ seed, roster, content: CONTENT });
     this.bots = new BotDirector(this.world, difficulty);
     this.transport = new LocalTransport({ ...net, seed });
