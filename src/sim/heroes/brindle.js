@@ -1,0 +1,69 @@
+// Brindle, the Beekeeper: every hit grows the swarm; bees are spent on stings, shields and the Hive Dome.
+import { KIND } from '../constants.js';
+import { spawnZone } from '../zones.js';
+import { spawnProjectile } from '../projectile.js';
+import { aoe, alliesInRadius, dealDamage, DMG, scale, sec, fx, pickTarget } from './kit.js';
+import { addShield, slow, heal } from '../damage.js';
+
+const MAX_BEES = 20;
+function addBee(world, e, n = 1) { e.resource = Math.min(MAX_BEES, e.resource + n); e.heroState.lastGain = world.tick; }
+export default {
+  key: 'brindle', name: 'Brindle', title: 'the Beekeeper', role: 'Support', resource: 'swarm', difficulty: 'Easy',
+  rankOrder: ['W', 'Q', 'E'],
+  base: { hp: 580, hpL: 92, ad: 48, adL: 2.8, armor: 26, armorL: 4.2, mr: 30, mrL: 1.3, as: 0.64, asL: 0.018, range: 500, speed: 335, projectile: 1300, radius: 32, mana: 0 },
+  init(world, e) { e.resource = 6; e.maxResource = MAX_BEES; e.heroState = { lastGain: 0, hitTick: {} }; },
+  onTick(world, e) {
+    const s = e.heroState;
+    if (world.tick - s.lastGain > sec(3) && world.tick - e.lastCombatTick > sec(3) && world.tick % sec(3) === 0 && e.resource > 0) e.resource--;
+  },
+  onDealtDamage(world, e, target, amount, type, opts) {
+    if (opts.dot || target.kind === KIND.TOWER || target.kind === KIND.HEART) return;
+    const s = e.heroState, last = s.hitTick[target.id] || -99;
+    if (world.tick - last < 6) return; // one bee per target per 0.2 s
+    s.hitTick[target.id] = world.tick; addBee(world, e);
+  },
+  onRespawn(world, e) { e.resource = 6; },
+  abilities: {
+    Q: { name: 'Sting', cd: [3, 3, 3, 3, 3], cost: 3, costType: 'swarm', range: 650, freeTarget: true,
+      desc: 'Fling 3 bees at a target for damage over 3 s.',
+      cast(world, e, c) {
+        const t = pickTarget(world, e, c.rawX, c.rawY, 700, false, c.targetId);
+        if (!t) return false;
+        const rank = c.rank;
+        spawnProjectile(world, { kind: 'brindle-sting', owner: e.id, team: e.team, x: e.x, y: e.y, speed: 1100, targetId: t.id,
+          onHit: (w, p, u) => {
+            const total = scale(rank, [90, 130, 170, 210, 250], 0.6, e.ap);
+            dealDamage(w, e, u, total * 0.25, DMG.MAGIC, { ability: true });
+            for (let k = 1; k <= 6; k++) w.schedule(sec(0.5 * k), (w2) => { if (u.alive && !u.dead) dealDamage(w2, e, u, total * 0.125, DMG.MAGIC, { dot: true }); });
+            spawnZone(w, { kind: 'brindle-sting-dot', team: e.team, owner: e.id, x: u.x, y: u.y, duration: 3, data: { target: u.id } });
+          } });
+      } },
+    W: { name: 'Buzz Shield', cd: [10, 9.5, 9, 8.5, 8], cost: 5, costType: 'swarm', range: 700, freeTarget: true,
+      desc: 'Bees form a shield on an ally (or yourself).',
+      cast(world, e, c) {
+        let best = e, bd = Math.hypot(c.rawX - e.x, c.rawY - e.y) - 120;
+        for (const a of alliesInRadius(world, e.team, e.x, e.y, 700)) { if (a.kind !== KIND.HERO) continue; const d = Math.hypot(a.x - c.rawX, a.y - c.rawY); if (d < bd) { bd = d; best = a; } }
+        addShield(world, best, scale(c.rank, [80, 110, 140, 170, 200], 0.6, e.ap), 2.5);
+        fx(world, best, 'brindle-shield', best.x, best.y, 2.5);
+      } },
+    E: { name: 'Honey Pool', cd: [12, 11.5, 11, 10.5, 10], cost: 0, costType: 'none', range: 700,
+      desc: 'Sticky zone that slows enemies 30%.',
+      cast(world, e, c) {
+        spawnZone(world, { kind: 'brindle-honey', team: e.team, owner: e.id, x: c.x, y: c.y, r: 220, duration: 3, every: 0.2,
+          onTick: (w, z) => aoe(w, z.team, z.x, z.y, z.r, (u) => slow(w, u, 0.3, 0.35)) });
+      } },
+    R: { name: 'Hive Dome', cd: [70, 60, 50], cost: 0, costType: 'none',
+      desc: 'Needs 15+ bees. Consumes the swarm for a dome that slows enemies 50% and heals allies for 4 s.',
+      cast(world, e, c) {
+        if (e.resource < 15) return false;
+        const bees = e.resource; e.resource = 0; const rank = c.rank, x = e.x, y = e.y;
+        const healPerSec = (scale(rank, [40, 60, 80], 0.2, e.ap)) * (bees / 15);
+        spawnZone(world, { kind: 'brindle-dome', team: e.team, owner: e.id, x, y, r: 340, duration: 4, every: 0.25,
+          onTick: (w, z) => {
+            aoe(w, z.team, z.x, z.y, z.r, (u) => slow(w, u, 0.5, 0.3));
+            for (const a of alliesInRadius(w, z.team, z.x, z.y, z.r)) heal(w, e, a, healPerSec / 4, true);
+          } });
+        fx(world, e, 'brindle-dome', x, y, 4);
+      } },
+  },
+};

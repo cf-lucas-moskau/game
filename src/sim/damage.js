@@ -81,6 +81,7 @@ function recordDamager(world, target, attacker) {
 
 export function heal(world, src, target, amount, silent = false) {
   if (!target || !target.alive || target.dead || amount <= 0) return 0;
+  if (src && src !== target && target.kind === KIND.HERO && world.registry.heroes[target.heroKey].selfHealOnly) return 0;
   const before = target.hp;
   target.hp = Math.min(target.maxHp, target.hp + amount);
   const h = target.hp - before;
