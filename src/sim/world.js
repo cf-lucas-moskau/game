@@ -33,10 +33,10 @@ export class World {
 
   // ---- entities -------------------------------------------------------------
   spawn(kind, team, x, y) {
-    let e;
-    if (this.freeIds.length) { e = resetEntity(this.entities[this.freeIds.pop()]); }
-    else { e = createEntity(); e.id = this.entities.length; this.entities.push(e); }
-    const id = e.id; resetEntity(e); e.id = id;
+    let e, id;
+    if (this.freeIds.length) { id = this.freeIds.pop(); e = resetEntity(this.entities[id]); }
+    else { id = this.entities.length; e = createEntity(); this.entities.push(e); }
+    e.id = id;
     e.alive = true; e.kind = kind; e.team = team; e.x = e.px = x; e.y = e.py = y;
     e.facing = team === 0 ? 0 : Math.PI;
     return e;
@@ -44,7 +44,8 @@ export class World {
   despawn(e) {
     if (!e.alive) return;
     e.alive = false;
-    if (e.kind !== KIND.HERO) this.freeIds.push(e.id); // heroes keep ids for the whole match
+    // heroes and structures keep their ids (and records) for the whole match
+    if (e.kind !== KIND.HERO && e.kind !== KIND.TOWER && e.kind !== KIND.HEART) this.freeIds.push(e.id);
   }
   get(id) { const e = id >= 0 ? this.entities[id] : undefined; return e && e.alive ? e : null; }
 

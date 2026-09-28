@@ -15,7 +15,7 @@ export function basicHit(world, src, target) {
   if (!src.alive || src.dead || !target.alive || target.dead) return;
   let dmg = src.kind === KIND.HERO || src.kind === KIND.PEBBLE ? src.ad : src.baseAd;
   if (src.kind === KIND.TOWER) dmg = src.baseAd + STRUCT.TOWER.adPerMin * (world.tick / TICK_HZ / 60);
-  if (isMinion(src.kind) && isStructure(target.kind)) dmg *= src.kind === KIND.SIEGE ? 2.2 : 0.8;
+  if (isMinion(src.kind) && isStructure(target.kind)) dmg *= src.kind === KIND.SIEGE ? 3 : 1.3;
   if (src.kind === KIND.HERO && isStructure(target.kind)) dmg *= 1.0;
   if (src.kind === KIND.TOWER && isMinion(target.kind)) dmg = target.maxHp * (target.kind === KIND.SIEGE ? 0.14 : target.kind === KIND.MELEE ? 0.45 : 0.7);
   const opts = { basic: true };

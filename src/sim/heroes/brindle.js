@@ -11,18 +11,19 @@ export default {
   key: 'brindle', name: 'Brindle', title: 'the Beekeeper', role: 'Support', resource: 'swarm', difficulty: 'Easy',
   rankOrder: ['W', 'Q', 'E'],
   base: { hp: 580, hpL: 92, ad: 48, adL: 2.8, armor: 26, armorL: 4.2, mr: 30, mrL: 1.3, as: 0.64, asL: 0.018, range: 500, speed: 335, projectile: 1300, radius: 32, mana: 0 },
-  init(world, e) { e.resource = 6; e.maxResource = MAX_BEES; e.heroState = { lastGain: 0, hitTick: {} }; },
+  init(world, e) { e.resource = 8; e.maxResource = MAX_BEES; e.heroState = { lastGain: 0, hitTick: {} }; },
   onTick(world, e) {
-    const s = e.heroState;
-    if (world.tick - s.lastGain > sec(3) && world.tick - e.lastCombatTick > sec(3) && world.tick % sec(3) === 0 && e.resource > 0) e.resource--;
+    const s = e.heroState, t = world.tick, inCombat = t - e.lastCombatTick < sec(4);
+    if (inCombat && t % sec(2) === 0) addBee(world, e); // the hive keeps buzzing in a fight
+    else if (!inCombat && t - s.lastGain > sec(5) && t % sec(4) === 0 && e.resource > 0) e.resource--;
   },
   onDealtDamage(world, e, target, amount, type, opts) {
     if (opts.dot || target.kind === KIND.TOWER || target.kind === KIND.HEART) return;
     const s = e.heroState, last = s.hitTick[target.id] || -99;
     if (world.tick - last < 6) return; // one bee per target per 0.2 s
-    s.hitTick[target.id] = world.tick; addBee(world, e);
+    s.hitTick[target.id] = world.tick; addBee(world, e, target.kind === KIND.HERO ? 2 : 1);
   },
-  onRespawn(world, e) { e.resource = 6; },
+  onRespawn(world, e) { e.resource = 8; },
   abilities: {
     Q: { name: 'Sting', cd: [3, 3, 3, 3, 3], cost: 3, costType: 'swarm', range: 650, freeTarget: true,
       desc: 'Fling 3 bees at a target for damage over 3 s.',

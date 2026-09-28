@@ -27,7 +27,7 @@ export const RULES = {
   WAVE_INTERVAL: 25, FIRST_WAVE: 3, SIEGE_EVERY: 3,
   RELIC_INTERVAL: 40, RELIC_HEAL: 0.22, RELIC_RADIUS: 70,
   WHALE_FIRST: 120, WHALE_INTERVAL: 90, WHALE_WARN: 3, WHALE_DURATION: 4, WHALE_SLIDE: 120, WHALE_EDGE_DPS: 90,
-  SUDDEN_DEATH: 720, SUDDEN_DEATH_DMG_BONUS: 0.5,
+  SUDDEN_DEATH: 600, SUDDEN_DEATH_DMG_BONUS: 0.5, SUDDEN_DEATH_HEART_DECAY: 0.012,
   KILL_GOLD: 300, ASSIST_GOLD: 150, KILL_XP: 280, ASSIST_WINDOW: 10,
   XP_SHARE_RADIUS: 1200, TOWER_GOLD: 150,
   FOUNTAIN_HEAL_PCT: 0.12, FOUNTAIN_DPS: 1200,
@@ -37,11 +37,11 @@ export const RULES = {
 export const xpToNext = (lvl) => 180 + 100 * (lvl - 1);
 
 export const MINION = {
-  [KIND.MELEE]:  { hp: 480, ad: 20, armor: 10, mr: 0, as: 1.0, range: 110, speed: 330, radius: 34, gold: 21, xp: 60, projectile: 0, growth: 0.025 },
-  [KIND.RANGED]: { hp: 300, ad: 28, armor: 0, mr: 0, as: 0.7, range: 450, speed: 330, radius: 30, gold: 16, xp: 32, projectile: 900, growth: 0.025 },
-  [KIND.SIEGE]:  { hp: 950, ad: 48, armor: 20, mr: 20, as: 0.5, range: 380, speed: 320, radius: 46, gold: 55, xp: 95, projectile: 750, growth: 0.03 },
+  [KIND.MELEE]:  { hp: 480, ad: 20, armor: 10, mr: 0, as: 1.0, range: 110, speed: 330, radius: 34, gold: 21, xp: 60, projectile: 0, growth: 0.05 },
+  [KIND.RANGED]: { hp: 300, ad: 28, armor: 0, mr: 0, as: 0.7, range: 450, speed: 330, radius: 30, gold: 16, xp: 32, projectile: 900, growth: 0.05 },
+  [KIND.SIEGE]:  { hp: 950, ad: 48, armor: 20, mr: 20, as: 0.5, range: 380, speed: 320, radius: 46, gold: 55, xp: 95, projectile: 750, growth: 0.06 },
 };
 export const STRUCT = {
-  TOWER: { hp: 3200, ad: 170, adPerMin: 12, armor: 60, mr: 60, as: 0.85, range: 680, radius: 90, projectile: 1300 },
-  HEART: { hp: 4200, armor: 40, mr: 40, radius: 120 },
+  TOWER: { hp: 2300, ad: 170, adPerMin: 12, armor: 60, mr: 60, as: 0.85, range: 680, radius: 90, projectile: 1300 },
+  HEART: { hp: 3000, armor: 40, mr: 40, radius: 120 },
 };

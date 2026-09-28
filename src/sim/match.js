@@ -142,6 +142,10 @@ function clockSystem(w) {
     }
   }
   if (!st.suddenDeath && t >= sec(RULES.SUDDEN_DEATH)) { st.suddenDeath = true; w.events.push(EV.FX, t, 0, 0, 0, 0, 0, 'sudden-death'); }
+  // sudden death: both Heartstones crack and lose health every second, so every match ends
+  if (st.suddenDeath && t % TICK_HZ === 0) for (const s of w.structures) if (s.alive && s.kind === KIND.HEART) {
+    s.vulnerable = s.vulnerable || true; s.hp -= s.maxHp * RULES.SUDDEN_DEATH_HEART_DECAY; if (s.hp <= 0) { s.hp = 0; w.events.push(EV.DEATH, t, s.id, -1, s.x, s.y); w.onStructureDown(s); w.despawn(s); break; }
+  }
 }
 
 function spawnWave(w) {
