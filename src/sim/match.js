@@ -57,8 +57,8 @@ export function spawnHero(w, r, index) {
   e.damagers = []; e.level = RULES.START_LEVEL; e.gold = RULES.START_GOLD; e.radius = def.base.radius || 36;
   e.projectileSpeed = def.base.projectile || 0; e.ranks = ranksForLevel(e.level, def.rankOrder);
   e.heroState = {};
-  recomputeHero(w, e); e.hp = e.maxHp; e.mana = e.maxMana;
   if (def.init) def.init(w, e);
+  recomputeHero(w, e); e.hp = e.maxHp; e.mana = e.maxMana;
   w.heroes.push(e); w.players[r.playerId] = e.id;
   return e;
 }
@@ -102,6 +102,7 @@ export function buy(w, e, key) {
 export function sell(w, e, index) {
   if (!canShop(e) || index >= e.items.length) return false;
   const key = e.items[index]; const it = w.registry.items[key];
+  if (e.heroState && e.heroState.repo && e.heroState.repo.kept && e.heroState.repo.key === key) return false;
   e.items.splice(index, 1); e.gold += Math.floor(it.cost * RULES.SELL_RATIO);
   if (it.onSell) it.onSell(w, e);
   recomputeHero(w, e); return true;

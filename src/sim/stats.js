@@ -21,9 +21,17 @@ export function recomputeHero(world, e) {
   }
   // dynamic item/passive bonuses
   if (e.itemState.barnacle) { armor += e.itemState.barnacle; mr += e.itemState.barnacle; }
-  if (def.modifyStats) { const m = def.modifyStats(world, e); if (m) { ad += m.ad || 0; ap += m.ap || 0; armor += m.armor || 0; speed += m.ms || 0; asBonus += m.as || 0; } }
+  let range = b.range;
+  if (def.modifyStats) {
+    const m = def.modifyStats(world, e);
+    if (m) {
+      ad += m.ad || 0; ap += m.ap || 0; armor += m.armor || 0; speed += m.ms || 0; asBonus += m.as || 0;
+      if (m.range) range = m.range; if (m.hpMult) maxHp *= m.hpMult;
+      if (m.projectile !== undefined) e.projectileSpeed = m.projectile; if (m.radius) e.radius = m.radius;
+    }
+  }
   e.maxHp = Math.round(maxHp); e.ad = ad; e.ap = ap; e.armor = armor; e.mr = mr;
-  e.as = Math.min(2.5, b.as * (1 + asBonus)); e.speed = speed; e.range = b.range;
+  e.as = Math.min(2.5, b.as * (1 + asBonus)); e.speed = speed; e.range = range;
   e.maxMana = Math.round(maxMana); e.hpRegen = hpRegen + e.level * 0.35; e.manaRegen = manaRegen + e.level * 0.25;
   e.cdr = Math.min(0.4, cdr); e.lifesteal = lifesteal; e.dmgAmp = dmgAmp;
   e.hp = Math.max(1, Math.min(e.maxHp, Math.round(hpRatio * e.maxHp)));
