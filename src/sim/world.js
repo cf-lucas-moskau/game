@@ -37,7 +37,7 @@ export class World {
     if (this.freeIds.length) { id = this.freeIds.pop(); e = resetEntity(this.entities[id]); }
     else { id = this.entities.length; e = createEntity(); this.entities.push(e); }
     e.id = id;
-    e.alive = true; e.kind = kind; e.team = team; e.x = e.px = x; e.y = e.py = y;
+    e.alive = true; e.bornTick = this.tick; e.kind = kind; e.team = team; e.x = e.px = x; e.y = e.py = y;
     e.facing = team === 0 ? 0 : Math.PI;
     return e;
   }

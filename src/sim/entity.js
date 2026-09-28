@@ -24,7 +24,7 @@ export function createEntity() {
     level: 1, xp: 0, gold: 0, kills: 0, deaths: 0, assists: 0, cs: 0, respawnAt: 0, dead: false,
     items: null, itemState: null, cds: null, ranks: null, abil: null, spells: null, spellCds: null,
     damagers: null, // [id, tick] pairs for assists
-    statsDirty: true, idleTicks: 0, isBot: false, channelUntil: 0, channelSlot: -1, castLockUntil: 0,
+    bornTick: 0, statsDirty: true, idleTicks: 0, isBot: false, channelUntil: 0, channelSlot: -1, castLockUntil: 0,
     heroState: null,
   };
 }

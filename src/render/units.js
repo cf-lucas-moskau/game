@@ -1,0 +1,334 @@
+// Visuals for every simulated unit. Reads world state, never writes it.
+import * as THREE from 'three';
+import { S, TEAM_COLORS } from './palette.js';
+import { KIND, isMinion } from '../sim/constants.js';
+import { HERO_LOOKS, MINION_LOOKS, STRUCTURE_LOOKS, CLIPS } from '../assets/manifest.js';
+import { bakeVAT, vatMaterial } from './vat.js';
+import * as BGU from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+
+const lerp = (a, b, t) => a + (b - a) * t;
+/** Standard material whose emissive glow follows the per-instance colour (team tint). */
+function glowMaterial(base, glow, opts = {}) {
+  const m = (base ? base.clone() : new THREE.MeshStandardMaterial({ roughness: 0.2, metalness: 0.1 }));
+  Object.assign(m, opts);
+  m.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+    #if defined( USE_COLOR ) || defined( USE_INSTANCING_COLOR )
+      totalEmissiveRadiance += vColor.rgb * ${glow.toFixed(2)};
+    #endif`); };
+  m.customProgramCacheKey = () => `glow${glow}`;
+  return m;
+}
+// Kenney rigs face +z at rotation 0: rotate so the model looks along the sim facing (cos a, sin a) in x/z.
+// (Verified by close-up: at yaw 0 the cap badge / Gus's beard face the camera.)
+const faceToRotY = (a) => Math.PI / 2 - a;
+const tmpObj = new THREE.Object3D();
+const tmpColor = new THREE.Color();
+
+// ---------------------------------------------------------------- heroes
+class HeroView {
+  constructor(lib, e, parent) {
+    this.look = HERO_LOOKS[e.heroKey]; this.id = e.id; this.team = e.team;
+    this.root = new THREE.Group(); parent.add(this.root);
+    this.body = lib.instance(this.look.model, this.look.height); this.root.add(this.body);
+    mergeSkinned(this.body);
+    this.mixer = new THREE.AnimationMixer(this.body);
+    this.actions = {};
+    for (const [k, name] of Object.entries(CLIPS)) { const c = lib.clip(this.look.model, name); if (c) this.actions[k] = this.mixer.clipAction(c); }
+    for (const k of ['attack', 'shoot', 'cast', 'emote']) if (this.actions[k]) { this.actions[k].setLoop(THREE.LoopOnce); this.actions[k].clampWhenFinished = false; }
+    if (this.actions.die) { this.actions.die.setLoop(THREE.LoopOnce); this.actions.die.clampWhenFinished = true; }
+    this.current = null; this.play('idle');
+    this.oneShotUntil = 0; this.lastYaw = 0;
+    // held props on bones
+    this.glows = [];
+    for (const p of this.look.props || []) {
+      let bone = null; this.body.traverse((o) => { if (!bone && o.name === p.bone) bone = o; });
+      if (!bone) continue;
+      const prop = lib.instance(p.key, p.size);
+      prop.position.fromArray(p.pos); prop.rotation.set(...p.rot);
+      // bones are scaled with the rig; compensate so props keep their authored size
+      const ws = new THREE.Vector3(); bone.getWorldScale(ws); prop.scale.divide(ws).multiplyScalar(this.body.scale.x || 1);
+      bone.add(prop);
+      if (p.glow) { const l = new THREE.PointLight(p.glow, 1.2, 2.5, 2); prop.add(l); l.position.y = 0.6; this.glows.push(l); }
+    }
+    if (this.look.pebble) { this.mount = buildPebble(lib, this.look.pebble, 1.0); this.root.add(this.mount); this.mount.visible = false; }
+    this.flash = 0;
+  }
+  play(k, fade = 0.15) {
+    const a = this.actions[k] || this.actions.idle; if (!a || this.current === a) return;
+    a.reset().fadeIn(fade).play(); if (this.current) this.current.fadeOut(fade); this.current = a; this.currentKey = k;
+  }
+  oneShot(k, now, speed = 1) {
+    const a = this.actions[k]; if (!a) return;
+    if (this.current && this.current !== a) this.current.fadeOut(0.08);
+    a.reset(); a.timeScale = speed; a.fadeIn(0.05).play(); this.current = a; this.currentKey = k;
+    this.oneShotUntil = now + (a.getClip().duration / speed) * 0.9;
+  }
+  update(e, alpha, dt, now, world) {
+    const x = lerp(e.px, e.x, alpha) * S, z = lerp(e.py, e.y, alpha) * S;
+    this.root.position.set(x, 0, z);
+    let yaw = faceToRotY(e.facing), d = yaw - this.lastYaw; d = Math.atan2(Math.sin(d), Math.cos(d));
+    this.lastYaw += d * Math.min(1, dt * 16); this.root.rotation.y = this.lastYaw;
+    const mounted = e.heroKey === 'gus' && e.heroState.mounted;
+    if (this.mount) { this.mount.visible = mounted && !e.dead; this.body.position.y = mounted ? 0.78 : 0; if (mounted) animatePebble(this.mount, e, now); }
+    const air = e.airborneUntil > world.tick ? Math.sin(Math.min(1, (e.airborneUntil - world.tick) / 20) * Math.PI) * 0.8 : 0;
+    this.root.position.y = air + (e.dashFx === 'gus-leap' && e.dashUntil > world.tick ? 2 : 0);
+    if (e.dead) { if (this.currentKey !== 'die') this.play('die', 0.1); }
+    else if (now >= this.oneShotUntil || this.currentKey === 'die') {
+      if (e.moving || e.dashUntil > world.tick) this.play(mounted ? 'idle' : (e.hasteUntil > world.tick ? 'run' : 'walk'));
+      else this.play('idle');
+    }
+    this.root.visible = !(e.dead && world.tick > e.respawnAt - 1);
+    this.mixer.update(dt);
+    for (const l of this.glows) l.intensity = 1 + Math.sin(now * 13 + this.id) * 0.25;
+  }
+  dispose() { this.root.removeFromParent(); }
+}
+
+/** Merge sibling skinned meshes (same bones + texture) into one draw call, remapping skin indices. */
+function mergeSkinned(root) {
+  const skinned = []; root.traverse((o) => { if (o.isSkinnedMesh) skinned.push(o); });
+  if (skinned.length < 2) return;
+  const base = skinned[0], bones = base.skeleton.bones, map = base.material.map;
+  const geos = [];
+  for (const m of skinned) {
+    if ((m.material.map || null) !== (map || null)) return;
+    const remap = m.skeleton.bones.map((bn) => bones.indexOf(bn));
+    if (remap.includes(-1)) return;
+    const g = new THREE.BufferGeometry(), src = m.geometry;
+    const src2 = src.index ? src.toNonIndexed() : src;
+    for (const n of ['position', 'normal', 'uv', 'skinWeight']) {
+      const a = src2.attributes[n]; const f = new Float32Array(a.count * a.itemSize);
+      for (let i = 0; i < a.count; i++) for (let c = 0; c < a.itemSize; c++) f[i * a.itemSize + c] = a.getComponent(i, c);
+      g.setAttribute(n, new THREE.BufferAttribute(f, a.itemSize));
+    }
+    const si = src2.attributes.skinIndex, u = new Uint16Array(si.count * 4);
+    for (let i = 0; i < si.count; i++) for (let c = 0; c < 4; c++) u[i * 4 + c] = remap[si.getComponent(i, c)];
+    g.setAttribute('skinIndex', new THREE.BufferAttribute(u, 4));
+    // re-bind into the base mesh: per vertex, via its dominant bone,
+    // p' = baseBind^-1 * baseInv_k^-1 * ownInv_k * ownBind * p  (exact for rigidly bound parts like heads)
+    if (m !== base) {
+      const P = g.attributes.position, N = g.attributes.normal, W = g.attributes.skinWeight, cache = new Map();
+      const v = new THREE.Vector3(), nm = new THREE.Matrix3();
+      for (let i = 0; i < P.count; i++) {
+        let bi = 0, bw = -1; for (let c = 0; c < 4; c++) { const w = W.getComponent(i, c); if (w > bw) { bw = w; bi = c; } }
+        const own = si.getComponent(i, bi);
+        let M = cache.get(own);
+        if (!M) { const k = remap[own]; M = new THREE.Matrix4().copy(base.bindMatrixInverse).multiply(new THREE.Matrix4().copy(base.skeleton.boneInverses[k]).invert()).multiply(m.skeleton.boneInverses[own]).multiply(m.bindMatrix); cache.set(own, M); }
+        v.fromBufferAttribute(P, i).applyMatrix4(M); P.setXYZ(i, v.x, v.y, v.z);
+        nm.getNormalMatrix(M); v.fromBufferAttribute(N, i).applyMatrix3(nm).normalize(); N.setXYZ(i, v.x, v.y, v.z);
+      }
+    }
+    geos.push(g);
+  }
+  const merged = BGU.mergeGeometries(geos, false); if (!merged) return;
+  merged.computeBoundingSphere();
+  base.geometry = merged;
+  for (let i = 1; i < skinned.length; i++) skinned[i].removeFromParent();
+}
+const STONE = new THREE.MeshStandardMaterial({ color: '#a39580', roughness: 0.95, flatShading: true });
+const PEBBLE_EYES = new THREE.MeshBasicMaterial({ color: '#8ff4ff' });
+/** Pebble the rock golem: boulder torso, rock head with glowing eyes, two boulder fists. */
+function buildPebble(lib, keys, height) {
+  const g = new THREE.Group();
+  const part = (k, h) => { const m = lib.instance(k, h); m.traverse((o) => { if (o.isMesh) { o.material = STONE; o.castShadow = true; } }); return m; };
+  const body = part(keys[0], height * 0.72); body.scale.set(1.2, 1, 1.05); g.add(body);
+  const head = part(keys[2], height * 0.36); head.position.set(0, height * 0.66, 0.12); g.add(head);
+  const eyes = new THREE.Mesh(BGU.mergeGeometries([-1, 1].map((sx) => new THREE.SphereGeometry(0.055, 8, 6).translate(sx * 0.11, height * 0.82, 0.36))), PEBBLE_EYES); g.add(eyes);
+  const armL = part(keys[1], height * 0.4); armL.position.set(0.62, height * 0.12, 0.1); g.add(armL);
+  const armR = armL.clone(); armR.position.x = -0.62; g.add(armR);
+  g.userData = { head, armL, armR, eyes };
+  return g;
+}
+function animatePebble(g, e, now) {
+  const u = g.userData, k = e.moving ? 1 : 0.2;
+  u.armL.rotation.x = Math.sin(now * 7) * 0.5 * k; u.armR.rotation.x = -Math.sin(now * 7) * 0.5 * k;
+  const bob = Math.abs(Math.sin(now * 7)) * 0.05 * k; u.head.position.y = 0.82 + bob; u.eyes.position.y = bob;
+  g.rotation.x = e.dashFx === 'pebble-roll' ? now * 12 : 0;
+}
+
+// ---------------------------------------------------------------- instanced minions (VAT)
+class MinionBatch {
+  constructor(lib, look, team, cap, parent) {
+    this.static = !!look.static; this.cap = cap; this.count = 0;
+    if (this.static) {
+      const { geometry, material } = lib.merged(look.model, look.height);
+      this.mesh = new THREE.InstancedMesh(geometry, material.clone(), cap);
+      this.mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3);
+    } else {
+      this.vat = bakeVAT(lib.gltf[look.model], [CLIPS.idle, CLIPS.walk, CLIPS.attack, CLIPS.shoot, CLIPS.die], look.height);
+      const geo = new THREE.InstancedBufferGeometry().copy(this.vat.geometry);
+      this.iFrame = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3); this.iFrame.setUsage(THREE.DynamicDrawUsage);
+      this.iTint = new THREE.InstancedBufferAttribute(new Float32Array(cap * 4), 4); this.iTint.setUsage(THREE.DynamicDrawUsage);
+      geo.setAttribute('iFrame', this.iFrame); geo.setAttribute('iTint', this.iTint);
+      this.mesh = new THREE.InstancedMesh(geo, vatMaterial(this.vat.material, this.vat), cap);
+    }
+    this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); this.mesh.frustumCulled = false; this.mesh.castShadow = true;
+    this.mesh.count = 0; this.team = team; parent.add(this.mesh);
+  }
+  begin() { this.count = 0; }
+  /** clip: 'idle'|'walk'|'attack'|'shoot'|'die'; t: seconds into clip; loop */
+  push(x, z, yaw, clip, t, loop, tint, flash, sink = 0) {
+    if (this.count >= this.cap) return;
+    const i = this.count++;
+    tmpObj.position.set(x, -sink, z); tmpObj.rotation.set(0, yaw, 0); tmpObj.scale.setScalar(1); tmpObj.updateMatrix();
+    this.mesh.setMatrixAt(i, tmpObj.matrix);
+    if (this.static) { tmpColor.set(tint).lerp(new THREE.Color('#ffffff'), 0.5 + flash * 0.5); this.mesh.setColorAt(i, tmpColor); return; }
+    const c = this.vat.clips[CLIPS[clip]] || this.vat.clips[CLIPS.idle];
+    let f = (t / c.duration) * c.frames; f = loop ? f % c.frames : Math.min(c.frames - 1.001, f);
+    const a = Math.floor(f), b = loop ? (a + 1) % c.frames : Math.min(c.frames - 1, a + 1);
+    this.iFrame.setXYZ(i, c.start + a, c.start + b, f - a);
+    tmpColor.set(tint); this.iTint.setXYZW(i, tmpColor.r, tmpColor.g, tmpColor.b, 0.12 + flash * 0.6);
+  }
+  end() {
+    this.mesh.count = this.count; this.mesh.instanceMatrix.needsUpdate = true;
+    if (this.static) { if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true; }
+    else { this.iFrame.needsUpdate = true; this.iTint.needsUpdate = true; }
+  }
+}
+
+// ---------------------------------------------------------------- structures
+class StructureViews {
+  constructor(lib, world, parent) {
+    this.towers = world.structures.filter((s) => s.kind === KIND.TOWER);
+    this.hearts = world.structures.filter((s) => s.kind === KIND.HEART);
+    const tl = STRUCTURE_LOOKS.tower;
+    this.parts = [];
+    let y = 0;
+    const stackH = [1.9, 0.75, 0.75, 1.25];
+    tl.parts.forEach((k, i) => {
+      const { geometry, material } = lib.merged(k, stackH[i]);
+      const roof = i === tl.parts.length - 1;
+      // roofs carry the team colour; stonework keeps its texture
+      const mat = roof ? new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.55, flatShading: true }) : material;
+      const m = new THREE.InstancedMesh(geometry, mat, this.towers.length); m.castShadow = true; m.receiveShadow = true;
+      if (roof) { m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(this.towers.length * 3), 3); this.roof = m; }
+      this.parts.push({ mesh: m, y }); y += stackH[i] * (i === 0 ? 0.97 : 0.93); parent.add(m);
+    });
+    this.towerTop = y;
+    const cr = lib.merged(tl.crystal, 0.9);
+    this.crystals = new THREE.InstancedMesh(cr.geometry, glowMaterial(null, 0.75, { flatShading: true }), this.towers.length);
+    this.crystals.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(this.towers.length * 3), 3); parent.add(this.crystals);
+    const h = lib.merged(STRUCTURE_LOOKS.heart.model, STRUCTURE_LOOKS.heart.height);
+    this.heartMat = glowMaterial(null, 0.55, { flatShading: true, roughness: 0.15, metalness: 0.25 });
+    this.heartMesh = new THREE.InstancedMesh(h.geometry, this.heartMat, this.hearts.length);
+    this.heartMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(this.hearts.length * 3), 3); parent.add(this.heartMesh);
+    // team banners on each tower
+    const fl = lib.merged(STRUCTURE_LOOKS.banner, 1.3);
+    this.flags = new THREE.InstancedMesh(fl.geometry, fl.material.clone(), this.towers.length);
+    this.flags.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(this.towers.length * 3), 3); parent.add(this.flags);
+    this.collapse = new Float32Array(world.structures.length);
+    this.hitFlash = new Map();
+  }
+  update(world, dt, now) {
+    this.towers.forEach((t, i) => {
+      const dead = !t.alive; const k = this.collapse[i] = dead ? Math.min(1, this.collapse[i] + dt * 0.8) : 0;
+      const col = new THREE.Color(TEAM_COLORS[t.team]);
+      for (const p of this.parts) {
+        tmpObj.position.set(t.x * S, p.y * (1 - k * 0.85) - k * 1.2, t.y * S); tmpObj.rotation.set(k * 0.3, t.team ? Math.PI : 0, k * 0.2); tmpObj.scale.set(1, 1 - k * 0.6, 1); tmpObj.updateMatrix();
+        p.mesh.setMatrixAt(i, tmpObj.matrix);
+      }
+      this.roof.setColorAt(i, tmpColor.copy(col).multiplyScalar(0.85));
+      const fl = this.hitFlash.get(t.id) || 0;
+      tmpObj.position.set(t.x * S, this.towerTop + 0.4 + Math.sin(now * 2 + i) * 0.12 - k * 4, t.y * S); tmpObj.rotation.set(0, now * 0.8, 0); tmpObj.scale.setScalar(dead ? 0.001 : 1 + fl * 0.3); tmpObj.updateMatrix();
+      this.crystals.setMatrixAt(i, tmpObj.matrix); this.crystals.setColorAt(i, tmpColor.copy(col).multiplyScalar(t.vulnerable ? 1 : 0.35));
+      tmpObj.position.set(t.x * S + (t.team ? -0.95 : 0.95), 0.6 - k * 2, t.y * S + 0.2); tmpObj.rotation.set(0, t.team ? Math.PI / 2 : -Math.PI / 2, 0); tmpObj.scale.setScalar(dead ? 0.001 : 1); tmpObj.updateMatrix();
+      this.flags.setMatrixAt(i, tmpObj.matrix); this.flags.setColorAt(i, col);
+      if (fl) this.hitFlash.set(t.id, Math.max(0, fl - dt * 4));
+    });
+    this.hearts.forEach((h, i) => {
+      const dead = !h.alive; const r = h.hp / h.maxHp;
+      tmpObj.position.set(h.x * S, 0.4 + Math.sin(now * 1.3 + i) * 0.15 - (dead ? 3 : 0), h.y * S);
+      tmpObj.rotation.set(0, now * 0.4 * (i ? -1 : 1), 0); const hs = dead ? 0.001 : 1 + (this.hitFlash.get(h.id) || 0) * 0.08; tmpObj.scale.set(hs * 0.6, hs, hs * 0.6); tmpObj.updateMatrix();
+      this.heartMesh.setMatrixAt(i, tmpObj.matrix);
+      const pulse = h.vulnerable ? 0.6 + 0.4 * Math.sin(now * (4 + (1 - r) * 10)) : 0.8;
+      this.heartMesh.setColorAt(i, tmpColor.set(TEAM_COLORS[h.team]).multiplyScalar(pulse));
+      const fl = this.hitFlash.get(h.id) || 0; if (fl) this.hitFlash.set(h.id, Math.max(0, fl - dt * 4));
+    });
+    for (const m of [...this.parts.map((p) => p.mesh), this.crystals, this.flags, this.heartMesh]) { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; }
+  }
+  flash(id) { this.hitFlash.set(id, 1); }
+}
+
+// ---------------------------------------------------------------- bees
+class BeeSwarm {
+  constructor(lib, key, parent, cap = 60) {
+    const { geometry, material } = lib.merged(key, 0.28);
+    this.mesh = new THREE.InstancedMesh(geometry, material, cap); this.mesh.count = 0; this.cap = cap; parent.add(this.mesh);
+    this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); this.mesh.frustumCulled = false;
+  }
+  update(world, alpha, now) {
+    let n = 0;
+    for (const h of world.heroes) {
+      if (h.heroKey !== 'brindle' || h.dead) continue;
+      const x = lerp(h.px, h.x, alpha) * S, z = lerp(h.py, h.y, alpha) * S;
+      for (let i = 0; i < h.resource && n < this.cap; i++) {
+        const a = now * (1.8 + (i % 3) * 0.4) + i * 2.399, r = 0.55 + (i % 4) * 0.13;
+        tmpObj.position.set(x + Math.cos(a) * r, 0.9 + Math.sin(now * 5 + i) * 0.18 + (i % 3) * 0.2, z + Math.sin(a) * r);
+        tmpObj.rotation.set(0, -a, 0); tmpObj.scale.setScalar(1); tmpObj.updateMatrix(); this.mesh.setMatrixAt(n++, tmpObj.matrix);
+      }
+    }
+    this.mesh.count = n; this.mesh.instanceMatrix.needsUpdate = true;
+  }
+}
+
+// ---------------------------------------------------------------- manager
+export class UnitRenderer {
+  constructor(lib, world, parent) {
+    this.lib = lib; this.parent = parent; this.heroViews = new Map(); this.pebbleViews = new Map();
+    this.batches = {};
+    for (const team of [0, 1]) for (const kind of ['melee', 'ranged', 'siege']) this.batches[`${team}:${kind}`] = new MinionBatch(lib, MINION_LOOKS[team][kind], team, 48, parent);
+    this.structures = new StructureViews(lib, world, parent);
+    this.bees = new BeeSwarm(lib, HERO_LOOKS.brindle.bees, parent);
+    this.anim = new Map();  // entity id -> {clip, start, kind, team}
+    this.corpses = [];      // dying minions kept visible while the die clip plays
+    this.flashes = new Map();
+  }
+  kindName(k) { return k === KIND.MELEE ? 'melee' : k === KIND.RANGED ? 'ranged' : 'siege'; }
+  onEvent(e, world, now) {
+    // called by the renderer for each sim event before update
+    if (e.type === 22) { const a = this.anim.get(e.a); if (a) { a.clip = world.entities[e.a].projectileSpeed > 0 ? 'shoot' : 'attack'; a.start = now; } const hv = this.heroViews.get(e.a); if (hv) hv.oneShot(HERO_LOOKS[world.entities[e.a].heroKey].attack, now, Math.max(1, world.entities[e.a].as * 1.2)); }
+    else if (e.type === 4) { const hv = this.heroViews.get(e.a); if (hv) hv.oneShot('cast', now, 1.8); }
+    else if (e.type === 1) { this.flashes.set(e.a, 1); const t = world.entities[e.a]; if (t && (t.kind === KIND.TOWER || t.kind === KIND.HEART)) this.structures.flash(t.id); }
+    else if (e.type === 3) {
+      const v = world.entities[e.a];
+      if (v && isMinion(v.kind)) this.corpses.push({ x: v.x * S, z: v.y * S, yaw: faceToRotY(v.facing), team: v.team, kind: this.kindName(v.kind), start: now });
+    }
+  }
+  update(world, alpha, dt, now) {
+    for (const b of Object.values(this.batches)) b.begin();
+    const es = world.entities;
+    for (let i = 0; i < es.length; i++) {
+      const e = es[i];
+      if (e.kind === KIND.HERO) {
+        let v = this.heroViews.get(e.id); if (!v) { v = new HeroView(this.lib, e, this.parent); this.heroViews.set(e.id, v); }
+        v.update(e, alpha, dt, now, world); continue;
+      }
+      if (e.kind === KIND.PEBBLE) {
+        let v = this.pebbleViews.get(e.id);
+        if (e.alive && !v) { v = buildPebble(this.lib, HERO_LOOKS.gus.pebble, 1.15); this.parent.add(v); this.pebbleViews.set(e.id, v); }
+        if (v) { v.visible = e.alive; if (e.alive) { v.position.set(lerp(e.px, e.x, alpha) * S, 0, lerp(e.py, e.y, alpha) * S); v.rotation.y = faceToRotY(e.facing); animatePebble(v, e, now); } }
+        continue;
+      }
+      if (!e.alive || !isMinion(e.kind)) continue;
+      let a = this.anim.get(e.id);
+      if (!a || a.born !== e.bornTick) { a = { clip: 'walk', start: now, born: e.bornTick }; this.anim.set(e.id, a); }
+      const moving = Math.abs(e.x - e.px) + Math.abs(e.y - e.py) > 0.5;
+      let clip = moving ? 'walk' : 'idle';
+      if ((a.clip === 'attack' || a.clip === 'shoot') && now - a.start < 0.6) clip = a.clip; else a.clip = clip;
+      const fl = this.flashes.get(e.id) || 0; if (fl) this.flashes.set(e.id, Math.max(0, fl - dt * 6));
+      const t = clip === a.clip && (clip === 'attack' || clip === 'shoot') ? now - a.start : now + e.id * 0.37;
+      this.batches[`${e.team}:${this.kindName(e.kind)}`].push(lerp(e.px, e.x, alpha) * S, lerp(e.py, e.y, alpha) * S, faceToRotY(e.facing), clip, t, clip === 'walk' || clip === 'idle', TEAM_COLORS[e.team], fl);
+    }
+    // corpses: play die clip, then sink into the whale
+    let w = 0;
+    for (const c of this.corpses) {
+      const age = now - c.start; if (age > 2.2) continue; this.corpses[w++] = c;
+      this.batches[`${c.team}:${c.kind}`].push(c.x, c.z, c.yaw, 'die', age, false, TEAM_COLORS[c.team], 0, Math.max(0, age - 1.3) * 0.8);
+    }
+    this.corpses.length = w;
+    for (const b of Object.values(this.batches)) b.end();
+    for (const [id, v] of this.pebbleViews) if (!es[id] || !es[id].alive || es[id].kind !== KIND.PEBBLE) { v.removeFromParent(); this.pebbleViews.delete(id); }
+    this.structures.update(world, dt, now);
+    this.bees.update(world, alpha, now);
+  }
+}
