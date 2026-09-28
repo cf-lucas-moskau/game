@@ -95,7 +95,9 @@ function evaluate(results, baseline) {
       if (isGated && typeof base === 'number' && base > 0.05 && lowerIsBetter(k)) {
         const delta = (r[k] - base) / base; reg = ` (baseline ${base}, ${delta >= 0 ? '+' : ''}${(delta * 100).toFixed(0)}%)`;
         // regression = relative tolerance exceeded AND above a noise floor of 10% of the budget
-        const floor = Math.max(0.2, (budget || 0) * 0.1);
+        // heap growth from a 30 s window scatters by ~half its budget (JIT, caches, match progression);
+        // tools/soak.mjs is the authoritative leak check
+        const floor = Math.max(0.2, (budget || 0) * (k === 'heapGrowthMbPer10Min' ? 0.5 : 0.1));
         if (delta > REGRESSION_TOLERANCE && r[k] - base > floor) fails.push(`${r.scenario}.${k} regressed ${(delta * 100).toFixed(0)}% (+${(r[k] - base).toFixed(2)})`);
       }
       if (isGated && !ok) fails.push(`${r.scenario}.${k} = ${r[k]} over budget ${budget}`);

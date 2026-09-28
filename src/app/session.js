@@ -27,7 +27,7 @@ export class GameSession {
     this.bots = new BotDirector(this.world, difficulty);
     this.transport = new LocalTransport({ ...net, seed });
     this.telemetry = telemetry; this.player = 0; this.me = this.world.heroes[0];
-    this.inbox = []; this.cmds = []; this.issued = new Map(); // command -> issue time (ms)
+    this.inbox = []; this.cmds = [];
     this.autopilot = autopilot ? new Bot(0, difficulty, seed + 99) : null;
     while (this.world.tick < skipSeconds * TICK_HZ) { this.bots.commands(this.world, this.cmds); if (this.autopilot) for (const c of this.autopilot.think(this.world)) if (c) this.cmds.push(c); this.world.step(this.cmds); }
     this.world.events.drain(() => {});
@@ -45,18 +45,18 @@ export class GameSession {
   send(cmd) {
     const now = performance.now();
     if (!this.transport.send(cmd, now)) return false;
-    this.issued.set(cmd, now);
+    cmd.ts = now; // local issue time (ignored by the sim and the server)
     this.predictor.onLocalCommand(cmd, now);
     return true;
   }
   tick() {
     const w = this.world, now = performance.now();
     this.bots.commands(w, this.cmds);
-    if (this.autopilot) for (const c of this.autopilot.think(w)) if (c) this.send({ ...c });
+    if (this.autopilot) { const out = this.autopilot.think(w); for (let i = 0; i < out.length; i++) if (out[i]) this.send(out[i]); }
     this.transport.receive(now, this.inbox);
     for (const c of this.inbox) {
       this.cmds.push(c);
-      const t = this.issued.get(c); if (t !== undefined) { this.issued.delete(c); this.telemetry && this.telemetry.inputProcessed(t); this.predictor.onAck(c); }
+      if (c.ts !== undefined) { this.telemetry && this.telemetry.inputProcessed(c.ts); this.predictor.onAck(c); }
     }
     const t0 = performance.now(); w.step(this.cmds); this.telemetry && this.telemetry.sim.push(performance.now() - t0);
     this.predictor.afterTick();

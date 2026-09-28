@@ -58,3 +58,9 @@ About three quarters of per-frame allocation is inside three.js uniform uploads,
 materials / 20 programs (every character and prop has its own texture). Planned: a shared texture
 atlas for characters and props so rigs and props can share materials, fewer program switches.
 The third (rim) light was removed already.
+
+## Leak check (soak)
+`node tools/soak.mjs [minutes]` plays through the transport (100 ms ping, jitter, loss) and samples
+retained heap after a forced GC every 30 s, then fits a slope. PR #9: 8.47 -> 9.03 MB over 4 minutes,
+slope 1.24 MB per 10 min and flattening (match progression: levels, items, bigger waves). The 30 s
+bench window is too short to judge leaks, so its heap regression noise floor is 50% of the budget.
