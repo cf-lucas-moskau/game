@@ -36,3 +36,20 @@ colour (`USE_COLOR` vs `USE_INSTANCING_COLOR`); merged heads distorted (bind spa
 health bars unreadable on small screens; a facing "fix" that was wrong was verified and reverted.
 
 Screenshots: `0007-desktop.png`, `0007-mobile.png`.
+
+```
+== 1/3 unit + determinism tests
+   ✓ heroes > every hero casts every ability in a chaotic 3v3 without errors, deterministically 1227ms
+   ✓ simulation > is deterministic for the same seed and commands 735ms
+   ✓ simulation > whale roll cycles through warn, roll and back to idle 317ms
+   ✓ bots > play a full match that ends by sudden death at the latest, and a command log replays it exactly 3030ms
+   ✓ bots > every hero uses all four abilities during a match 1186ms
+      Tests  35 passed (35)
+   Start at  13:13:56
+   Duration  9.72s (transform 388ms, setup 0ms, collect 532ms, tests 7.44s, environment 1ms, prepare 647ms)
+== 2/3 production build
+   dist/index.html: 3220 KB
+== 3/3 performance benchmark vs budgets
+   (bench harness not present yet)
+ALL CHECKS PASSED
+```
