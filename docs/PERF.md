@@ -68,3 +68,8 @@ bench window is too short to judge leaks, so its heap regression noise floor is 
 PR #10: the 30 s bench value read 5.84 MB/10 min while a 3-minute soak of the same scenario gave a
 1.47 MB/10 min slope with the heap oscillating (9.45 -> 9.26 -> 9.47 MB). A single pair of samples
 30 s apart cannot gate leaks, so heap growth moved to the soak step of the gate; the bench reports it as info.
+
+PR #10 also showed that the emulated phone's effective throttle factor varies between runs (2.8x to
+4.1x measured by the probe), and timer resolution is 0.1 ms. Regression checks in throttled scenarios
+therefore compare time metrics divided by the measured throttle factor, with the noise floor scaled
+by it. Absolute budgets are unchanged. (The flagged case: sim tick p95 0.2 -> 0.6 ms with no sim change.)

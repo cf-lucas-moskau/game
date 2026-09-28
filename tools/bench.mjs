@@ -93,11 +93,15 @@ function evaluate(results, baseline) {
       const base = baseline && baseline[r.scenario] && baseline[r.scenario][k];
       let reg = '';
       if (isGated && typeof base === 'number' && base > 0.05 && lowerIsBetter(k)) {
-        const delta = (r[k] - base) / base; reg = ` (baseline ${base}, ${delta >= 0 ? '+' : ''}${(delta * 100).toFixed(0)}%)`;
+        // throttled scenarios: the effective throttle factor varies run to run (measured 2.8x-5.1x),
+        // so time metrics are compared per unit of throttle, and the noise floor scales with it
+        const timeMetric = /Ms$/.test(k), bf = (baseline[r.scenario].throttleFactor || 1), rf = (r.throttleFactor || 1);
+        const cur = timeMetric ? r[k] / rf : r[k], ref = timeMetric ? base / bf : base;
+        const delta = (cur - ref) / ref; reg = ` (baseline ${base}, ${delta >= 0 ? '+' : ''}${(delta * 100).toFixed(0)}%${timeMetric && rf > 1 ? ' throttle-normalized' : ''})`;
         // regression = relative tolerance exceeded AND above a noise floor of 10% of the budget
         // heap growth from a 30 s window scatters by ~half its budget (JIT, caches, match progression);
         // tools/soak.mjs is the authoritative leak check
-        const floor = Math.max(0.2, (budget || 0) * (k === 'heapGrowthMbPer10Min' ? 0.5 : 0.1));
+        const floor = Math.max(0.2, (budget || 0) * (k === 'heapGrowthMbPer10Min' ? 0.5 : 0.1)) * (timeMetric ? Math.max(rf, bf) : 1);
         if (delta > REGRESSION_TOLERANCE && r[k] - base > floor) fails.push(`${r.scenario}.${k} regressed ${(delta * 100).toFixed(0)}% (+${(r[k] - base).toFixed(2)})`);
       }
       if (isGated && !ok) fails.push(`${r.scenario}.${k} = ${r[k]} over budget ${budget}`);
