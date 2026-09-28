@@ -36,7 +36,7 @@ export class HealthBars {
   }
   update(world, alpha, myTeam, myId, res) {
     if (res) this.mesh.material.uniforms.uRes.value.copy(res);
-    let n = 0; const col = new THREE.Color();
+    let n = 0;
     for (const e of world.entities) {
       if (!e.alive || e.dead || n >= this.cap) continue;
       if (isStructure(e.kind) && e.hp >= e.maxHp && !e.vulnerable) continue;
@@ -75,7 +75,7 @@ export class GroundDecals {
   }
   update(world, alpha, myTeam, myId, dt) {
     this.mesh.material.uniforms.uTime.value += dt;
-    let n = 0; const col = new THREE.Color();
+    let n = 0;
     for (const e of world.entities) {
       if (!e.alive || e.dead || n >= this.cap || e.kind === KIND.TOWER || e.kind === KIND.HEART) continue;
       const ring = e.kind === KIND.HERO ? 1 : 0.5;
@@ -115,7 +115,7 @@ export class ProjectileViews {
     this.mesh = new THREE.Mesh(g, m); this.mesh.frustumCulled = false; this.mesh.renderOrder = 50; parent.add(this.mesh); this.cap = cap;
   }
   update(world, alpha) {
-    let n = 0; const col = new THREE.Color();
+    let n = 0;
     for (const p of world.projectiles) {
       if (!p.alive || n >= this.cap) continue;
       const look = PROJ[p.kind] || PROJ_DEFAULT, rgb = PROJ_RGB[p.kind] || PROJ_DEFAULT_RGB;

@@ -43,3 +43,18 @@ Players can see live numbers with the F3 overlay and copy a report.
 - The renderer parsed colour strings every frame; pre-parsed colours dropped render update p95 from
   about 1.4 ms to 0.6 ms and removed the GC pressure behind a 5.9 ms pause.
 - Steady-state GC over 150 s of gameplay: only minor GCs, 0.1 to 0.4 ms CPU each.
+
+## CPU measurement mode
+The software rasterizer makes the page GPU-bound (profile: main thread 98% idle), which left only
+about 10 frames per window at full resolution, so p95 values were noise. The benchmark therefore
+renders the identical scene (same draw calls, same JS and WebGL work) into a 160x90 buffer
+(`?cpu=1`) and requires at least 200 sampled frames; fewer frames make the run invalid, not a pass.
+CPU throttling for the mobile scenario is applied after navigation and verified with a warmed
+busy-loop probe (a first run without JIT warmup had faked a 1.3x factor).
+
+## Open item: WebGL submission cost on phones
+On the emulated phone (4-5x CPU throttle) WebGL submission p95 is about 12 ms (report-only here).
+About three quarters of per-frame allocation is inside three.js uniform uploads, driven by 43
+materials / 20 programs (every character and prop has its own texture). Planned: a shared texture
+atlas for characters and props so rigs and props can share materials, fewer program switches.
+The third (rim) light was removed already.

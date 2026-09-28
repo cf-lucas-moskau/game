@@ -15,9 +15,13 @@ const { chromium } = require(process.env.PW_PATH || '/home/claude/.npm-global/li
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const args = new Set(process.argv.slice(2));
 const quick = args.has('--quick') || args.has('--gate');
+// Two passes per scenario: `cpu` renders the identical scene (same draw calls and JS work) into a
+// 160x90 buffer so rasterization on the software GPU does not starve the main thread and hundreds of
+// frames are sampled; `full` renders at real resolution for frame-time / GPU reporting.
+const MIN_FRAMES = 200; // p95 from >= 200 samples keeps at least 10 samples in the tail
 const SCENARIOS = [
   { name: 'desktop-medium', viewport: { width: 1280, height: 720 }, query: 'quality=medium&skip=150', seconds: quick ? 30 : 90 },
-  { name: 'mobile-low', viewport: { width: 844, height: 390 }, mobile: true, cpuThrottle: 4, query: 'quality=low&skip=150', seconds: quick ? 25 : 60 },
+  { name: 'mobile-low', viewport: { width: 844, height: 390 }, mobile: true, cpuThrottle: 4, query: 'quality=low&skip=150', seconds: quick ? 70 : 120 },
 ];
 const lowerIsBetter = (k) => !/fps/i.test(k);
 
@@ -25,15 +29,25 @@ async function runScenario(browser, sc) {
   const ctx = await browser.newContext({ viewport: sc.viewport, isMobile: !!sc.mobile, hasTouch: !!sc.mobile, deviceScaleFactor: sc.mobile ? 2 : 1 });
   const page = await ctx.newPage();
   const errors = []; page.on('pageerror', (e) => errors.push(e.message)); page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
-  const cdp = await ctx.newCDPSession(page);
-  await cdp.send('Performance.enable');
-  if (sc.cpuThrottle) await cdp.send('Emulation.setCPUThrottlingRate', { rate: sc.cpuThrottle });
+  let cdp = await ctx.newCDPSession(page);
   // warmup covers JIT tier-up, shader compilation and V8's one-time memory-reducer GC (~30 s after load)
   const warm = +(process.env.BENCH_WARMUP || 35);
   const t0 = Date.now();
-  await page.goto(`file://${root}/dist/index.html?bench=1&${sc.query}&warmup=${warm}&seconds=${sc.seconds}`);
+  await page.goto(`file://${root}/dist/index.html?bench=1&cpu=1&${sc.query}&warmup=${warm}&seconds=${sc.seconds}`);
   await page.waitForFunction(() => window.__game, null, { timeout: 180000 });
   const loadWallMs = Date.now() - t0;
+  // (re)attach after navigation: a file:// load can swap renderer processes and drop emulation state
+  cdp = await ctx.newCDPSession(page);
+  await cdp.send('Performance.enable');
+  if (sc.cpuThrottle) {
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: sc.cpuThrottle });
+    // verify throttling is live: a fixed busy loop must take roughly `rate` times longer
+    const probe = () => page.evaluate(() => { const t = performance.now(); let x = 0; for (let i = 0; i < 3e7; i++) x += Math.sqrt(i); return performance.now() - t + (x < 0 ? 1 : 0); });
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 }); await probe(); const fast = await probe(); // first call warms the JIT
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: sc.cpuThrottle }); const slow = await probe();
+    sc.throttleFactor = +(slow / fast).toFixed(1);
+    if (slow / fast < sc.cpuThrottle * 0.6) throw new Error(`CPU throttling not effective (${(slow / fast).toFixed(1)}x)`);
+  }
   await page.waitForTimeout(warm * 1000);
   await cdp.send('HeapProfiler.enable'); await cdp.send('HeapProfiler.collectGarbage');
   const heap0 = (await cdp.send('Runtime.getHeapUsage')).usedSize;
@@ -61,7 +75,7 @@ async function runScenario(browser, sc) {
   } catch {}
   await ctx.close();
   const secs = r.seconds || sc.seconds;
-  return { scenario: sc.name, ...r, loadMs: r.loadMs, loadWallMs, gcPauseMaxMs: +gcMax.toFixed(2), gcTotalMs: +gcTotal.toFixed(1), gcCount, gcWorst, gcWallMaxMs: +gcWallMax.toFixed(2), memoryReducerMaxMs: +reducerMax.toFixed(2), memoryReducerCount: reducerCount,
+  return { scenario: sc.name, ...r, throttleFactor: sc.throttleFactor || 1, loadMs: r.loadMs, loadWallMs, gcPauseMaxMs: +gcMax.toFixed(2), gcTotalMs: +gcTotal.toFixed(1), gcCount, gcWorst, gcWallMaxMs: +gcWallMax.toFixed(2), memoryReducerMaxMs: +reducerMax.toFixed(2), memoryReducerCount: reducerCount,
     heapGrowthMbPer10Min: +(((heap1 - heap0) / 1048576) / secs * 600).toFixed(2), heapRetainedMb: +(heap1 / 1048576).toFixed(1), errors };
 }
 
@@ -71,7 +85,7 @@ function evaluate(results, baseline) {
     const software = /SwiftShader|llvmpipe|Software/i.test(r.gpu || '');
     const gated = software ? GATED : GATED_REAL_GPU;
     lines.push(`\n  ${r.scenario}  (${software ? 'software GPU: CPU-side metrics gate' : 'hardware GPU'})`);
-    for (const k of [...new Set([...GATED_REAL_GPU, 'gcWallMaxMs', 'gcCount', 'memoryReducerMaxMs', 'fps', 'onePercentLowFps', 'trianglesMax', 'postPasses', 'longTasks'])]) {
+    for (const k of [...new Set([...GATED_REAL_GPU, 'gcWallMaxMs', 'gcCount', 'memoryReducerMaxMs', 'throttleFactor', 'fps', 'onePercentLowFps', 'trianglesMax', 'postPasses', 'longTasks'])]) {
       if (r[k] === undefined) continue;
       const budget = BUDGETS[k]; const isGated = gated.includes(k);
       const ok = budget === undefined || (lowerIsBetter(k) ? r[k] <= budget : r[k] >= budget);
@@ -86,6 +100,8 @@ function evaluate(results, baseline) {
       if (isGated && !ok) fails.push(`${r.scenario}.${k} = ${r[k]} over budget ${budget}`);
       lines.push(`   ${isGated ? (ok ? 'PASS' : 'FAIL') : 'info'}  ${k.padEnd(22)} ${String(r[k]).padStart(9)}${budget !== undefined ? `  / ${budget}` : ''}${reg}`);
     }
+    if (r.frames < MIN_FRAMES) fails.push(`${r.scenario}: only ${r.frames} frames sampled (need ${MIN_FRAMES}); result not valid`);
+    lines.push(`   info  ${'frames sampled'.padEnd(22)} ${String(r.frames).padStart(9)}  (min ${MIN_FRAMES})`);
     if (r.errors.length) { fails.push(`${r.scenario}: ${r.errors.length} page errors`); lines.push(`   FAIL  page errors: ${r.errors.slice(0, 3).join(' | ')}`); }
   }
   return { fails, report: lines.join('\n') };

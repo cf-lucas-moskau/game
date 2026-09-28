@@ -298,6 +298,7 @@ export class UnitRenderer {
     }
   }
   update(world, alpha, dt, now) {
+    this.world = world;
     if (!this.batchList) this.batchList = Object.values(this.batches);
     for (const b of this.batchList) b.begin();
     const es = world.entities;
@@ -331,7 +332,7 @@ export class UnitRenderer {
     }
     this.corpses.length = w;
     for (const b of this.batchList) b.end();
-    for (const [id, v] of this.pebbleViews) if (!es[id] || !es[id].alive || es[id].kind !== KIND.PEBBLE) { v.removeFromParent(); this.pebbleViews.delete(id); }
+    if (this.pebbleViews.size) this.pebbleViews.forEach(this._prunePebble || (this._prunePebble = (v, id) => { const x = this.world.entities[id]; if (!x || !x.alive || x.kind !== KIND.PEBBLE) { v.removeFromParent(); this.pebbleViews.delete(id); } }));
     this.structures.update(world, dt, now);
     this.bees.update(world, alpha, now);
   }

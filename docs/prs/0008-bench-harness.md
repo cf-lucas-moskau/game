@@ -22,3 +22,10 @@ Measurement method made robust after investigation: GC pauses use thread CPU tim
 rasterizer preemption inflated wall time 3x), a 35 s warmup covers V8's one-time memory-reducer
 compaction (verified over 150 s: afterwards only 0.1 to 0.4 ms minor GCs), and regressions need
 to exceed both 10% and a noise floor of 10% of the budget.
+
+Second investigation (the gate caught it): p95 values came from ~10 frames because the software GPU
+starved the main thread, and mobile CPU throttling had silently not been applied. Fixed with a CPU
+measurement mode (`?cpu=1`, identical scene into a 160x90 buffer, >= 200 frames required) and a
+verified throttle probe. Opaque draws are now sorted by material; the rim light was removed.
+Final gate: desktop render update p95 0.4 ms, GC max 0.63 ms; emulated phone render update 2.6 ms,
+GC max 3.5 ms. Open item recorded in docs/PERF.md (WebGL submission cost on phones).
