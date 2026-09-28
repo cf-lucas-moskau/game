@@ -25,14 +25,14 @@ export class Bot {
     if ((world.tick + this.phase) % this.cfg.think) return EMPTY;
     const me = world.get(world.players[this.p]);
     if (!me || world.state.over) return EMPTY;
-    const out = [];
+    const out = this.out || (this.out = []); out.length = 0;
     this.shop(world, me, out);
     if (me.dead) return out;
-    const snap = snapshot(world, me);
+    const snap = snapshot(world, me, this.snap || (this.snap = { enemies: [], allies: [], enemyMinions: [], allyMinions: [] }));
     this.decide(world, snap);
     const script = SCRIPTS[me.heroKey];
     // summoner spells
-    const threatened = snap.enemies.some((e) => d(e, me) < 650);
+    const threatened = anyWithin(snap.enemies, me, 650);
     if (hpr(me) < 0.28 && threatened && me.spellCds[1] === 0) out.push(spellCmd(this.p, 1, me.x, me.y));
     if (hpr(me) < 0.18 && threatened && me.spellCds[0] === 0) { const hx = sideX(me.team, MAP.FOUNTAIN_X); out.push(spellCmd(this.p, 0, me.x + Math.sign(hx - me.x) * 400, me.y)); }
     // abilities
@@ -53,19 +53,19 @@ export class Bot {
   }
   decide(world, snap) {
     const { me, enemies, allies } = snap;
-    const near = enemies.filter((e) => d(e, me) < 1000);
-    const allyNear = allies.filter((a) => d(a, me) < 1000);
-    const ourPower = power(me) + allyNear.reduce((s, a) => s + power(a), 0);
-    const theirPower = near.reduce((s, e) => s + power(e), 0);
-    const weak = near.find((e) => hpr(e) < 0.35 && d(e, me) < me.range + 400);
+    const near = this.near || (this.near = []); near.length = 0;
+    for (const e of enemies) if (d(e, me) < 1000) near.push(e);
+    let ourPower = power(me), theirPower = 0, weak = null;
+    for (const a of allies) if (d(a, me) < 1000) ourPower += power(a);
+    for (const e of near) { theirPower += power(e); if (!weak && hpr(e) < 0.35 && d(e, me) < me.range + 400) weak = e; }
     const diveRisk = underTower(snap, me, 60) && minionsTankingTower(snap) < 2;
     if (hpr(me) < 0.25 && near.length) this.state = 'retreat';
     else if (diveRisk && !(weak && hpr(weak) < 0.15)) this.state = 'retreat';
     else if (weak && ourPower > theirPower * 0.9 && hpr(me) > 0.35) { this.state = 'allin'; this.focus = weak.id; }
-    else if (near.length && ourPower > theirPower * 1.45 && hpr(me) > 0.5) { this.state = 'allin'; this.focus = near.reduce((a, b) => (hpr(a) < hpr(b) ? a : b)).id; }
-    else if (near.length && near.some((e) => d(e, me) < me.range + 350)) this.state = 'trade';
+    else if (near.length && ourPower > theirPower * 1.45 && hpr(me) > 0.5) { let f = near[0]; for (const e of near) if (hpr(e) < hpr(f)) f = e; this.state = 'allin'; this.focus = f.id; }
+    else if (near.length && anyWithin(near, me, me.range + 350)) this.state = 'trade';
     else if (snap.enemyTower && minionsTankingTower(snap) >= 1 && (!near.length || ourPower > theirPower * 1.3)) this.state = 'siege';
-    else if (snap.enemyTower && world.heroes.filter((h) => h.team !== me.team && h.dead).length >= 2 && hpr(me) > 0.45) this.state = 'siege';
+    else if (snap.enemyTower && deadEnemies(world, me) >= 2 && hpr(me) > 0.45) this.state = 'siege';
     else this.state = 'lane';
   }
   act(world, me, snap) {
@@ -82,7 +82,7 @@ export class Bot {
         return attackMoveCmd(this.p, me.x + f * 400, 450);
       }
       case 'trade': {
-        const t = snap.enemies.filter((e) => d(e, me) < me.range + 500).sort((a, b) => hpr(a) - hpr(b))[0];
+        let t = null; for (const e of snap.enemies) if (d(e, me) < me.range + 500 && (!t || hpr(e) < hpr(t))) t = e;
         if (!t) break;
         const dist = d(t, me), want = me.range * 0.85;
         if (me.range < 250) return attackCmd(this.p, t.id);
@@ -94,7 +94,7 @@ export class Bot {
       case 'siege': {
         const t = snap.enemyTower;
         // tank-check: never be the closest unit to the tower unless enemies are mostly dead
-        if (minionsTankingTower(snap) < 1 && world.heroes.filter((h) => h.team !== me.team && h.dead).length < 2) return attackMoveCmd(this.p, t.x - f * (t.range + 150), me.y);
+        if (minionsTankingTower(snap) < 1 && deadEnemies(world, me) < 2) return attackMoveCmd(this.p, t.x - f * (t.range + 150), me.y);
         return attackCmd(this.p, t.id);
       }
     }
@@ -111,3 +111,5 @@ export class Bot {
   }
 }
 const EMPTY = [];
+const anyWithin = (list, me, r) => { for (const e of list) if (d(e, me) < r) return true; return false; };
+const deadEnemies = (world, me) => { let n = 0; for (const h of world.heroes) if (h.team !== me.team && h.dead) n++; return n; };

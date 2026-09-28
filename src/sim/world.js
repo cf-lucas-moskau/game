@@ -73,13 +73,31 @@ export class World {
     }
     return c;
   }
+  /**
+   * Allocation-free variant for hot paths: fills `out` (array of entities, reused by the caller)
+   * with living targetable units within r (edge-inclusive). side: 0 any, 1 enemies of team, 2 allies of team.
+   */
+  query(x, y, r, team, side, out) {
+    const ids = this.scratch; const n = this.hash.query(x, y, r + 130, ids); const t = this.tick;
+    out.length = 0;
+    for (let i = 0; i < n; i++) {
+      const e = this.entities[ids[i]];
+      if (!e.alive || e.dead || e.untargetableUntil > t) continue;
+      if (side === 1 && e.team === team) continue;
+      if (side === 2 && e.team !== team) continue;
+      const rr = r + e.radius, dx = e.x - x, dy = e.y - y;
+      if (dx * dx + dy * dy <= rr * rr) out.push(e);
+    }
+    return out.length;
+  }
   nearestEnemy(x, y, r, team, pred) {
+    const list = this.query(x, y, r, team, 1, this._near || (this._near = [])) ? this._near : this._near;
     let best = null, bd = Infinity;
-    this.forEachInRadius(x, y, r, team, 'enemy', (e) => {
-      if (pred && !pred(e)) return;
+    for (let i = 0; i < list.length; i++) {
+      const e = list[i]; if (pred && !pred(e)) continue;
       const d = (e.x - x) ** 2 + (e.y - y) ** 2;
       if (d < bd || (d === bd && e.id < best.id)) { bd = d; best = e; }
-    });
+    }
     return best;
   }
 

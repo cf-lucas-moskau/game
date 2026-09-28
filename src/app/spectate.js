@@ -25,7 +25,7 @@ export function startSpectate({ canvas, lib, seed = 1, quality = 'medium', telem
       const f = world.entities[renderer.focusId];
       if (!f || f.dead) { const alive = world.heroes.find((h) => !h.dead); if (alive) renderer.focusId = alive.id; }
       renderer.render(alpha, dt);
-      if (telemetry) telemetry.gauges.entities = world.entities.filter((e) => e.alive).length;
+      if (telemetry && (world.tick & 31) === 0) { let n = 0; for (const e of world.entities) if (e.alive) n++; telemetry.gauges.entities = n; }
     } });
   loop.timeScale = timeScale;
   loop.start();

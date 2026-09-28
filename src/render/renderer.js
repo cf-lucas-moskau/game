@@ -60,7 +60,8 @@ export class GameRenderer {
   /** Draw one frame. alpha = interpolation between previous and current sim tick. */
   render(alpha, dt) {
     const t0 = performance.now(); this.now += dt; const w = this.world;
-    w.events.drain((e) => { this.units.onEvent(e, w, this.now); for (const x of this.extra) if (x.onEvent) x.onEvent(e, w, this.now, this); });
+    if (!this._onEvent) this._onEvent = (e) => { this.units.onEvent(e, this.world, this.now); for (const x of this.extra) if (x.onEvent) x.onEvent(e, this.world, this.now, this); };
+    w.events.drain(this._onEvent);
     this.env.update(dt, w);
     this.units.update(w, alpha, dt, this.now);
     const me = w.entities[this.focusId];
@@ -69,13 +70,15 @@ export class GameRenderer {
     this.projectiles.update(w, alpha);
     for (const x of this.extra) x.update(w, alpha, dt, this.now, this);
     this.updateCamera(alpha, dt);
+    const tSubmit = performance.now();
     this.gl.info.reset();
     if (this.post) this.post.render(this.scene, this.camera, this.gl.info); else { this.gl.setRenderTarget(null); this.gl.render(this.scene, this.camera); }
     // scene draw calls (post-processing fullscreen passes are a fixed, separately reported cost)
     const sceneCalls = this.post ? this.post.sceneCalls : this.gl.info.render.calls;
     const cpu = performance.now() - t0;
     if (this.telemetry) {
-      this.telemetry.render.push(cpu); this.telemetry.draws.push(sceneCalls); this.telemetry.tris.push(this.gl.info.render.triangles);
+      this.telemetry.render.push(cpu); this.telemetry.renderUpdate.push(tSubmit - t0); this.telemetry.renderSubmit.push(performance.now() - tSubmit);
+      this.telemetry.draws.push(sceneCalls); this.telemetry.tris.push(this.gl.info.render.triangles);
       this.telemetry.gauges.postPasses = this.post ? this.gl.info.render.calls - sceneCalls : 0;
       this.telemetry.gauges.quality = this.q.name;
       const ft = this.telemetry.frame.count ? this.telemetry.frame.last() : 16;

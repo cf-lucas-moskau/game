@@ -1,6 +1,6 @@
 // Instanced overlays: health bars (1 draw), ground shadows + team rings (1 draw), projectiles (1 draw).
 import * as THREE from 'three';
-import { S, TEAM_COLORS } from './palette.js';
+import { S, TEAM_COLORS, TEAM_RGB, SELF_RGB } from './palette.js';
 import { KIND, isStructure } from '../sim/constants.js';
 
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -45,8 +45,8 @@ export class HealthBars {
       this.iPos.setXYZ(n, lerp(e.px, e.x, alpha) * S, h + (hero && e.heroKey === 'gus' && e.heroState.mounted ? 0.75 : 0), lerp(e.py, e.y, alpha) * S);
       const shield = e.shieldUntil > world.tick ? e.shield / e.maxHp : 0;
       this.iData.setXYZW(n, Math.max(0, e.hp / e.maxHp), shield, w, hero ? e.maxHp : 0);
-      col.set(e.id === myId ? '#7ee07a' : e.team === myTeam ? TEAM_COLORS[0] : TEAM_COLORS[1]);
-      this.iCol.setXYZW(n, col.r, col.g, col.b, hero ? 1 : 0);
+      const c = e.id === myId ? SELF_RGB : TEAM_RGB[e.team === myTeam ? 0 : 1];
+      this.iCol.setXYZW(n, c.r, c.g, c.b, hero ? 1 : 0);
       n++;
     }
     this.mesh.geometry.instanceCount = n;
@@ -80,8 +80,8 @@ export class GroundDecals {
       if (!e.alive || e.dead || n >= this.cap || e.kind === KIND.TOWER || e.kind === KIND.HEART) continue;
       const ring = e.kind === KIND.HERO ? 1 : 0.5;
       this.iPos.setXYZW(n, lerp(e.px, e.x, alpha) * S, lerp(e.py, e.y, alpha) * S, e.radius * S * (e.kind === KIND.HERO ? 1.25 : 1), ring);
-      col.set(e.id === myId ? '#7ee07a' : e.team === myTeam ? TEAM_COLORS[0] : TEAM_COLORS[1]);
-      this.iCol.setXYZ(n, col.r, col.g, col.b); n++;
+      const c = e.id === myId ? SELF_RGB : TEAM_RGB[e.team === myTeam ? 0 : 1];
+      this.iCol.setXYZ(n, c.r, c.g, c.b); n++;
     }
     this.mesh.geometry.instanceCount = n; this.iPos.needsUpdate = this.iCol.needsUpdate = true;
   }
@@ -94,6 +94,8 @@ const PROJ = {
   'vesper-auto': ['#a99bff', 0.14, 2.4], 'gus-auto': ['#d9b98a', 0.18, 1.2], 'brindle-auto': ['#ffd84a', 0.14, 2.2],
   'brindle-sting': ['#ffd000', 0.2, 3], 'auctioneer-auto': ['#ffe07a', 0.14, 2.2], 'auctioneer-gavel': ['#f2c14e', 0.36, 3.2],
 };
+const PROJ_RGB = {}; for (const [k, v] of Object.entries(PROJ)) PROJ_RGB[k] = new THREE.Color(v[0]).multiplyScalar(v[2]);
+const PROJ_DEFAULT = ['#ffffff', 0.15, 1.5], PROJ_DEFAULT_RGB = new THREE.Color('#ffffff').multiplyScalar(1.5);
 export class ProjectileViews {
   constructor(parent, cap = 256) {
     const g = new THREE.InstancedBufferGeometry().copy(new THREE.PlaneGeometry(1, 1));
@@ -116,10 +118,10 @@ export class ProjectileViews {
     let n = 0; const col = new THREE.Color();
     for (const p of world.projectiles) {
       if (!p.alive || n >= this.cap) continue;
-      const look = PROJ[p.kind] || ['#ffffff', 0.15, 1.5];
+      const look = PROJ[p.kind] || PROJ_DEFAULT, rgb = PROJ_RGB[p.kind] || PROJ_DEFAULT_RGB;
       const y = p.kind === 'tower-bolt' ? 2.4 : 0.85;
       this.iA.setXYZW(n, lerp(p.px, p.x, alpha) * S, y, lerp(p.py, p.y, alpha) * S, look[1]);
-      col.set(look[0]).multiplyScalar(look[2]); this.iB.setXYZW(n, col.r, col.g, col.b, 0);
+      this.iB.setXYZW(n, rgb.r, rgb.g, rgb.b, 0);
       this.iD.setXY(n, p.dirX * 0.35, p.dirY * 0.35); n++;
     }
     this.mesh.geometry.instanceCount = n; this.iA.needsUpdate = this.iB.needsUpdate = this.iD.needsUpdate = true;

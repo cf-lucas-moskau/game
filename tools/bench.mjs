@@ -1,0 +1,110 @@
+// Performance benchmark: runs the production build in headless Chromium under scripted scenarios,
+// collects in-game telemetry (window.__perf) plus Chrome DevTools data (forced-GC heap, GC pauses
+// from a trace, long tasks), and compares against budgets and the stored baseline.
+//   node tools/bench.mjs                 run + report
+//   node tools/bench.mjs --gate          exit 1 on budget failure or >10% regression
+//   node tools/bench.mjs --update-baseline
+import { createRequire } from 'node:module';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, rmSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { BUDGETS, GATED, GATED_REAL_GPU, REGRESSION_TOLERANCE } from '../src/perf/budgets.js';
+const require = createRequire(import.meta.url);
+const { chromium } = require(process.env.PW_PATH || '/home/claude/.npm-global/lib/node_modules/playwright');
+
+const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+const args = new Set(process.argv.slice(2));
+const quick = args.has('--quick') || args.has('--gate');
+const SCENARIOS = [
+  { name: 'desktop-medium', viewport: { width: 1280, height: 720 }, query: 'quality=medium&skip=150', seconds: quick ? 30 : 90 },
+  { name: 'mobile-low', viewport: { width: 844, height: 390 }, mobile: true, cpuThrottle: 4, query: 'quality=low&skip=150', seconds: quick ? 25 : 60 },
+];
+const lowerIsBetter = (k) => !/fps/i.test(k);
+
+async function runScenario(browser, sc) {
+  const ctx = await browser.newContext({ viewport: sc.viewport, isMobile: !!sc.mobile, hasTouch: !!sc.mobile, deviceScaleFactor: sc.mobile ? 2 : 1 });
+  const page = await ctx.newPage();
+  const errors = []; page.on('pageerror', (e) => errors.push(e.message)); page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
+  const cdp = await ctx.newCDPSession(page);
+  await cdp.send('Performance.enable');
+  if (sc.cpuThrottle) await cdp.send('Emulation.setCPUThrottlingRate', { rate: sc.cpuThrottle });
+  // warmup covers JIT tier-up, shader compilation and V8's one-time memory-reducer GC (~30 s after load)
+  const warm = +(process.env.BENCH_WARMUP || 35);
+  const t0 = Date.now();
+  await page.goto(`file://${root}/dist/index.html?bench=1&${sc.query}&warmup=${warm}&seconds=${sc.seconds}`);
+  await page.waitForFunction(() => window.__game, null, { timeout: 180000 });
+  const loadWallMs = Date.now() - t0;
+  await page.waitForTimeout(warm * 1000);
+  await cdp.send('HeapProfiler.enable'); await cdp.send('HeapProfiler.collectGarbage');
+  const heap0 = (await cdp.send('Runtime.getHeapUsage')).usedSize;
+  const traceFile = join('/tmp', `bench-${sc.name}.json`);
+  await browser.startTracing(page, { path: traceFile, categories: ['v8', 'devtools.timeline', 'disabled-by-default-devtools.timeline'] });
+  await page.waitForFunction(() => window.__perf.done, null, { timeout: (sc.seconds + 120) * 1000, polling: 1000 });
+  await browser.stopTracing();
+  await cdp.send('HeapProfiler.collectGarbage');
+  const heap1 = (await cdp.send('Runtime.getHeapUsage')).usedSize;
+  const r = await page.evaluate(() => window.__perf.result);
+  // GC pauses from the trace
+  // GC pauses: thread CPU time (tdur), so preemption by the software rasterizer on shared cores is not counted
+  // as GC cost. V8 memory-reducer compactions are housekeeping, reported separately.
+  let gcMax = 0, gcTotal = 0, gcCount = 0, gcWorst = null, reducerMax = 0, reducerCount = 0, gcWallMax = 0;
+  try {
+    const tr = JSON.parse(readFileSync(traceFile, 'utf8')); const evs = tr.traceEvents || tr;
+    const reducer = evs.filter((e) => e.name === 'V8.GCFinalizeMCReduceMemory').map((e) => e.ts);
+    for (const e of evs) if ((e.name === 'MajorGC' || e.name === 'MinorGC') && e.dur) {
+      const cpu = (e.tdur ?? e.dur) / 1000; gcWallMax = Math.max(gcWallMax, e.dur / 1000);
+      if (reducer.some((ts) => ts >= e.ts && ts <= e.ts + e.dur)) { reducerCount++; reducerMax = Math.max(reducerMax, cpu); continue; }
+      gcCount++; gcTotal += cpu;
+      if (cpu > gcMax) { gcMax = cpu; gcWorst = { name: e.name, cpuMs: +cpu.toFixed(2), wallMs: +(e.dur / 1000).toFixed(2), type: e.args?.type }; }
+    }
+    if (process.env.KEEP_TRACE) console.log('   trace kept at', traceFile); else rmSync(traceFile);
+  } catch {}
+  await ctx.close();
+  const secs = r.seconds || sc.seconds;
+  return { scenario: sc.name, ...r, loadMs: r.loadMs, loadWallMs, gcPauseMaxMs: +gcMax.toFixed(2), gcTotalMs: +gcTotal.toFixed(1), gcCount, gcWorst, gcWallMaxMs: +gcWallMax.toFixed(2), memoryReducerMaxMs: +reducerMax.toFixed(2), memoryReducerCount: reducerCount,
+    heapGrowthMbPer10Min: +(((heap1 - heap0) / 1048576) / secs * 600).toFixed(2), heapRetainedMb: +(heap1 / 1048576).toFixed(1), errors };
+}
+
+function evaluate(results, baseline) {
+  const fails = [], lines = [];
+  for (const r of results) {
+    const software = /SwiftShader|llvmpipe|Software/i.test(r.gpu || '');
+    const gated = software ? GATED : GATED_REAL_GPU;
+    lines.push(`\n  ${r.scenario}  (${software ? 'software GPU: CPU-side metrics gate' : 'hardware GPU'})`);
+    for (const k of [...new Set([...GATED_REAL_GPU, 'gcWallMaxMs', 'gcCount', 'memoryReducerMaxMs', 'fps', 'onePercentLowFps', 'trianglesMax', 'postPasses', 'longTasks'])]) {
+      if (r[k] === undefined) continue;
+      const budget = BUDGETS[k]; const isGated = gated.includes(k);
+      const ok = budget === undefined || (lowerIsBetter(k) ? r[k] <= budget : r[k] >= budget);
+      const base = baseline && baseline[r.scenario] && baseline[r.scenario][k];
+      let reg = '';
+      if (isGated && typeof base === 'number' && base > 0.05 && lowerIsBetter(k)) {
+        const delta = (r[k] - base) / base; reg = ` (baseline ${base}, ${delta >= 0 ? '+' : ''}${(delta * 100).toFixed(0)}%)`;
+        // regression = relative tolerance exceeded AND above a noise floor of 10% of the budget
+        const floor = Math.max(0.2, (budget || 0) * 0.1);
+        if (delta > REGRESSION_TOLERANCE && r[k] - base > floor) fails.push(`${r.scenario}.${k} regressed ${(delta * 100).toFixed(0)}% (+${(r[k] - base).toFixed(2)})`);
+      }
+      if (isGated && !ok) fails.push(`${r.scenario}.${k} = ${r[k]} over budget ${budget}`);
+      lines.push(`   ${isGated ? (ok ? 'PASS' : 'FAIL') : 'info'}  ${k.padEnd(22)} ${String(r[k]).padStart(9)}${budget !== undefined ? `  / ${budget}` : ''}${reg}`);
+    }
+    if (r.errors.length) { fails.push(`${r.scenario}: ${r.errors.length} page errors`); lines.push(`   FAIL  page errors: ${r.errors.slice(0, 3).join(' | ')}`); }
+  }
+  return { fails, report: lines.join('\n') };
+}
+
+const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+const results = [];
+for (const sc of SCENARIOS) { process.stdout.write(`   running ${sc.name} (${sc.seconds}s)...\n`); results.push(await runScenario(browser, sc)); }
+await browser.close();
+const dir = join(root, 'perf-results'); mkdirSync(dir, { recursive: true });
+const basePath = join(dir, 'baseline.json');
+const baseline = existsSync(basePath) ? JSON.parse(readFileSync(basePath, 'utf8')) : null;
+const { fails, report } = evaluate(results, baseline);
+const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+writeFileSync(join(dir, `${stamp}.json`), JSON.stringify(results, null, 2));
+console.log(report);
+if (args.has('--update-baseline') || !baseline) {
+  writeFileSync(basePath, JSON.stringify(Object.fromEntries(results.map((r) => [r.scenario, r])), null, 2));
+  console.log(`\n   baseline ${baseline ? 'updated' : 'created'}: perf-results/baseline.json`);
+}
+if (fails.length) { console.log(`\n   PERF GATE: ${fails.length} failure(s)\n   - ${fails.join('\n   - ')}`); if (args.has('--gate')) process.exit(1); }
+else console.log('\n   PERF GATE: all gated metrics within budget');

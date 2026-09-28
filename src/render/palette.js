@@ -5,3 +5,9 @@ export const PALETTE = {
 };
 export const TEAM_COLORS = ['#45c4e6', '#f0476e'];
 export const S = 0.01; // sim units -> render units
+
+import { Color } from 'three';
+/** Pre-parsed colours for per-frame use (Color.set(string) parses and allocates). */
+export const TEAM_RGB = TEAM_COLORS.map((c) => new Color(c));
+export const SELF_RGB = new Color('#7ee07a');
+export const WHITE_RGB = new Color('#ffffff');

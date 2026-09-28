@@ -4,6 +4,7 @@ import { DT } from './constants.js';
 // Projectiles live outside the entity table (they are not targetable).
 // Straight skillshots, homing auto-attacks, boomerangs and piercing lines share one record.
 let nextId = 1;
+const HITS = [];
 export function spawnProjectile(world, o) {
   const p = {
     id: nextId++, alive: true, kind: o.kind || 'bolt', owner: o.owner ?? -1, team: o.team,
@@ -16,7 +17,7 @@ export function spawnProjectile(world, o) {
     born: world.tick,
   };
   if (p.targetId < 0) {
-    const dx = (o.tx ?? o.x + 1) - o.x, dy = (o.ty ?? o.y) - o.y, l = Math.hypot(dx, dy) || 1;
+    const dx = (o.tx ?? o.x + 1) - o.x, dy = (o.ty ?? o.y) - o.y, l = Math.sqrt((dx) ** 2 + (dy) ** 2) || 1;
     p.dirX = dx / l; p.dirY = dy / l;
   }
   world.projectiles.push(p);
@@ -30,7 +31,7 @@ export function projectileSystem(world) {
     if (p.targetId >= 0) { // homing
       const t = world.get(p.targetId);
       if (!t || t.dead) { p.alive = false; continue; }
-      const dx = t.x - p.x, dy = t.y - p.y, d = Math.hypot(dx, dy);
+      const dx = t.x - p.x, dy = t.y - p.y, d = Math.sqrt((dx) ** 2 + (dy) ** 2);
       if (d <= step + t.radius * 0.5) { p.x = t.x; p.y = t.y; if (p.onHit) p.onHit(world, p, t); p.alive = false; continue; }
       p.dirX = dx / d; p.dirY = dy / d; p.x += p.dirX * step; p.y += p.dirY * step;
       continue;
@@ -38,19 +39,20 @@ export function projectileSystem(world) {
     if (p.boomerang && p.returning) {
       const o = world.get(p.owner);
       if (!o || o.dead) { p.alive = false; continue; }
-      const dx = o.x - p.x, dy = o.y - p.y, d = Math.hypot(dx, dy);
+      const dx = o.x - p.x, dy = o.y - p.y, d = Math.sqrt((dx) ** 2 + (dy) ** 2);
       if (d <= step + o.radius) { p.alive = false; if (p.onEnd) p.onEnd(world, p); continue; }
       p.dirX = dx / d; p.dirY = dy / d;
     }
     p.x += p.dirX * step; p.y += p.dirY * step; p.traveled += step;
     if (!p.ground) {
-      world.forEachInRadius(p.x, p.y, p.radius, p.team, 'enemy', (e) => {
-        if (!p.alive) return false;
-        if (!p.hitMinions && e.kind >= 2 && e.kind <= 4) return;
-        if (!p.hitStructures && (e.kind === 5 || e.kind === 6)) return;
-        if (p.pierce) { if (p.hits.includes(e.id)) return; p.hits.push(e.id); if (p.onHit) p.onHit(world, p, e); }
-        else { if (p.onHit) p.onHit(world, p, e); p.alive = false; world.events.push(EV.PROJECTILE_HIT, world.tick, e.id, p.owner, p.x, p.y, 0, p.kind); return false; }
-      });
+      world.query(p.x, p.y, p.radius, p.team, 1, HITS);
+      for (let k = 0; k < HITS.length && p.alive; k++) {
+        const e = HITS[k];
+        if (!p.hitMinions && e.kind >= 2 && e.kind <= 4) continue;
+        if (!p.hitStructures && (e.kind === 5 || e.kind === 6)) continue;
+        if (p.pierce) { if (p.hits.includes(e.id)) continue; p.hits.push(e.id); if (p.onHit) p.onHit(world, p, e); }
+        else { if (p.onHit) p.onHit(world, p, e); p.alive = false; world.events.push(EV.PROJECTILE_HIT, world.tick, e.id, p.owner, p.x, p.y, 0, p.kind); }
+      }
     }
     if (p.alive && p.traveled >= p.maxDist) {
       if (p.boomerang && !p.returning) { p.returning = true; p.hits.length = 0; }
