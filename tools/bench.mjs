@@ -114,12 +114,36 @@ function evaluate(results, baseline) {
   return { fails, report: lines.join('\n') };
 }
 
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
-const results = [];
-for (const sc of SCENARIOS) { process.stdout.write(`   running ${sc.name} (${sc.seconds}s)...\n`); results.push(await runScenario(browser, sc)); }
-await browser.close();
+const argv = process.argv.slice(2);
+const argOf = (k) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : null; };
 const dir = join(root, 'perf-results'); mkdirSync(dir, { recursive: true });
 const basePath = join(dir, 'baseline.json');
+const commit = argOf('--commit') || (existsSync(join(root, 'dist/.commit')) ? readFileSync(join(root, 'dist/.commit'), 'utf8').trim() : 'working-tree');
+const partialPath = (name) => join(dir, `partial-${name}.json`);
+
+async function runAndStore(list) {
+  const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+  const out = [];
+  for (const sc of list) { process.stdout.write(`   running ${sc.name} (${sc.seconds}s)...\n`); const r = await runScenario(browser, sc); r.commit = commit; out.push(r); writeFileSync(partialPath(sc.name), JSON.stringify(r, null, 2)); }
+  await browser.close();
+  return out;
+}
+let results;
+if (argOf('--scenario')) {
+  const sc = SCENARIOS.find((x) => x.name === argOf('--scenario'));
+  if (!sc) { console.log('unknown scenario'); process.exit(1); }
+  results = await runAndStore([sc]);
+  const r = results[0];
+  console.log(`   ${sc.name}: frames ${r.frames}, sim p95 ${r.simTickP95Ms} ms, render update p95 ${r.renderUpdateP95Ms} ms, GC max ${r.gcPauseMaxMs} ms, draws ${r.drawCallsMax}`);
+  if (r.errors.length) { console.log('   page errors:', r.errors.slice(0, 3).join(' | ')); process.exit(1); }
+  process.exit(0); // budgets are judged in --evaluate, across all scenarios of the same commit
+} else if (args.has('--evaluate')) {
+  results = SCENARIOS.map((sc) => { const p = partialPath(sc.name); if (!existsSync(p)) { console.log(`   missing result for ${sc.name}`); process.exit(1); } return JSON.parse(readFileSync(p, 'utf8')); });
+  const stale = results.filter((r) => r.commit !== commit);
+  if (stale.length) { console.log(`   results are not from ${commit}: ${stale.map((r) => r.scenario).join(', ')}`); process.exit(1); }
+} else {
+  results = await runAndStore(SCENARIOS);
+}
 const baseline = existsSync(basePath) ? JSON.parse(readFileSync(basePath, 'utf8')) : null;
 const { fails, report } = evaluate(results, baseline);
 const stamp = new Date().toISOString().replace(/[:.]/g, '-');
