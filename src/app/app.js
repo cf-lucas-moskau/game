@@ -17,7 +17,7 @@ import { EndScreen } from '../ui/endscreen.js';
 import { PauseMenu, SettingsPanel } from '../ui/pause.js';
 import { PerfOverlay } from '../ui/perf-overlay.js';
 import { Tooltip } from '../ui/tooltip.js';
-import { h } from '../ui/dom.js';
+import { h, toggle } from '../ui/dom.js';
 
 const END_SCREEN_DELAY = 2600; // let the Heartstone shatter before the result covers it
 
@@ -96,7 +96,8 @@ export class App {
         for (const i of inputs) i.update();
         const now = performance.now();
         m.hud.update(now); m.floaters.update(now); m.shop.update(); m.scoreboard.update(now); this.perf.update(now);
-        this.dim.classList.toggle('on', session.me.dead);
+        toggle(this.dim, 'on', session.me.dead);
+        if (this.telemetry) this.telemetry.ui.push(performance.now() - now);
       } else if (ev === 'end') this.onMatchEnd(arg);
     });
     window.__game = session;
@@ -108,7 +109,7 @@ export class App {
     for (const i of m.session.inputs) i.dispose(); m.session.inputs = [];
     m.endTimer = setTimeout(() => {
       if (this.match !== m) return;
-      m.shop.hide(); m.scoreboard.hide(); m.pause.hide(); this.tooltip.hide(); this.dim.classList.remove('on');
+      m.shop.hide(); m.scoreboard.hide(); m.pause.hide(); this.tooltip.hide(); toggle(this.dim, 'on', false);
       m.hud.el.classList.add('hidden'); m.floaters.el.classList.add('hidden');
       m.end = new EndScreen(this.ui, m.session, {
         surrendered: m.session.world.state.surrendered,
@@ -139,7 +140,7 @@ export class App {
   }
   /** Dispose whatever is on screen: the menu with its backdrop, or a match with its UI. */
   teardown() {
-    this.tooltip.hide(); this.settingsPanel.hide(); this.dim.classList.remove('on');
+    this.tooltip.hide(); this.settingsPanel.hide(); toggle(this.dim, 'on', false);
     if (this.menu) { this.menu.dispose(); this.menu = null; }
     if (this.backdrop) { this.backdrop.dispose(); this.backdrop.canvas.remove(); this.backdrop = null; }
     const m = this.match;

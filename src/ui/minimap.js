@@ -5,12 +5,18 @@ import { S } from '../render/palette.js';
 
 const COL = { 0: '#45c4e6', 1: '#f0476e' }, DIM = { 0: 'rgba(69,196,230,.35)', 1: 'rgba(240,71,110,.35)' };
 export class LaneStrip {
-  constructor(canvas) { this.c = canvas; this.ctx = canvas.getContext('2d'); this.next = 0; this.w = 0; this.h = 0; }
+  constructor(canvas) {
+    this.c = canvas; this.ctx = canvas.getContext('2d'); this.next = 0; this.w = 0; this.h = 0; this.css = null;
+    // size from a ResizeObserver: reading layout (getBoundingClientRect) per redraw would force a synchronous layout
+    this.ro = new ResizeObserver((entries) => { const r = entries[entries.length - 1].contentRect; this.css = { w: r.width, h: r.height }; });
+    this.ro.observe(canvas);
+  }
   fit() {
-    const r = this.c.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1);
-    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (!this.css) return;
+    const dpr = Math.min(2, devicePixelRatio || 1), w = Math.round(this.css.w * dpr), h = Math.round(this.css.h * dpr);
     if (w && h && (w !== this.w || h !== this.h)) { this.c.width = this.w = w; this.c.height = this.h = h; }
   }
+  dispose() { this.ro.disconnect(); }
   update(world, me, renderer, now) {
     if (now < this.next) return; this.next = now + 66;
     this.fit(); const { ctx, w, h } = this; if (!w) return;

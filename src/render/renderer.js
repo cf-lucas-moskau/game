@@ -47,6 +47,7 @@ export class GameRenderer {
   }
   resize() {
     const w = this.canvas.clientWidth || innerWidth, h = this.canvas.clientHeight || innerHeight;
+    this.cssW = w; this.cssH = h; // cached: reading clientWidth per frame would force a layout
     let dpr = Math.min(devicePixelRatio || 1, 2) * this.q.pixelRatio * this.guard.scale;
     if (this.fixedBuffer) { dpr = this.fixedBuffer[0] / w; this.guard.enabled = false; }
     this.gl.setPixelRatio(dpr); this.gl.setSize(w, h, false);
@@ -115,7 +116,7 @@ export class GameRenderer {
   /** Allocation-free projection for per-frame UI (canvas-relative CSS px); out.visible = in front of the camera. */
   project(x, y, h, out) {
     const v = this._pv.set(x * S, h, y * S).project(this.camera);
-    out.x = (v.x + 1) / 2 * this.canvas.clientWidth; out.y = (1 - v.y) / 2 * this.canvas.clientHeight; out.visible = v.z < 1;
+    out.x = (v.x + 1) / 2 * this.cssW; out.y = (1 - v.y) / 2 * this.cssH; out.visible = v.z < 1;
     return out;
   }
   /** Release the GL context and listeners; the shared AssetLibrary stays loaded for the next match. */

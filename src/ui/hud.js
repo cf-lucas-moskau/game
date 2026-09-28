@@ -1,12 +1,12 @@
 // In-match HUD: lane strip + score + clock, kill feed, banners, respawn timer, and the dock
 // (portrait with level/XP ring, HP and resource bars, abilities with cooldowns, D/F, items, gold).
 // Every per-frame write goes through change-detecting setters; nothing allocates while values hold.
-import { h, setText, setStyle, toggle } from './dom.js';
+import { h, toggle, setNum, setScaleX, setSweep } from './dom.js';
 import { LaneStrip } from './minimap.js';
 import { emblem } from './menu.js';
-import { clock, secs } from './format.js';
+import { cdKey, cdLabel } from './format.js';
 import { EV } from '../core/events.js';
-import { KIND, RULES, xpToNext } from '../sim/constants.js';
+import { KIND, RULES, TICK_HZ, xpToNext } from '../sim/constants.js';
 import { byRank } from '../sim/abilities.js';
 import { canShop } from '../sim/match.js';
 import { itemActiveCmd } from '../sim/commands.js';
@@ -14,7 +14,15 @@ import { itemActiveCmd } from '../sim/commands.js';
 const KEYS = ['Q', 'W', 'E', 'R'];
 const RES_COLOR = { mana: 'linear-gradient(180deg,#7aa2ff,#4a6fe0)', ink: 'linear-gradient(180deg,#a99cff,#7564e8)', flame: 'linear-gradient(180deg,#ffc27a,#f07a3a)', swarm: 'linear-gradient(180deg,#ffe07a,#e0a82e)' };
 const RING = 2 * Math.PI * 34;
-const cdMask = (f) => (f > 0 ? `conic-gradient(rgba(8,10,28,.74) ${Math.round(f * 360)}deg, transparent 0)` : '');
+const fmtClock = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+const fmtPair = (k) => `${Math.floor(k / 1e5)} / ${k % 1e5}`;
+const RANK_UP = [{ transform: 'translateY(-6px)' }, { transform: 'none' }];
+/** Current amount of the pool an ability spends, or -1 when it costs nothing trackable. */
+function resourcePool(me, type) {
+  switch (type) { case 'mana': return me.mana; case 'ink': case 'swarm': return me.resource; case 'gold': return me.gold; default: return -1; }
+}
+const READY_FLASH = [{ boxShadow: '0 0 0 3px rgba(247,178,103,.9), 0 0 18px rgba(247,178,103,.8)' }, { boxShadow: '0 0 0 0 rgba(247,178,103,0)' }];
+const BANNER_IN = [{ transform: 'scale(1.3)', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }];
 const short = (name) => name.split(' ').map((w) => w[0]).join('').slice(0, 3);
 
 export class Hud {
@@ -120,58 +128,59 @@ export class Hud {
     if (now < this.bannerUntil && this.bannerQueue.length < 3) { this.bannerQueue.push([title, sub, kind, ms]); return; }
     const [b, s] = this.banner.children; b.textContent = title; s.textContent = sub;
     this.banner.className = `banner ${kind}`; this.bannerUntil = now + ms;
-    b.style.animation = 'none'; void b.offsetWidth; b.style.animation = '';
+    b.animate(BANNER_IN, { duration: 350, easing: 'cubic-bezier(.2, 1.4, .4, 1)' });
   }
   update(now) {
     const s = this.s, w = s.world, me = s.me, def = this.def, t = w.tick;
     // top bar
     let k0 = 0, k1 = 0; for (const x of w.heroes) { if (x.team === 0) k0 += x.kills; else k1 += x.kills; }
-    setText(this.blue, String(k0)); setText(this.red, String(k1));
-    setText(this.clock, clock(t)); toggle(this.clock, 'sd', !!w.state.suddenDeath);
+    setNum(this.blue, k0); setNum(this.red, k1);
+    setNum(this.clock, Math.floor(t / TICK_HZ), fmtClock); toggle(this.clock, 'sd', !!w.state.suddenDeath);
     this.strip.update(w, me, s.renderer, now);
     // banners + feed expiry
     if (this.bannerUntil && now > this.bannerUntil) { if (this.bannerQueue.length) { this.bannerUntil = 0; this.showBanner(...this.bannerQueue.shift()); } else { this.bannerUntil = 0; this.banner.classList.add('hidden'); } }
     while (this.feedItems.length && this.feedItems[0].until < now) this.feedItems.shift().row.remove();
     // respawn
     toggle(this.respawn, 'hidden', !me.dead);
-    if (me.dead) setText(this.respawn.firstChild, secs(Math.max(0, me.respawnAt - t)));
+    if (me.dead) setNum(this.respawn.firstChild, cdKey(Math.max(0, me.respawnAt - t)), cdLabel);
     // portrait
-    setText(this.lvl, String(me.level));
+    setNum(this.lvl, me.level);
     const xpf = me.level >= RULES.MAX_LEVEL ? 1 : Math.min(1, me.xp / xpToNext(me.level));
-    const off = String(Math.round(RING * (1 - xpf))); if (this.xpArc._o !== off) { this.xpArc._o = off; this.xpArc.setAttribute('stroke-dashoffset', off); }
+    const off = Math.round(RING * (1 - xpf)); if (this.xpArc._o !== off) { this.xpArc._o = off; this.xpArc.setAttribute('stroke-dashoffset', String(off)); }
     // bars
     const hp = Math.max(0, me.hp) / me.maxHp; this.lag = this.lag > hp ? Math.max(hp, this.lag - 0.012) : hp;
-    setStyle(this.hpFill, 'transform', `scaleX(${hp.toFixed(3)})`); setStyle(this.hpLag, 'transform', `scaleX(${this.lag.toFixed(3)})`);
+    setScaleX(this.hpFill, hp); setScaleX(this.hpLag, this.lag);
     const sh = me.shield > 0 && me.shieldUntil > t ? Math.min(1 - hp, me.shield / me.maxHp) : 0;
-    setStyle(this.shield, 'transform', sh > 0 ? `translateX(${(hp * 100).toFixed(1)}%) scaleX(${sh.toFixed(3)})` : 'scaleX(0)');
-    setText(this.hpText, `${Math.ceil(Math.max(0, me.hp))} / ${Math.round(me.maxHp)}`);
+    const shKey = sh > 0 ? Math.round(hp * 1000) * 1001 + Math.round(sh * 1000) : -1;
+    if (this.shield._k !== shKey) { this.shield._k = shKey; this.shield.style.transform = sh > 0 ? `translateX(${(hp * 100).toFixed(1)}%) scaleX(${sh.toFixed(3)})` : 'scaleX(0)'; }
+    setNum(this.hpText, Math.ceil(Math.max(0, me.hp)) * 1e5 + Math.round(me.maxHp), fmtPair);
     const usesMana = def.resource === 'mana', rv = usesMana ? me.mana : me.resource, rmax = usesMana ? me.maxMana : me.maxResource;
     toggle(this.resBar, 'hidden', !(rmax > 0));
-    if (rmax > 0) { setStyle(this.resFill, 'transform', `scaleX(${Math.max(0, rv / rmax).toFixed(3)})`); setText(this.resText, `${Math.floor(rv)} / ${Math.round(rmax)}`); }
+    if (rmax > 0) { setScaleX(this.resFill, rv / rmax); setNum(this.resText, Math.floor(Math.max(0, rv)) * 1e5 + Math.round(rmax), fmtPair); }
     // abilities
     for (let i = 0; i < 4; i++) {
       const sl = this.slots[i], k = KEYS[i], a = def.abilities[k], rank = me.ranks[k], cd = me.cds[i];
       if (cd > this.prevCd[i]) this.cdTotal[i] = cd;
-      if (this.prevCd[i] > 0 && cd === 0) { sl.el.classList.remove('flash'); void sl.el.offsetWidth; sl.el.classList.add('flash'); }
+      if (this.prevCd[i] > 0 && cd === 0) sl.el.animate(READY_FLASH, 400);
       this.prevCd[i] = cd;
-      setStyle(sl.cd, 'background', cdMask(cd > 0 ? cd / this.cdTotal[i] : 0));
-      setText(sl.cdn, cd > 0 ? secs(cd) : '');
+      setSweep(sl.cd, cd > 0 ? cd / this.cdTotal[i] : 0);
+      setNum(sl.cdn, cd > 0 ? cdKey(cd) : 0, cdLabel);
       const cost = rank > 0 ? (typeof a.cost === 'function' ? 0 : byRank(a.cost || 0, rank)) : 0;
-      const pool = { mana: me.mana, ink: me.resource, swarm: me.resource, gold: me.gold }[a.costType || def.resource];
-      toggle(sl.el, 'locked', rank <= 0 || me.dead); toggle(sl.el, 'poor', rank > 0 && pool !== undefined && pool < cost);
+      const pool = resourcePool(me, a.costType || def.resource);
+      toggle(sl.el, 'locked', rank <= 0 || me.dead); toggle(sl.el, 'poor', rank > 0 && pool >= 0 && pool < cost);
       toggle(sl.el, 'ready', rank > 0 && cd === 0 && !me.dead);
-      if (rank !== this.prevRanks[k]) { const first = this.prevRanks[k] < 0; this.prevRanks[k] = rank; sl.pips.forEach((p, r) => p.classList.toggle('on', r < rank)); if (!first) sl.el.animate([{ transform: 'translateY(-6px)' }, { transform: 'none' }], { duration: 300, easing: 'ease-out' }); }
+      if (rank !== this.prevRanks[k]) { const first = this.prevRanks[k] < 0; this.prevRanks[k] = rank; sl.pips.forEach((p, r) => p.classList.toggle('on', r < rank)); if (!first) sl.el.animate(RANK_UP, 300); }
     }
-    for (let i = 0; i < 2; i++) { const cd = me.spellCds[i], total = i === 0 ? 900 : 1800; setStyle(this.spells[i].cd, 'background', cdMask(cd / total)); setText(this.spells[i].cdn, cd > 0 ? secs(cd) : ''); toggle(this.spells[i].el, 'locked', me.dead); }
+    for (let i = 0; i < 2; i++) { const cd = me.spellCds[i]; setSweep(this.spells[i].cd, cd / (i === 0 ? 900 : 1800)); setNum(this.spells[i].cdn, cd > 0 ? cdKey(cd) : 0, cdLabel); toggle(this.spells[i].el, 'locked', me.dead); }
     // items + gold
     for (let i = 0; i < this.items.length; i++) {
-      const el = this.items[i], key = me.items[i], it = key && w.registry.items[key];
-      toggle(el, 'full', !!it); setText(el.children[1], it ? short(it.name) : '');
+      const el = this.items[i], key = me.items[i], it = key ? w.registry.items[key] : null;
+      if (el._key !== key) { el._key = key; toggle(el, 'full', !!it); el.children[1].textContent = it ? short(it.name) : ''; }
       const until = it && it.active ? (me.itemState[key + ':cd'] || 0) : 0;
-      setStyle(el.children[2], 'background', until > t ? cdMask((until - t) / (it.activeCd * 30)) : '');
+      setSweep(el.children[2], until > t ? (until - t) / (it.activeCd * TICK_HZ) : 0);
     }
-    setText(this.gold, String(Math.floor(me.gold)));
+    setNum(this.gold, Math.floor(me.gold));
     toggle(this.goldBtn, 'shop-here', canShop(me) && me.gold >= 900 && me.items.length < RULES.MAX_ITEMS);
   }
-  dispose() { this.untap(); this.el.remove(); this.tip.hide(); }
+  dispose() { this.untap(); this.strip.dispose(); this.el.remove(); this.tip.hide(); }
 }
