@@ -19,7 +19,7 @@ async function boot() {
   const bench = params.get('bench');
   const quality = params.get('quality') || defaultQuality();
   const seed = +(params.get('seed') || 7);
-  const game = startSpectate({ canvas, lib, seed, quality, telemetry, timeScale: +(params.get('speed') || 1), skipSeconds: +(params.get('skip') || 0) });
+  const game = startSpectate({ canvas, lib, seed, quality, telemetry, timeScale: +(params.get('speed') || 1), skipSeconds: +(params.get('skip') || 0), fixedBuffer: params.get('cpu') ? [160, 90] : null });
   window.__game = game;
   if (bench) {
     const warm = +(params.get('warmup') || 5), secs = +(params.get('seconds') || 90);

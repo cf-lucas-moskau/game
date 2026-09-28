@@ -1,6 +1,6 @@
 // Visuals for every simulated unit. Reads world state, never writes it.
 import * as THREE from 'three';
-import { S, TEAM_COLORS } from './palette.js';
+import { S, TEAM_COLORS, TEAM_RGB, WHITE_RGB } from './palette.js';
 import { KIND, isMinion } from '../sim/constants.js';
 import { HERO_LOOKS, MINION_LOOKS, STRUCTURE_LOOKS, CLIPS } from '../assets/manifest.js';
 import { bakeVAT, vatMaterial } from './vat.js';
@@ -172,12 +172,12 @@ class MinionBatch {
     const i = this.count++;
     tmpObj.position.set(x, -sink, z); tmpObj.rotation.set(0, yaw, 0); tmpObj.scale.setScalar(1); tmpObj.updateMatrix();
     this.mesh.setMatrixAt(i, tmpObj.matrix);
-    if (this.static) { tmpColor.set(tint).lerp(new THREE.Color('#ffffff'), 0.5 + flash * 0.5); this.mesh.setColorAt(i, tmpColor); return; }
+    if (this.static) { tmpColor.copy(tint).lerp(WHITE_RGB, 0.5 + flash * 0.5); this.mesh.setColorAt(i, tmpColor); return; }
     const c = this.vat.clips[CLIPS[clip]] || this.vat.clips[CLIPS.idle];
     let f = (t / c.duration) * c.frames; f = loop ? f % c.frames : Math.min(c.frames - 1.001, f);
     const a = Math.floor(f), b = loop ? (a + 1) % c.frames : Math.min(c.frames - 1, a + 1);
     this.iFrame.setXYZ(i, c.start + a, c.start + b, f - a);
-    tmpColor.set(tint); this.iTint.setXYZW(i, tmpColor.r, tmpColor.g, tmpColor.b, 0.12 + flash * 0.6);
+    this.iTint.setXYZW(i, tint.r, tint.g, tint.b, 0.12 + flash * 0.6);
   }
   end() {
     this.mesh.count = this.count; this.mesh.instanceMatrix.needsUpdate = true;
@@ -222,7 +222,7 @@ class StructureViews {
   update(world, dt, now) {
     this.towers.forEach((t, i) => {
       const dead = !t.alive; const k = this.collapse[i] = dead ? Math.min(1, this.collapse[i] + dt * 0.8) : 0;
-      const col = new THREE.Color(TEAM_COLORS[t.team]);
+      const col = TEAM_RGB[t.team];
       for (const p of this.parts) {
         tmpObj.position.set(t.x * S, p.y * (1 - k * 0.85) - k * 1.2, t.y * S); tmpObj.rotation.set(k * 0.3, t.team ? Math.PI : 0, k * 0.2); tmpObj.scale.set(1, 1 - k * 0.6, 1); tmpObj.updateMatrix();
         p.mesh.setMatrixAt(i, tmpObj.matrix);
@@ -241,10 +241,11 @@ class StructureViews {
       tmpObj.rotation.set(0, now * 0.4 * (i ? -1 : 1), 0); const hs = dead ? 0.001 : 1 + (this.hitFlash.get(h.id) || 0) * 0.08; tmpObj.scale.set(hs * 0.6, hs, hs * 0.6); tmpObj.updateMatrix();
       this.heartMesh.setMatrixAt(i, tmpObj.matrix);
       const pulse = h.vulnerable ? 0.6 + 0.4 * Math.sin(now * (4 + (1 - r) * 10)) : 0.8;
-      this.heartMesh.setColorAt(i, tmpColor.set(TEAM_COLORS[h.team]).multiplyScalar(pulse));
+      this.heartMesh.setColorAt(i, tmpColor.copy(TEAM_RGB[h.team]).multiplyScalar(pulse));
       const fl = this.hitFlash.get(h.id) || 0; if (fl) this.hitFlash.set(h.id, Math.max(0, fl - dt * 4));
     });
-    for (const m of [...this.parts.map((p) => p.mesh), this.crystals, this.flags, this.heartMesh]) { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; }
+    if (!this.allMeshes) this.allMeshes = [...this.parts.map((p) => p.mesh), this.crystals, this.flags, this.heartMesh];
+    for (const m of this.allMeshes) { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; }
   }
   flash(id) { this.hitFlash.set(id, 1); }
 }
@@ -272,6 +273,7 @@ class BeeSwarm {
 }
 
 // ---------------------------------------------------------------- manager
+const BATCH_KEYS = [0, 1].map((t) => ({ [KIND.MELEE]: `${t}:melee`, [KIND.RANGED]: `${t}:ranged`, [KIND.SIEGE]: `${t}:siege` }));
 export class UnitRenderer {
   constructor(lib, world, parent) {
     this.lib = lib; this.parent = parent; this.heroViews = new Map(); this.pebbleViews = new Map();
@@ -283,6 +285,7 @@ export class UnitRenderer {
     this.corpses = [];      // dying minions kept visible while the die clip plays
     this.flashes = new Map();
   }
+  batchFor(team, kind) { return this.batches[BATCH_KEYS[team][kind]]; }
   kindName(k) { return k === KIND.MELEE ? 'melee' : k === KIND.RANGED ? 'ranged' : 'siege'; }
   onEvent(e, world, now) {
     // called by the renderer for each sim event before update
@@ -291,11 +294,13 @@ export class UnitRenderer {
     else if (e.type === 1) { this.flashes.set(e.a, 1); const t = world.entities[e.a]; if (t && (t.kind === KIND.TOWER || t.kind === KIND.HEART)) this.structures.flash(t.id); }
     else if (e.type === 3) {
       const v = world.entities[e.a];
-      if (v && isMinion(v.kind)) this.corpses.push({ x: v.x * S, z: v.y * S, yaw: faceToRotY(v.facing), team: v.team, kind: this.kindName(v.kind), start: now });
+      if (v && isMinion(v.kind)) this.corpses.push({ x: v.x * S, z: v.y * S, yaw: faceToRotY(v.facing), team: v.team, key: `${v.team}:${this.kindName(v.kind)}`, start: now });
     }
   }
   update(world, alpha, dt, now) {
-    for (const b of Object.values(this.batches)) b.begin();
+    this.world = world;
+    if (!this.batchList) this.batchList = Object.values(this.batches);
+    for (const b of this.batchList) b.begin();
     const es = world.entities;
     for (let i = 0; i < es.length; i++) {
       const e = es[i];
@@ -317,17 +322,17 @@ export class UnitRenderer {
       if ((a.clip === 'attack' || a.clip === 'shoot') && now - a.start < 0.6) clip = a.clip; else a.clip = clip;
       const fl = this.flashes.get(e.id) || 0; if (fl) this.flashes.set(e.id, Math.max(0, fl - dt * 6));
       const t = clip === a.clip && (clip === 'attack' || clip === 'shoot') ? now - a.start : now + e.id * 0.37;
-      this.batches[`${e.team}:${this.kindName(e.kind)}`].push(lerp(e.px, e.x, alpha) * S, lerp(e.py, e.y, alpha) * S, faceToRotY(e.facing), clip, t, clip === 'walk' || clip === 'idle', TEAM_COLORS[e.team], fl);
+      this.batchFor(e.team, e.kind).push(lerp(e.px, e.x, alpha) * S, lerp(e.py, e.y, alpha) * S, faceToRotY(e.facing), clip, t, clip === 'walk' || clip === 'idle', TEAM_RGB[e.team], fl);
     }
     // corpses: play die clip, then sink into the whale
     let w = 0;
     for (const c of this.corpses) {
       const age = now - c.start; if (age > 2.2) continue; this.corpses[w++] = c;
-      this.batches[`${c.team}:${c.kind}`].push(c.x, c.z, c.yaw, 'die', age, false, TEAM_COLORS[c.team], 0, Math.max(0, age - 1.3) * 0.8);
+      this.batches[c.key].push(c.x, c.z, c.yaw, 'die', age, false, TEAM_RGB[c.team], 0, Math.max(0, age - 1.3) * 0.8);
     }
     this.corpses.length = w;
-    for (const b of Object.values(this.batches)) b.end();
-    for (const [id, v] of this.pebbleViews) if (!es[id] || !es[id].alive || es[id].kind !== KIND.PEBBLE) { v.removeFromParent(); this.pebbleViews.delete(id); }
+    for (const b of this.batchList) b.end();
+    if (this.pebbleViews.size) this.pebbleViews.forEach(this._prunePebble || (this._prunePebble = (v, id) => { const x = this.world.entities[id]; if (!x || !x.alive || x.kind !== KIND.PEBBLE) { v.removeFromParent(); this.pebbleViews.delete(id); } }));
     this.structures.update(world, dt, now);
     this.bees.update(world, alpha, now);
   }

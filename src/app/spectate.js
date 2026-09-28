@@ -7,13 +7,13 @@ import { FixedLoop } from '../core/fixed-loop.js';
 import { TICK_HZ } from '../sim/constants.js';
 import { GameRenderer } from '../render/renderer.js';
 
-export function startSpectate({ canvas, lib, seed = 1, quality = 'medium', telemetry, heroes = null, difficulty = 'medium', timeScale = 1, skipSeconds = 0 }) {
+export function startSpectate({ canvas, lib, seed = 1, quality = 'medium', telemetry, heroes = null, difficulty = 'medium', timeScale = 1, skipSeconds = 0, fixedBuffer = null }) {
   const roster = (heroes || [...HERO_KEYS]).map((k, p) => ({ playerId: p, heroKey: k, team: p < 3 ? 0 : 1, isBot: true }));
   const world = createMatch({ seed, roster, content: CONTENT });
   const dir = new BotDirector(world, difficulty); const cmds = [];
   while (world.tick < skipSeconds * TICK_HZ && !world.state.over) { dir.commands(world, cmds); world.step(cmds); }
   world.events.drain(() => {});
-  const renderer = new GameRenderer(canvas, lib, world, { quality, telemetry });
+  const renderer = new GameRenderer(canvas, lib, world, { quality, telemetry, fixedBuffer });
   renderer.focusId = world.heroes[0].id;
   let last = performance.now();
   const loop = new FixedLoop({ hz: TICK_HZ,
@@ -25,7 +25,7 @@ export function startSpectate({ canvas, lib, seed = 1, quality = 'medium', telem
       const f = world.entities[renderer.focusId];
       if (!f || f.dead) { const alive = world.heroes.find((h) => !h.dead); if (alive) renderer.focusId = alive.id; }
       renderer.render(alpha, dt);
-      if (telemetry) telemetry.gauges.entities = world.entities.filter((e) => e.alive).length;
+      if (telemetry && (world.tick & 31) === 0) { let n = 0; for (const e of world.entities) if (e.alive) n++; telemetry.gauges.entities = n; }
     } });
   loop.timeScale = timeScale;
   loop.start();

@@ -26,6 +26,9 @@ export function createEntity() {
     damagers: null, // [id, tick] pairs for assists
     bornTick: 0, statsDirty: true, idleTicks: 0, isBot: false, channelUntil: 0, channelSlot: -1, castLockUntil: 0,
     heroState: null,
+    // declared up front so every record shares one hidden class (no dictionary mode, no boxed doubles)
+    vulnerable: false, tier: 0, laneOffset: 0, aiControlled: false, moving: false, onDashTick: null,
+    lastHeroHitTick: -9999, lensUntil: 0, lensBy: -1,
   };
 }
 export function resetEntity(e) {

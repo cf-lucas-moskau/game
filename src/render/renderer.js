@@ -10,13 +10,17 @@ import { PostFX } from './post.js';
 import { QUALITY, ResolutionGuard } from './quality.js';
 
 export class GameRenderer {
-  constructor(canvas, lib, world, { quality = 'medium', telemetry = null } = {}) {
+  constructor(canvas, lib, world, { quality = 'medium', telemetry = null, fixedBuffer = null } = {}) {
+    this.fixedBuffer = fixedBuffer; // [w, h]: CPU-measurement mode renders the full scene into a tiny buffer
     this.canvas = canvas; this.lib = lib; this.world = world; this.telemetry = telemetry;
     this.q = QUALITY[quality] || QUALITY.medium;
     const gl = new THREE.WebGLRenderer({ canvas, antialias: !this.q.post && this.q.name !== 'low', powerPreference: 'high-performance', alpha: false, stencil: false });
     gl.outputColorSpace = THREE.SRGBColorSpace; gl.toneMapping = THREE.ACESFilmicToneMapping; gl.toneMappingExposure = 1.05;
     gl.shadowMap.enabled = this.q.shadows; gl.shadowMap.type = THREE.PCFSoftShadowMap;
     gl.info.autoReset = false;
+    // opaque draws grouped by program/material first, then front-to-back: fewer program and
+    // uniform re-uploads (the biggest source of per-frame allocation inside three.js)
+    gl.setOpaqueSort((a, b) => a.groupOrder - b.groupOrder || a.renderOrder - b.renderOrder || a.material.id - b.material.id || a.z - b.z || a.id - b.id);
     this.gl = gl;
     if (telemetry) { const ext = gl.getContext().getExtension('WEBGL_debug_renderer_info'); telemetry.gpu = ext ? gl.getContext().getParameter(ext.UNMASKED_RENDERER_WEBGL) : 'unknown'; }
     this.scene = new THREE.Scene();
@@ -33,7 +37,8 @@ export class GameRenderer {
   }
   resize() {
     const w = this.canvas.clientWidth || innerWidth, h = this.canvas.clientHeight || innerHeight;
-    const dpr = Math.min(devicePixelRatio || 1, 2) * this.q.pixelRatio * this.guard.scale;
+    let dpr = Math.min(devicePixelRatio || 1, 2) * this.q.pixelRatio * this.guard.scale;
+    if (this.fixedBuffer) { dpr = this.fixedBuffer[0] / w; this.guard.enabled = false; }
     this.gl.setPixelRatio(dpr); this.gl.setSize(w, h, false);
     this.camera.aspect = w / h; this.camera.updateProjectionMatrix();
     if (this.post) this.post.setSize(Math.floor(w * dpr), Math.floor(h * dpr));
@@ -60,7 +65,8 @@ export class GameRenderer {
   /** Draw one frame. alpha = interpolation between previous and current sim tick. */
   render(alpha, dt) {
     const t0 = performance.now(); this.now += dt; const w = this.world;
-    w.events.drain((e) => { this.units.onEvent(e, w, this.now); for (const x of this.extra) if (x.onEvent) x.onEvent(e, w, this.now, this); });
+    if (!this._onEvent) this._onEvent = (e) => { this.units.onEvent(e, this.world, this.now); for (const x of this.extra) if (x.onEvent) x.onEvent(e, this.world, this.now, this); };
+    w.events.drain(this._onEvent);
     this.env.update(dt, w);
     this.units.update(w, alpha, dt, this.now);
     const me = w.entities[this.focusId];
@@ -69,13 +75,15 @@ export class GameRenderer {
     this.projectiles.update(w, alpha);
     for (const x of this.extra) x.update(w, alpha, dt, this.now, this);
     this.updateCamera(alpha, dt);
+    const tSubmit = performance.now();
     this.gl.info.reset();
     if (this.post) this.post.render(this.scene, this.camera, this.gl.info); else { this.gl.setRenderTarget(null); this.gl.render(this.scene, this.camera); }
     // scene draw calls (post-processing fullscreen passes are a fixed, separately reported cost)
     const sceneCalls = this.post ? this.post.sceneCalls : this.gl.info.render.calls;
     const cpu = performance.now() - t0;
     if (this.telemetry) {
-      this.telemetry.render.push(cpu); this.telemetry.draws.push(sceneCalls); this.telemetry.tris.push(this.gl.info.render.triangles);
+      this.telemetry.render.push(cpu); this.telemetry.renderUpdate.push(tSubmit - t0); this.telemetry.renderSubmit.push(performance.now() - tSubmit);
+      this.telemetry.draws.push(sceneCalls); this.telemetry.tris.push(this.gl.info.render.triangles);
       this.telemetry.gauges.postPasses = this.post ? this.gl.info.render.calls - sceneCalls : 0;
       this.telemetry.gauges.quality = this.q.name;
       const ft = this.telemetry.frame.count ? this.telemetry.frame.last() : 16;

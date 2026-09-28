@@ -202,7 +202,7 @@ function economySystem(w) {
     if (h.dead) {
       if (t >= h.respawnAt) {
         h.dead = false; h.hp = h.maxHp; h.mana = h.maxMana;
-        const slot = w.heroes.filter((x) => x.team === h.team).indexOf(h);
+        let slot = 0; for (const x of w.heroes) { if (x === h) break; if (x.team === h.team) slot++; }
         h.x = h.px = sideX(h.team, MAP.FOUNTAIN_X + 40); h.y = h.py = 330 + slot * 120;
         h.order = ORDER.IDLE; h.targetId = -1; h.invulnUntil = t + sec(1);
         const def = w.registry.heroes[h.heroKey]; if (def.onRespawn) def.onRespawn(w, h);
@@ -214,13 +214,17 @@ function economySystem(w) {
   // fountain: heal allies, shred enemies
   if (t % 3 === 0) for (const team of [TEAM.BLUE, TEAM.RED]) {
     const fx = sideX(team, MAP.FOUNTAIN_X);
-    w.forEachInRadius(fx, 450, MAP.FOUNTAIN_R, team, 'any', (u) => {
-      if (u.kind !== KIND.HERO && u.kind !== KIND.PEBBLE) { if (u.team !== team && u.kind !== KIND.TOWER && u.kind !== KIND.HEART) dealDamage(w, null, u, RULES.FOUNTAIN_DPS / 10, DMG.TRUE); return; }
+    const list = FOUNT; list.length = 0;
+    const ids = w.scratch, n = w.hash.query(fx, 450, MAP.FOUNTAIN_R + 130, ids);
+    for (let i = 0; i < n; i++) { const u = w.entities[ids[i]]; if (u.alive && !u.dead && (u.x - fx) ** 2 + (u.y - 450) ** 2 <= (MAP.FOUNTAIN_R + u.radius) ** 2) list.push(u); }
+    for (const u of list) {
+      if (u.kind !== KIND.HERO && u.kind !== KIND.PEBBLE) { if (u.team !== team && u.kind !== KIND.TOWER && u.kind !== KIND.HEART) dealDamage(w, null, u, RULES.FOUNTAIN_DPS / 10, DMG.TRUE); continue; }
       if (u.team === team) { heal(w, null, u, u.maxHp * RULES.FOUNTAIN_HEAL_PCT / 10, true); u.mana = Math.min(u.maxMana, u.mana + u.maxMana * 0.012); }
-      else dealDamage(w, null, u, RULES.FOUNTAIN_DPS / 10, DMG.TRUE, { source: 'fountain' });
-    }, true);
+      else dealDamage(w, null, u, RULES.FOUNTAIN_DPS / 10, DMG.TRUE, FOUNTAIN_SRC);
+    }
   }
 }
+const FOUNT = [], FOUNTAIN_SRC = Object.freeze({ source: 'fountain' });
 function onStructureDown(w, s) {
   const mine = w.structures.filter((x) => x.team === s.team && x.alive && x !== s);
   if (s.kind === KIND.TOWER) {

@@ -10,6 +10,7 @@ const inRange = (a, b, extra = 0) => {
   return dx * dx + dy * dy <= r * r;
 };
 
+const BASIC = Object.freeze({ basic: true });
 /** Called when a basic attack lands. */
 export function basicHit(world, src, target) {
   if (!src.alive || src.dead || !target.alive || target.dead) return;
@@ -18,7 +19,7 @@ export function basicHit(world, src, target) {
   if (isMinion(src.kind) && isStructure(target.kind)) dmg *= src.kind === KIND.SIEGE ? 3 : 1.3;
   if (src.kind === KIND.HERO && isStructure(target.kind)) dmg *= 1.0;
   if (src.kind === KIND.TOWER && isMinion(target.kind)) dmg = target.maxHp * (target.kind === KIND.SIEGE ? 0.14 : target.kind === KIND.MELEE ? 0.45 : 0.7);
-  const opts = { basic: true };
+  const opts = BASIC;
   const hero = src.kind === KIND.HERO ? world.registry.heroes[src.heroKey] : null;
   if (hero && hero.onBasicAttack) dmg = hero.onBasicAttack(world, src, target, dmg) ?? dmg;
   if (src.kind === KIND.HERO) for (const k of src.items) { const it = world.registry.items[k]; if (it && it.onBasicHit) it.onBasicHit(world, src, target); }
@@ -41,12 +42,12 @@ function releaseAttack(world, e) {
   if (!inRange(e, tg, 120)) return;
   if (e.projectileSpeed > 0) {
     const kind = e.kind === KIND.TOWER ? 'tower-bolt' : e.kind === KIND.HERO ? `${e.heroKey}-auto` : e.kind === KIND.SIEGE ? 'siege-shot' : 'minion-bolt';
-    spawnProjectile(world, { kind, owner: e.id, team: e.team, x: e.x, y: e.y, speed: e.projectileSpeed, targetId: tg.id,
-      onHit: (w, p, t) => { const s = w.get(p.owner); if (s) basicHit(w, s, t); } });
+    spawnProjectile(world, { kind, owner: e.id, team: e.team, x: e.x, y: e.y, speed: e.projectileSpeed, targetId: tg.id, onHit: autoHit });
     if (e.kind === KIND.TOWER) world.events.push(EV.TOWER_SHOT, world.tick, e.id, tg.id, e.x, e.y);
   } else basicHit(world, e, tg);
 }
 
+const autoHit = (w, p, t) => { const s = w.get(p.owner); if (s) basicHit(w, s, t); };
 export function combatSystem(world) {
   const es = world.entities, t = world.tick;
   for (let i = 0; i < es.length; i++) {
@@ -61,7 +62,7 @@ export function combatSystem(world) {
     else if (e.kind === KIND.PEBBLE && e.aiControlled) pebbleThink(world, e);
     else if (e.kind === KIND.HERO && e.order === ORDER.ATTACK_MOVE && (t + e.id) % 4 === 0) {
       const cur = world.get(e.targetId);
-      if (!cur || !inRange(e, cur, 200)) { const n = world.nearestEnemy(e.x, e.y, e.range + 250, e.team, (u) => !isStructure(u.kind) || u.vulnerable); e.targetId = n ? n.id : -1; }
+      if (!cur || !inRange(e, cur, 200)) { const n = world.nearestEnemy(e.x, e.y, e.range + 250, e.team, attackable); e.targetId = n ? n.id : -1; }
     }
     const tg = e.targetId >= 0 ? world.get(e.targetId) : null;
     if (!tg || !isTargetable(tg, t) || tg.team === e.team || (isStructure(tg.kind) && !tg.vulnerable)) {
@@ -73,6 +74,9 @@ export function combatSystem(world) {
 }
 
 // ---- unit AI --------------------------------------------------------------------
+const attackable = (u) => !isStructure(u.kind) || u.vulnerable;
+const notFortified = (u) => u.kind !== KIND.HEART && u.kind !== KIND.TOWER;
+const Q = [];
 function minionThink(world, e) {
   const t = world.tick;
   const goalX = e.team === 0 ? LANE.W - 300 : 300;
@@ -81,13 +85,15 @@ function minionThink(world, e) {
   if ((t + e.id) % 5 === 0 || !valid) {
     // call for help: enemy hero that hit an allied hero nearby recently
     let best = null, bestScore = Infinity;
-    world.forEachInRadius(e.x, e.y, 520, e.team, 'enemy', (u) => {
-      if (isStructure(u.kind) && !u.vulnerable) return;
+    world.query(e.x, e.y, 520, e.team, 1, Q);
+    for (let i = 0; i < Q.length; i++) {
+      const u = Q[i];
+      if (isStructure(u.kind) && !u.vulnerable) continue;
       let score = (u.x - e.x) ** 2 + (u.y - e.y) ** 2;
       if (u.kind === KIND.HERO) score += (t - (u.lastHeroHitTick || -9999) < sec(2)) ? -200000 : 400000;
       if (isStructure(u.kind)) score += 150000;
       if (score < bestScore || (score === bestScore && u.id < best.id)) { bestScore = score; best = u; }
-    });
+    }
     if (best && (!valid || best.id !== e.targetId) && (!valid || bestScore < -100000 || !inRange(e, cur))) e.targetId = best.id;
     else if (!best) e.targetId = -1;
   }
@@ -101,21 +107,24 @@ function towerThink(world, e) {
   // hero aggro: enemy hero that damaged an allied hero within range in the last 2 s
   let aggro = null;
   if ((t + e.id) % 3 === 0) {
-    world.forEachInRadius(e.x, e.y, e.range, e.team, 'enemy', (u) => {
+    world.query(e.x, e.y, e.range, e.team, 1, Q);
+    outer: for (let i = 0; i < Q.length; i++) {
+      const u = Q[i];
       if (u.kind === KIND.HERO && t - (u.lastHeroHitTick || -9999) < sec(2)) {
         // was the hit against an ally inside tower range?
-        for (const h of world.heroes) if (h.team === e.team && !h.dead && t - h.lastHeroDamageTick < sec(2) && (h.x - e.x) ** 2 + (h.y - e.y) ** 2 < (e.range + 200) ** 2) { aggro = u; return false; }
+        for (const h of world.heroes) if (h.team === e.team && !h.dead && t - h.lastHeroDamageTick < sec(2) && (h.x - e.x) ** 2 + (h.y - e.y) ** 2 < (e.range + 200) ** 2) { aggro = u; break outer; }
       }
-    });
+    }
   }
   if (aggro) { e.targetId = aggro.id; return; }
   if (valid) return;
   let best = null, bd = Infinity;
-  world.forEachInRadius(e.x, e.y, e.range, e.team, 'enemy', (u) => {
-    if (u.kind === KIND.HEART) return;
+  world.query(e.x, e.y, e.range, e.team, 1, Q);
+  for (let i = 0; i < Q.length; i++) {
+    const u = Q[i]; if (u.kind === KIND.HEART) continue;
     let d = (u.x - e.x) ** 2 + (u.y - e.y) ** 2; if (u.kind === KIND.HERO || u.kind === KIND.PEBBLE) d += 1e7;
     if (d < bd || (d === bd && u.id < best.id)) { bd = d; best = u; }
-  });
+  }
   e.targetId = best ? best.id : -1;
 }
 function pebbleThink(world, e) {
@@ -124,11 +133,11 @@ function pebbleThink(world, e) {
   if ((t + e.id) % 4) return;
   const tg = world.get(e.targetId);
   if (tg && isTargetable(tg, t) && inRange(e, tg, 150)) return;
-  const n = world.nearestEnemy(e.x, e.y, 420, e.team, (u) => u.kind !== KIND.HEART && u.kind !== KIND.TOWER);
+  const n = world.nearestEnemy(e.x, e.y, 420, e.team, notFortified);
   if (n) { e.targetId = n.id; e.order = ORDER.ATTACK; }
   else if (owner && !owner.dead) {
     e.targetId = -1;
-    const d = Math.hypot(owner.x - e.x, owner.y - e.y);
+    const d = Math.sqrt((owner.x - e.x) ** 2 + (owner.y - e.y) ** 2);
     if (d > 260) { e.order = ORDER.MOVE; e.moveX = owner.x - 120 * Math.cos(owner.facing); e.moveY = owner.y - 120 * Math.sin(owner.facing); }
   }
 }

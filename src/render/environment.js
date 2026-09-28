@@ -37,12 +37,13 @@ export class Environment {
     this.tilt = 0;
   }
   buildLights() {
-    const hemi = new THREE.HemisphereLight('#8f9dff', '#3a2448', 0.75); this.scene.add(hemi);
+    const hemi = new THREE.HemisphereLight('#8fa6ff', '#3a2448', 0.9); this.scene.add(hemi);
     const sun = new THREE.DirectionalLight('#ffc98f', 3.1); sun.position.copy(this.uniforms.uSun.value).multiplyScalar(40);
     sun.castShadow = this.quality.shadows;
     if (sun.castShadow) { sun.shadow.mapSize.set(2048, 2048); const c = sun.shadow.camera; c.left = -14; c.right = 14; c.top = 12; c.bottom = -12; c.near = 1; c.far = 90; sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.02; }
     this.sun = sun; this.scene.add(sun); this.scene.add(sun.target);
-    const rim = new THREE.DirectionalLight('#7fd6ff', 0.6); rim.position.set(10, 8, 30); this.scene.add(rim);
+    // (a cool rim light was removed: a third light re-uploads per material every frame for little visual gain;
+    //  the hemisphere's cool sky term carries the same role)
   }
   buildSky() {
     const g = new THREE.SphereGeometry(600, 32, 16);
