@@ -28,3 +28,19 @@ All six heroes as self-contained modules in `src/sim/heroes/`, registered in `in
 Engine additions: `modifyStats` can set range, projectile speed, radius and health multiplier;
 `selfHealOnly` heal rule; hero `init` now runs before the first stat computation.
 Tests cover every signature mechanic plus a 150 s six-hero determinism run.
+
+```
+== 1/3 unit + determinism tests
+   ✓ heroes > every hero casts every ability in a chaotic 3v3 without errors, deterministically 1540ms
+   ✓ simulation > is deterministic for the same seed and commands 1136ms
+   ✓ simulation > whale roll cycles through warn, roll and back to idle 567ms
+   ✓ simulation > heroes gain gold, xp and levels, and structures take damage 834ms
+      Tests  20 passed (20)
+   Start at  12:31:20
+   Duration  5.55s (transform 198ms, setup 0ms, collect 307ms, tests 4.43s, environment 1ms, prepare 253ms)
+== 2/3 production build
+   dist/index.html: 1 KB
+== 3/3 performance benchmark vs budgets
+   (bench harness not present yet)
+ALL CHECKS PASSED
+```
