@@ -15,10 +15,10 @@ case "$cmd" in
     f=$(ls docs/prs/$num-*.md); branch=$(basename "$f" .md | cut -d- -f2-)
     title=$(head -1 "$f" | sed 's/^# //')
     git checkout -q "$branch"
-    commit=$(git rev-parse HEAD); missing=""
+    commit=$(bash scripts/check.sh key); missing=""
     for s in $(bash scripts/check.sh list); do [ -f ".gate/$commit/$s.ok" ] || missing="$missing $s"; done
     if [ -n "$missing" ]; then echo "GATE INCOMPLETE for $commit, run: scripts/check.sh <step> for:$missing"; exit 1; fi
-    { echo; echo "## Gate results ($commit)"; echo '```'; for s in $(bash scripts/check.sh list); do echo "--- $s"; grep -E "PASS|FAIL|passed|slope|SOAK|GATE|E2E|Tests|KB|info " ".gate/$commit/$s.log" | tail -30; done; echo '```'; } >> "$f"
+    { echo; echo "## Gate results (gate key $commit, commit $(git rev-parse --short HEAD))"; echo '```'; for s in $(bash scripts/check.sh list); do echo "--- $s"; { grep -E "PASS|FAIL|passed|slope|SOAK|GATE|E2E|Tests|KB|info |frames" ".gate/$commit/$s.log" || true; } | tail -30; done; echo '```'; } >> "$f"
     git add "$f" && git commit -q -m "docs(pr-$2): record gate results"
     git checkout -q main && git merge -q --no-ff "$branch" -m "Merge $title" && git branch -q -d "$branch"
     echo "merged $title";;
