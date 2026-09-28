@@ -10,7 +10,7 @@ page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') 
 page.on('pageerror', (e) => logs.push(`pageerror: ${e.message}`));
 await page.goto(`file://${process.cwd()}/dist/index.html${q}`);
 await page.waitForTimeout(+wait * 1000);
-await page.screenshot({ path: out });
+await page.screenshot({ path: out, timeout: 120000 });
 const perf = await page.evaluate(() => window.__perf && window.__perf.summary());
 console.log(JSON.stringify(perf && { fps: perf.fps, frameP95Ms: perf.frameP95Ms, simTickP95Ms: perf.simTickP95Ms, renderCpuP95Ms: perf.renderCpuP95Ms, drawCallsMax: perf.drawCallsMax, trianglesMax: perf.trianglesMax, gpu: perf.gpu, entities: perf.entities }));
 console.log(logs.slice(0, 15).join('\n'));

@@ -20,8 +20,9 @@ const quick = args.has('--quick') || args.has('--gate');
 // frames are sampled; `full` renders at real resolution for frame-time / GPU reporting.
 const MIN_FRAMES = 200; // p95 from >= 200 samples keeps at least 10 samples in the tail
 const SCENARIOS = [
-  { name: 'desktop-medium', viewport: { width: 1280, height: 720 }, query: 'quality=medium&skip=150', seconds: quick ? 30 : 90 },
-  { name: 'mobile-low', viewport: { width: 844, height: 390 }, mobile: true, cpuThrottle: 4, query: 'quality=low&skip=150', seconds: quick ? 70 : 120 },
+  { name: 'desktop-medium', viewport: { width: 1280, height: 720 }, query: 'quality=medium&skip=150&spectate=1', seconds: quick ? 30 : 90 },
+  { name: 'play-ping100', viewport: { width: 1280, height: 720 }, query: 'quality=medium&skip=60&play=auto&ping=100&jitter=15&loss=0.01', seconds: quick ? 30 : 90 },
+  { name: 'mobile-low', viewport: { width: 844, height: 390 }, mobile: true, cpuThrottle: 4, query: 'quality=low&skip=150&play=auto&ping=100&jitter=20&loss=0.02', seconds: quick ? 70 : 120 },
 ];
 const lowerIsBetter = (k) => !/fps/i.test(k);
 
