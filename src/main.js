@@ -29,7 +29,8 @@ async function boot() {
   else {
     const heroKey = HERO_KEYS.includes(params.get('hero')) ? params.get('hero') : null;
     const net = { ping: num('ping', 0), jitter: num('jitter', 0), loss: num('loss', 0) };
-    game = new GameSession({ ...common, heroKey, net, autopilot: params.get('play') === 'auto', difficulty: params.get('bots') || 'medium' });
+    const heroes = params.get('heroes') ? params.get('heroes').split(',') : null;
+    game = new GameSession({ ...common, heroKey, heroes, net, autopilot: params.get('play') === 'auto', difficulty: params.get('bots') || 'medium' });
     const toggle = (what) => window.dispatchEvent(new CustomEvent('ll-toggle', { detail: what }));
     const inputs = [];
     if (params.get('play') !== 'auto') {
