@@ -9,7 +9,7 @@
 | Render CPU p95 (update + submission) | 6 ms | report only | yes |
 | Frame time p95 / p99 | 16.7 / 20 ms | report only | yes |
 | GC pause max (thread CPU time) | 5 ms | yes | yes |
-| Heap growth (after forced GC) | 5 MB / 10 min | yes | yes |
+| Heap growth (retained-heap slope, `tools/soak.mjs`, 2.5 min) | 5 MB / 10 min | yes (soak step) | yes |
 | Scene draw calls | 50 | yes | yes |
 | Load to first frame | 4 s | yes | yes |
 | Input latency (input to displayed response) | 1 frame + 20 ms (desktop), + 30 ms (mobile) | once input lands | yes |
@@ -64,3 +64,7 @@ The third (rim) light was removed already.
 retained heap after a forced GC every 30 s, then fits a slope. PR #9: 8.47 -> 9.03 MB over 4 minutes,
 slope 1.24 MB per 10 min and flattening (match progression: levels, items, bigger waves). The 30 s
 bench window is too short to judge leaks, so its heap regression noise floor is 50% of the budget.
+
+PR #10: the 30 s bench value read 5.84 MB/10 min while a 3-minute soak of the same scenario gave a
+1.47 MB/10 min slope with the heap oscillating (9.45 -> 9.26 -> 9.47 MB). A single pair of samples
+30 s apart cannot gate leaks, so heap growth moved to the soak step of the gate; the bench reports it as info.

@@ -86,7 +86,7 @@ function evaluate(results, baseline) {
     const software = /SwiftShader|llvmpipe|Software/i.test(r.gpu || '');
     const gated = software ? GATED : GATED_REAL_GPU;
     lines.push(`\n  ${r.scenario}  (${software ? 'software GPU: CPU-side metrics gate' : 'hardware GPU'})`);
-    for (const k of [...new Set([...GATED_REAL_GPU, 'gcWallMaxMs', 'gcCount', 'memoryReducerMaxMs', 'throttleFactor', 'fps', 'onePercentLowFps', 'trianglesMax', 'postPasses', 'longTasks'])]) {
+    for (const k of [...new Set([...GATED_REAL_GPU, 'heapGrowthMbPer10Min', 'gcWallMaxMs', 'gcCount', 'memoryReducerMaxMs', 'throttleFactor', 'fps', 'onePercentLowFps', 'trianglesMax', 'postPasses', 'longTasks'])]) {
       if (r[k] === undefined) continue;
       const budget = BUDGETS[k]; const isGated = gated.includes(k);
       const ok = budget === undefined || (lowerIsBetter(k) ? r[k] <= budget : r[k] >= budget);

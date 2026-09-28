@@ -10,7 +10,8 @@ export const BUDGETS = {
 // CPU-side metrics are reliable in the headless container (software GPU); these gate merges.
 // With a software GPU (SwiftShader, as in CI containers) GL submission competes with rasterization
 // for the same cores, so only JS-side metrics gate; on a real GPU the full render CPU gates too.
-export const GATED = ['simTickP95Ms', 'renderUpdateP95Ms', 'gcPauseMaxMs', 'heapGrowthMbPer10Min', 'drawCallsMax', 'loadMs', 'correctionsPer10s'];
+// heap growth is gated by tools/soak.mjs (slope over minutes); a 30 s bench window is too short to judge
+export const GATED = ['simTickP95Ms', 'renderUpdateP95Ms', 'gcPauseMaxMs', 'drawCallsMax', 'loadMs', 'correctionsPer10s'];
 // input latency includes waiting for the next frame, so it is only meaningful where frames are real
 export const GATED_REAL_GPU = [...GATED, 'renderCpuP95Ms', 'renderSubmitP95Ms', 'frameP95Ms', 'frameP99Ms', 'inputLatencyP95Ms'];
 export const REGRESSION_TOLERANCE = 0.10;
