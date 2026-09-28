@@ -7,10 +7,17 @@ import { MODEL_URLS } from '../assets/manifest.js';
 
 export class AssetLibrary {
   constructor() { this.gltf = {}; this.loader = new GLTFLoader(); this.mergedCache = {}; }
+  /** Inlined models (single-file build) are decoded in place: hosts with a strict CSP block fetch() of data: URLs. */
+  load(url) {
+    if (!url.startsWith('data:')) return this.loader.loadAsync(url);
+    const bin = atob(url.slice(url.indexOf(',') + 1)), buf = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+    return this.loader.parseAsync(buf.buffer, '');
+  }
   async loadAll(onProgress) {
     const keys = Object.keys(MODEL_URLS); let done = 0;
     await Promise.all(keys.map(async (k) => {
-      const g = await this.loader.loadAsync(MODEL_URLS[k]);
+      const g = await this.load(MODEL_URLS[k]);
       g.scene.traverse((o) => {
         if (o.isMesh) {
           o.castShadow = true; o.receiveShadow = false; o.frustumCulled = !o.isSkinnedMesh;
