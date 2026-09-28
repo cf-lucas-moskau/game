@@ -1,0 +1,51 @@
+// Asset sources. Every model is CC0 (Kenney, KayKit), taken from the Code3DBench asset
+// collection (https://github.com/VladimirGl/Code3DBench, benchmark_assets/manifest.json lists license CC0).
+// To replace an asset: point the key at a new GLB and rerun `node tools/assets.mjs`.
+// The game only ever refers to the keys below (see src/assets/manifest.js).
+const A = 'benchmark_assets/assets';
+export const SOURCE_ROOT = process.env.ASSET_SRC || '/tmp/c3d';
+export const ASSETS = {
+  // heroes (animated)
+  'hero-morrow':     { src: `${A}/character/mini-characters/mini-characters_models_glb_format_character-male-c/character-male-c.glb`, author: 'Kenney', pack: 'Mini Characters' },
+  'hero-saffi':      { src: `${A}/character/mini-characters/mini-characters_models_glb_format_character-female-b/character-female-b.glb`, author: 'Kenney', pack: 'Mini Characters' },
+  'hero-vesper':     { src: `${A}/character/mini-characters/mini-characters_models_glb_format_character-female-e/character-female-e.glb`, author: 'Kenney', pack: 'Mini Characters' },
+  'hero-gus':        { src: `${A}/character/mini-dungeon/mini-dungeon-character-human/character-human.glb`, author: 'Kenney', pack: 'Mini Dungeon' },
+  'hero-brindle':    { src: `${A}/character/mini-characters/mini-characters_models_glb_format_character-female-d/character-female-d.glb`, author: 'Kenney', pack: 'Mini Characters' },
+  'hero-auctioneer': { src: `${A}/character/mini-characters/mini-characters_models_glb_format_character-male-f/character-male-f.glb`, author: 'Kenney', pack: 'Mini Characters' },
+  // minions (animated)
+  'minion-blue':     { src: `${A}/character/mini-arena/mini-arena-character-soldier/character-soldier.glb`, author: 'Kenney', pack: 'Mini Arena' },
+  'minion-red':      { src: `${A}/character/mini-dungeon/mini-dungeon-character-orc/character-orc.glb`, author: 'Kenney', pack: 'Mini Dungeon' },
+  'minion-red-caster': { src: `${A}/character/graveyard-kit/graveyard-kit-character-skeleton/character-skeleton.glb`, author: 'Kenney', pack: 'Graveyard Kit' },
+  'minion-blue-caster': { src: `${A}/character/graveyard-kit/graveyard-kit-character-keeper/character-keeper.glb`, author: 'Kenney', pack: 'Graveyard Kit' },
+  'bee':             { src: `${A}/character/cube-pets/cube-pets_models_glb_format_animal-bee/animal-bee.glb`, author: 'Kenney', pack: 'Cube Pets' },
+  // props held by heroes
+  'prop-wrench':     { src: `${A}/tool/kaykit-rpg-tools/kaykit-rpg-tools-wrench_a/wrench_A.glb`, author: 'Kay Lousberg', pack: 'KayKit RPG Tools' },
+  'prop-compass':    { src: `${A}/tool/kaykit-rpg-tools/kaykit-rpg-tools-drafting_compass/drafting_compass.glb`, author: 'Kay Lousberg', pack: 'KayKit RPG Tools' },
+  'prop-candle':     { src: `${A}/prop/kaykit-dungeon/kaykit-dungeon-candle_lit/candle_lit.glb`, author: 'Kay Lousberg', pack: 'KayKit Dungeon' },
+  'prop-dagger':     { src: `${A}/tool/kaykit-fantasy-weapons/kaykit-fantasy-weapons-dagger_a/dagger_A.glb`, author: 'Kay Lousberg', pack: 'KayKit Fantasy Weapons' },
+  'prop-brush':      { src: `${A}/tool/kaykit-rpg-tools/kaykit-rpg-tools-pencil_a_long/pencil_A_long.glb`, author: 'Kay Lousberg', pack: 'KayKit RPG Tools' },
+  'prop-staff':      { src: `${A}/tool/kaykit-fantasy-weapons/kaykit-fantasy-weapons-staff_a/staff_A.glb`, author: 'Kay Lousberg', pack: 'KayKit Fantasy Weapons' },
+  'prop-hammer':     { src: `${A}/tool/kaykit-fantasy-weapons/kaykit-fantasy-weapons-hammer_a/hammer_A.glb`, author: 'Kay Lousberg', pack: 'KayKit Fantasy Weapons' },
+  'prop-mallet':     { src: `${A}/tool/kaykit-rpg-tools/kaykit-rpg-tools-mallet/mallet.glb`, author: 'Kay Lousberg', pack: 'KayKit RPG Tools' },
+  'prop-coins':      { src: `${A}/prop/kaykit-dungeon/kaykit-dungeon-coin_stack_small/coin_stack_small.glb`, author: 'Kay Lousberg', pack: 'KayKit Dungeon' },
+  'prop-coin':       { src: `${A}/prop/kaykit-dungeon/kaykit-dungeon-coin/coin.glb`, author: 'Kay Lousberg', pack: 'KayKit Dungeon' },
+  'prop-lantern':    { src: `${A}/tool/graveyard-kit/graveyard-kit_models_glb_format_lantern-candle/lantern-candle.glb`, author: 'Kenney', pack: 'Graveyard Kit' },
+  'prop-spellbook':  { src: `${A}/prop/kaykit-adventurers/kaykit-adventurers-spellbook_open/spellbook_open.glb`, author: 'Kay Lousberg', pack: 'KayKit Adventurers' },
+  // Pebble the golem is assembled from rocks
+  'rock-a':          { src: `${A}/nature/kaykit-forest-nature/kaykit-forest-nature-rock_1_a_color1/Rock_1_A_Color1.glb`, author: 'Kay Lousberg', pack: 'KayKit Forest Nature' },
+  'rock-b':          { src: `${A}/nature/kaykit-forest-nature/kaykit-forest-nature-rock_2_a_color1/Rock_2_A_Color1.glb`, author: 'Kay Lousberg', pack: 'KayKit Forest Nature' },
+  'rock-c':          { src: `${A}/nature/kaykit-forest-nature/kaykit-forest-nature-rock_3_a_color1/Rock_3_A_Color1.glb`, author: 'Kay Lousberg', pack: 'KayKit Forest Nature' },
+  // structures + scenery
+  'tower-base':      { src: `${A}/prop/castle-kit/castle-kit-tower-hexagon-base/tower-hexagon-base.glb`, author: 'Kenney', pack: 'Castle Kit' },
+  'tower-mid':       { src: `${A}/prop/castle-kit/castle-kit-tower-hexagon-mid/tower-hexagon-mid.glb`, author: 'Kenney', pack: 'Castle Kit' },
+  'tower-roof':      { src: `${A}/prop/castle-kit/castle-kit-tower-hexagon-roof/tower-hexagon-roof.glb`, author: 'Kenney', pack: 'Castle Kit' },
+  'flag':            { src: `${A}/prop/castle-kit/castle-kit-flag-pennant/flag-pennant.glb`, author: 'Kenney', pack: 'Castle Kit' },
+  'banner':          { src: `${A}/prop/castle-kit/castle-kit-flag-banner-long/flag-banner-long.glb`, author: 'Kenney', pack: 'Castle Kit' },
+  'crystal':         { src: `${A}/nature/tower-defense-kit/tower-defense-kit-detail-crystal-large/detail-crystal-large.glb`, author: 'Kenney', pack: 'Tower Defense Kit' },
+  'crystal-small':   { src: `${A}/nature/tower-defense-kit/tower-defense-kit-detail-crystal/detail-crystal.glb`, author: 'Kenney', pack: 'Tower Defense Kit' },
+  'siege-ram':       { src: `${A}/tool/castle-kit/castle-kit-siege-ram/siege-ram.glb`, author: 'Kenney', pack: 'Castle Kit' },
+  'tree':            { src: `${A}/nature/kaykit-forest-nature/kaykit-forest-nature-tree_2_a_color1/Tree_2_A_Color1.glb`, author: 'Kay Lousberg', pack: 'KayKit Forest Nature' },
+  'tree-bare':       { src: `${A}/nature/kaykit-forest-nature/kaykit-forest-nature-tree_bare_1_a_color1/Tree_Bare_1_A_Color1.glb`, author: 'Kay Lousberg', pack: 'KayKit Forest Nature' },
+  'bush':            { src: `${A}/nature/kaykit-forest-nature/kaykit-forest-nature-bush_1_a_color1/Bush_1_A_Color1.glb`, author: 'Kay Lousberg', pack: 'KayKit Forest Nature' },
+  'lamp':            { src: `${A}/prop/fantasy-town-kit/fantasy-town-kit-lantern/lantern.glb`, author: 'Kenney', pack: 'Fantasy Town Kit' },
+};
