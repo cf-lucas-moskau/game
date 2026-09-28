@@ -80,6 +80,39 @@ const until = async (page, fn, arg, ms = 20000) => { try { await page.waitForFun
   check('no page errors (touch)', errors.length === 0, errors[0] || '');
   await ctx.close();
 }
+// ---------------- the game loop: hero select -> match -> shop -> surrender -> end screen -> hero select -> match
+{
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  const errors = []; page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto(`file://${root}/dist/index.html?cpu=1&quality=low`);
+  const menu = await until(page, () => !!document.querySelector('[data-act=play]'), null, 90000);
+  check('hero select appears', menu);
+  const k0 = await page.evaluate(() => document.querySelector('.hero-card h2').textContent);
+  await page.click('[data-act=reroll]');
+  check('reroll is spent after one use', await page.evaluate(() => document.querySelector('[data-act=reroll]').disabled));
+  const chosen = await page.evaluate(() => document.querySelector('.hero-card h2').textContent);
+  await page.click('[data-act=play]');
+  check('Fight starts a match with the chosen hero', await until(page, (n) => window.__game && window.__game.world.tick > 30 && window.__game.world.registry.heroes[window.__game.me.heroKey].name === n, chosen, 60000), `${k0} -> ${chosen}`);
+  check('HUD shows the hero', await page.evaluate(() => !!document.querySelector('.hud .dock') && !document.querySelector('.menu')));
+  await page.keyboard.press('p');
+  const gold0 = await page.evaluate(() => window.__game.me.gold);
+  await page.click('.card:not([disabled])');
+  check('shop buys an item at the fountain', await until(page, () => window.__game.me.items.length === 1), `gold ${gold0 | 0} -> ${(await page.evaluate(() => window.__game.me.gold)) | 0}`);
+  await page.keyboard.press('Escape');
+  check('Escape closes the shop', await page.evaluate(() => document.querySelector('[aria-label=Shop]').classList.contains('hidden')));
+  await page.keyboard.press('Tab');
+  check('Tab opens the scoreboard with six heroes', await until(page, () => document.querySelectorAll('[aria-label=Scoreboard] tbody tr').length === 6));
+  await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
+  await page.click('[data-act=surrender]'); await page.click('[data-act=confirm-surrender]');
+  check('surrender ends the match in defeat', await until(page, () => document.querySelector('.end h1') && document.querySelector('.end h1').textContent === 'Defeat', null, 20000));
+  await page.click('[data-act=again]');
+  check('Play again returns to hero select', await until(page, () => !!document.querySelector('[data-act=play]') && !document.querySelector('.hud'), null, 30000));
+  await page.click('[data-act=play]');
+  check('a second match starts cleanly', await until(page, () => window.__game && window.__game.world.tick > 30 && window.__game.me.items.length === 0, null, 60000),
+    `${await page.evaluate(() => document.querySelectorAll('canvas').length)} canvases`);
+  check('no page errors (loop)', errors.length === 0, errors[0] || '');
+  await page.close();
+}
 await browser.close();
 console.log(results.map((r) => '   ' + r).join('\n'));
-if (failed) { console.log(`   E2E: ${failed} failure(s)`); process.exit(1); } else console.log('   E2E: all input checks passed');
+if (failed) { console.log(`   E2E: ${failed} failure(s)`); process.exit(1); } else console.log('   E2E: all input and game-loop checks passed');
