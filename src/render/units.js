@@ -4,6 +4,7 @@ import { S, TEAM_COLORS, TEAM_RGB, WHITE_RGB } from './palette.js';
 import { KIND, isMinion } from '../sim/constants.js';
 import { HERO_LOOKS, MINION_LOOKS, STRUCTURE_LOOKS, CLIPS } from '../assets/manifest.js';
 import { bakeVAT, vatMaterial } from './vat.js';
+import { rx, ry } from './interp.js';
 import * as BGU from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -64,7 +65,7 @@ class HeroView {
     this.oneShotUntil = now + (a.getClip().duration / speed) * 0.9;
   }
   update(e, alpha, dt, now, world) {
-    const x = lerp(e.px, e.x, alpha) * S, z = lerp(e.py, e.y, alpha) * S;
+    const x = rx(e) * S, z = ry(e) * S;
     this.root.position.set(x, 0, z);
     let yaw = faceToRotY(e.facing), d = yaw - this.lastYaw; d = Math.atan2(Math.sin(d), Math.cos(d));
     this.lastYaw += d * Math.min(1, dt * 16); this.root.rotation.y = this.lastYaw;
@@ -261,7 +262,7 @@ class BeeSwarm {
     let n = 0;
     for (const h of world.heroes) {
       if (h.heroKey !== 'brindle' || h.dead) continue;
-      const x = lerp(h.px, h.x, alpha) * S, z = lerp(h.py, h.y, alpha) * S;
+      const x = rx(h) * S, z = ry(h) * S;
       for (let i = 0; i < h.resource && n < this.cap; i++) {
         const a = now * (1.8 + (i % 3) * 0.4) + i * 2.399, r = 0.55 + (i % 4) * 0.13;
         tmpObj.position.set(x + Math.cos(a) * r, 0.9 + Math.sin(now * 5 + i) * 0.18 + (i % 3) * 0.2, z + Math.sin(a) * r);
@@ -311,7 +312,7 @@ export class UnitRenderer {
       if (e.kind === KIND.PEBBLE) {
         let v = this.pebbleViews.get(e.id);
         if (e.alive && !v) { v = buildPebble(this.lib, HERO_LOOKS.gus.pebble, 1.15); this.parent.add(v); this.pebbleViews.set(e.id, v); }
-        if (v) { v.visible = e.alive; if (e.alive) { v.position.set(lerp(e.px, e.x, alpha) * S, 0, lerp(e.py, e.y, alpha) * S); v.rotation.y = faceToRotY(e.facing); animatePebble(v, e, now); } }
+        if (v) { v.visible = e.alive; if (e.alive) { v.position.set(rx(e) * S, 0, ry(e) * S); v.rotation.y = faceToRotY(e.facing); animatePebble(v, e, now); } }
         continue;
       }
       if (!e.alive || !isMinion(e.kind)) continue;
@@ -322,7 +323,7 @@ export class UnitRenderer {
       if ((a.clip === 'attack' || a.clip === 'shoot') && now - a.start < 0.6) clip = a.clip; else a.clip = clip;
       const fl = this.flashes.get(e.id) || 0; if (fl) this.flashes.set(e.id, Math.max(0, fl - dt * 6));
       const t = clip === a.clip && (clip === 'attack' || clip === 'shoot') ? now - a.start : now + e.id * 0.37;
-      this.batchFor(e.team, e.kind).push(lerp(e.px, e.x, alpha) * S, lerp(e.py, e.y, alpha) * S, faceToRotY(e.facing), clip, t, clip === 'walk' || clip === 'idle', TEAM_RGB[e.team], fl);
+      this.batchFor(e.team, e.kind).push(rx(e) * S, ry(e) * S, faceToRotY(e.facing), clip, t, clip === 'walk' || clip === 'idle', TEAM_RGB[e.team], fl);
     }
     // corpses: play die clip, then sink into the whale
     let w = 0;

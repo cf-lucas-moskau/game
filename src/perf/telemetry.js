@@ -20,10 +20,10 @@ export class Telemetry {
   }
   heap() { const m = performance.memory; return m ? m.usedJSHeapSize / 1048576 : 0; }
   beginFrame(now) { if (this.lastFrame) this.frame.push(now - this.lastFrame); this.lastFrame = now; }
-  /** Called when an input event produced a command. */
-  inputIssued(t) { this.pendingInputs.push(t); }
-  /** Called after the frame that first displays the result of processed commands. */
-  inputsPresented(now) { for (const t of this.pendingInputs) this.input.push(now - t); this.pendingInputs.length = 0; }
+  /** Input pipeline: issued (input event) -> processed (sim tick applied it) -> presented (next frame drawn). */
+  inputProcessed(issuedAt) { this.pendingInputs.push(issuedAt); }
+  /** Called right after a frame is submitted: every processed input is now on screen. */
+  inputsPresented(now) { for (let i = 0; i < this.pendingInputs.length; i++) this.input.push(now - this.pendingInputs[i]); this.pendingInputs.length = 0; }
   reset() { for (const s of [this.frame, this.sim, this.render, this.renderUpdate, this.renderSubmit, this.input, this.draws, this.tris]) s.reset(); this.corrections = 0; this.heapStart = this.heap(); this.startedAt = performance.now(); this.longTasks = 0; this.lastFrame = 0; }
   summary() {
     const seconds = (performance.now() - this.startedAt) / 1000;

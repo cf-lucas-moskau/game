@@ -8,6 +8,8 @@ import { UnitRenderer } from './units.js';
 import { HealthBars, GroundDecals, ProjectileViews } from './overlays.js';
 import { PostFX } from './post.js';
 import { QUALITY, ResolutionGuard } from './quality.js';
+import { view, rx, ry } from './interp.js';
+import { Indicators } from './indicators.js';
 
 export class GameRenderer {
   constructor(canvas, lib, world, { quality = 'medium', telemetry = null, fixedBuffer = null } = {}) {
@@ -29,7 +31,9 @@ export class GameRenderer {
     this.env = new Environment(this.scene, lib, this.q);
     this.units = new UnitRenderer(lib, world, this.env.root);
     this.bars = new HealthBars(this.env.root); this.decals = new GroundDecals(this.env.root); this.projectiles = new ProjectileViews(this.env.root);
-    this.extra = []; // pluggable views (fx, zones) with update(world, alpha, dt, now)
+    this.extra = []; // pluggable views (fx, zones) with update(world, alpha, dt, now, renderer)
+    this.indicators = new Indicators(this.env.root); this.extra.push(this.indicators);
+    this.aim = { active: false }; this.hoverId = -1; this.showRange = false;
     this.post = this.q.post ? new PostFX(gl, { levels: this.q.bloomLevels, msaa: this.q.msaa }) : null;
     this.guard = new ResolutionGuard(0.55, 1);
     this.cam = { x: 8, z: 4.5, shake: 0, zoom: 1 }; this.focusId = -1; this.myTeam = 0;
@@ -44,12 +48,13 @@ export class GameRenderer {
     if (this.post) this.post.setSize(Math.floor(w * dpr), Math.floor(h * dpr));
     if (this.telemetry) this.telemetry.gauges.renderScale = +(this.guard.scale).toFixed(2);
   }
+  marker(x, y, type) { this.indicators.marker(x, y, type); }
   shake(amount) { this.cam.shake = Math.min(1, this.cam.shake + amount); }
   /** Camera: follows the focus unit, clamped to the lane. Narrow screens pull back to keep the same lane width in view. */
   updateCamera(alpha, dt) {
     const f = this.world.entities[this.focusId];
     let tx = this.cam.x, tz = 4.5;
-    if (f) { tx = (f.px + (f.x - f.px) * alpha) * S; tz = (f.py + (f.y - f.py) * alpha) * S; }
+    if (f) { tx = rx(f) * S; tz = ry(f) * S; }
     if (this.freeCam) { tx = this.freeCam.x; tz = this.freeCam.z; }
     const k = Math.min(1, dt * 7);
     this.cam.x += (tx - this.cam.x) * k; this.cam.z += (Math.max(3.2, Math.min(5.8, tz)) - this.cam.z) * k;
@@ -65,6 +70,8 @@ export class GameRenderer {
   /** Draw one frame. alpha = interpolation between previous and current sim tick. */
   render(alpha, dt) {
     const t0 = performance.now(); this.now += dt; const w = this.world;
+    view.alpha = alpha; const pr = this.predictor;
+    if (pr) { view.predId = pr.id; view.ox = pr.ox; view.oy = pr.oy; } else view.predId = -1;
     if (!this._onEvent) this._onEvent = (e) => { this.units.onEvent(e, this.world, this.now); for (const x of this.extra) if (x.onEvent) x.onEvent(e, this.world, this.now, this); };
     w.events.drain(this._onEvent);
     this.env.update(dt, w);
