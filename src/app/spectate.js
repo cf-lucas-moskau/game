@@ -29,5 +29,5 @@ export function startSpectate({ canvas, lib, seed = 1, quality = 'medium', telem
     } });
   loop.timeScale = timeScale;
   loop.start();
-  return { world, renderer, loop };
+  return { world, renderer, loop, dispose() { loop.stop(); renderer.dispose(); } };
 }

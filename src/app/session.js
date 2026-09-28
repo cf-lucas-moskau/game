@@ -42,6 +42,14 @@ export class GameSession {
   }
   start() { this.loop.start(); return this; }
   stop() { this.loop.stop(); }
+  /** Receive every sim event the renderer drains (UI: kill feed, banners, damage numbers). */
+  tapEvents(fn) { const tap = { onEvent: fn, update() {} }; this.renderer.extra.push(tap); return () => { const i = this.renderer.extra.indexOf(tap); if (i >= 0) this.renderer.extra.splice(i, 1); }; }
+  /** Stop the match and free the renderer and input devices. */
+  dispose() {
+    this.stop(); this.listeners.clear();
+    for (const i of this.inputs || []) i.dispose();
+    this.renderer.dispose();
+  }
   /** Local input entry point: stamp, predict, send. */
   send(cmd) {
     const now = performance.now();

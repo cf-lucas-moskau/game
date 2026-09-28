@@ -41,7 +41,9 @@ export class GameRenderer {
     this.post = this.q.post ? new PostFX(gl, { levels: this.q.bloomLevels, msaa: this.q.msaa }) : null;
     this.guard = new ResolutionGuard(0.55, 1);
     this.cam = { x: 8, z: 4.5, shake: 0, zoom: 1 }; this.focusId = -1; this.myTeam = 0;
-    this.now = 0; this.resize(); addEventListener('resize', () => this.resize());
+    this.shakeScale = 1; // user setting (0 disables camera shake)
+    this._pv = new THREE.Vector3();
+    this.now = 0; this.resize(); addEventListener('resize', (this._onResize = () => this.resize()));
   }
   resize() {
     const w = this.canvas.clientWidth || innerWidth, h = this.canvas.clientHeight || innerHeight;
@@ -53,7 +55,7 @@ export class GameRenderer {
     if (this.telemetry) this.telemetry.gauges.renderScale = +(this.guard.scale).toFixed(2);
   }
   marker(x, y, type) { this.indicators.marker(x, y, type); }
-  shake(amount) { this.cam.shake = Math.min(1, this.cam.shake + amount); }
+  shake(amount) { this.cam.shake = Math.min(1, this.cam.shake + amount * this.shakeScale); }
   /** Camera: follows the focus unit, clamped to the lane. Narrow screens pull back to keep the same lane width in view. */
   updateCamera(alpha, dt) {
     const f = this.world.entities[this.focusId];
@@ -109,6 +111,18 @@ export class GameRenderer {
     const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0); const hit = new THREE.Vector3();
     if (!ray.ray.intersectPlane(plane, hit)) return null;
     return { x: hit.x / S, y: hit.z / S };
+  }
+  /** Allocation-free projection for per-frame UI (canvas-relative CSS px); out.visible = in front of the camera. */
+  project(x, y, h, out) {
+    const v = this._pv.set(x * S, h, y * S).project(this.camera);
+    out.x = (v.x + 1) / 2 * this.canvas.clientWidth; out.y = (1 - v.y) / 2 * this.canvas.clientHeight; out.visible = v.z < 1;
+    return out;
+  }
+  /** Release the GL context and listeners; the shared AssetLibrary stays loaded for the next match. */
+  dispose() {
+    removeEventListener('resize', this._onResize);
+    if (this.post && this.post.dispose) this.post.dispose();
+    this.gl.dispose(); this.gl.forceContextLoss();
   }
   worldToScreen(x, y, h = 0) {
     const v = new THREE.Vector3(x * S, h, y * S).project(this.camera); const r = this.canvas.getBoundingClientRect();
