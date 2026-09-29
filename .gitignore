@@ -6,3 +6,4 @@ perf-results/*.json
 .DS_Store
 .gate/
 .shots/
+release/

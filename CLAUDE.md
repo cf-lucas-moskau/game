@@ -15,9 +15,8 @@ Performance and smoothness are critical: always measure (frame time, sim, render
 The owner writes in German or English; answer in the language of their message.
 
 Spec document (Claude Docs): https://claude.ai/code/artifact/9992dd94-0c29-42d7-aca8-44a8a11e3378
-It is **out of date** on: 3D (three.js + CC0 GLBs, not 2D vector), tower HP 2300 / Heartstone 3000,
-sudden death at 10:00 with Heartstone decay 1.2%/s, Brindle bee rebalance, auto-leveled ability ranks,
-pooled entity records, minion growth 5%/min, Auctioneer interest passive, the measurement method in docs/PERF.md.
+Updated after PR #21 (3D rendering, rules numbers, Brindle and Auctioneer passives, auto ranks, pooled records,
+measurement method). Keep it in sync when rules or tech change.
 
 ## Commands
 ```
@@ -93,7 +92,8 @@ input path), `skip=<seconds>` (fast-forward the sim), `seed=`, `touch=1`, `cpu=1
 5. Done (PRs #14-#18, owner feedback round): props in hands, unlimited rerolls, readable combat (distinct attacks, tower
    range + lock-on), real numbers in tooltips/shop, unit inspection, per-hero ability styles, Leviathan Lab.
 6. Done (PRs #19-#21): item icons (`src/ui/identity.js`), mobile polish (portrait + landscape, e2e overlap check),
-   `docs/ARCHITECTURE.md`. Remaining: update the spec doc, final deliverables (zip + dist/index.html), painted hero portraits.
+   `docs/ARCHITECTURE.md`. Spec doc updated. Deliverables: `release/` (gitignored) holds `leviathan-lane.html` (the build) and
+   `leviathan-lane-src.zip` (`git archive` of main). Remaining: painted hero portraits.
 7. Later (phase 5): `NetTransport` + Node.js WebSocket authoritative server (the owner can host Node).
 
 ## Architecture map
