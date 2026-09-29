@@ -136,14 +136,21 @@ for (const [w, hgt] of [[844, 390], [390, 844]]) {
   await page.click('[aria-label=Scoreboard] tbody tr[data-id]:not(.me)');
   check('clicking a scoreboard row shows that hero\'s details and items', await until(page, () => { const p = document.querySelector('.inspect'); return p && !p.classList.contains('hidden') && p.querySelectorAll('.ins-item').length === 6; }));
   await page.keyboard.press('Escape');
-  // click a hero's head (screen-space picking: what you see is what you click): an ally if one is on the canvas and
-  // not under the HUD, else an enemy (bots walk off-screen as the match goes on). Time is frozen for the click:
-  // a bot moves ~15 px between reading its position and the click landing, which is not what this checks.
+  // click a unit where it is drawn (screen-space picking: what you see is what you click): a hero if one is on the
+  // canvas and not under the HUD (allies first), else a minion, tower or Heartstone (bots may all be down the lane
+  // while the player shops at the fountain). Time is frozen for the click: a bot moves ~15 px between reading its
+  // position and the click landing, which is not what this checks.
   const ally = await page.evaluate(() => {
     const g = window.__game; g.stop();
-    const hs = g.world.heroes.filter((h) => h !== g.me && !h.dead).sort((a, b) => (a.team === g.me.team ? 0 : 1) - (b.team === g.me.team ? 0 : 1));
-    for (const h of hs) { const p = g.renderer.worldToScreen(h.x, h.y, 1.2); const el = document.elementFromPoint(p.x, p.y); if (p.visible && el && el.tagName === 'CANVAS') return { x: p.x, y: p.y, name: g.world.registry.heroes[h.heroKey].name }; }
-    return { x: 0, y: 0, name: 'none visible' };
+    // kinds by preference: hero, Pebble, minions, tower, Heartstone; aim at the middle of the body
+    const ORDER = [1, 7, 2, 3, 4, 5, 6], MID = { 1: 1.2, 7: 0.7, 2: 0.5, 3: 0.5, 4: 0.6, 5: 2.5, 6: 1.3 };
+    const us = g.world.entities.filter((u) => u && u.alive && !u.dead && u !== g.me && ORDER.includes(u.kind))
+      .sort((a, b) => ORDER.indexOf(a.kind) - ORDER.indexOf(b.kind) || (a.team === g.me.team ? 0 : 1) - (b.team === g.me.team ? 0 : 1));
+    for (const u of us) {
+      const p = g.renderer.worldToScreen(u.x, u.y, MID[u.kind]), el = document.elementFromPoint(p.x, p.y);
+      if (p.visible && el && el.tagName === 'CANVAS') return { x: p.x, y: p.y, name: u.kind === 1 ? g.world.registry.heroes[u.heroKey].name : `kind ${u.kind}` };
+    }
+    return { x: 0, y: 0, name: 'nothing visible' };
   });
   await page.mouse.click(ally.x, ally.y);
   await page.evaluate(() => window.__game.start());

@@ -25,5 +25,6 @@ hero select:
 - e2e battlefield inspect: the test used to click the first allied bot. It failed intermittently in the gate
   ("(Saffi Blinkwick)" was the stale scoreboard panel, so nothing was picked). The debug runs showed every passing
   click landing on the canvas near the centre. The failures came from the ally having walked off-screen or under the HUD
-  by the time the test reached this step. The test now clicks the first hero (allies first) whose head is on the canvas
-  (`elementFromPoint` is the canvas), and it reports which hero was clicked and which one the panel shows.
+  by the time the test reached this step (once every bot was down the lane). The test now clicks the first unit whose body is
+  on the canvas: heroes first (allies before enemies), then Pebble, minions, towers and the Heartstone
+  (`elementFromPoint` must be the canvas). It reports which unit was clicked and which one the panel shows.
