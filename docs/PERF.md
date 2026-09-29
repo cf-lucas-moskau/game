@@ -114,3 +114,13 @@ Decoding the inlined GLB data URLs with `atob` (instead of `fetch`, which a stri
 about 2.47 MB of base64 strings from Blink's external string storage onto the V8 heap. The heap
 snapshot diff is +2.49 MB strings, -2.47 MB ExternalStringData: total memory is unchanged, but
 `heapRetainedMb` reads about 12.1 instead of 9.8 MB. The soak slope (leaks) is unaffected.
+
+## GC pauses on a software GPU: p99 gates, max is reported (PR #12)
+Traces of `desktop-medium` (spectate: no UI, no audio) on the PR #11 build and the PR #12 build, two runs
+each: 101-116 GCs per run, MinorGC p50 0.18-0.19 ms and p95 0.25-0.38 ms on both, and at most one pause
+over 2 ms per run. Every worst pause sits next to a ~32 ms `GPUTask` (SwiftShader rasterizing on the same
+four cores), inside the scavenger's parallel phase (`V8.GC_SCAVENGER_BACKGROUND_SCAVENGE_PARALLEL`),
+which waits for helper threads the rasterizer is starving. Gate runs recorded such single outliers at
+13-19 ms on builds with and without the code under review. On a software GPU the worst single pause
+measures that contention, so `gcPauseP99Ms` (budget 5) gates there and `gcPauseMaxMs` plus
+`gcPausesOver5Ms` are reported; on a real GPU `gcPauseMaxMs` still gates. The budget value is unchanged.

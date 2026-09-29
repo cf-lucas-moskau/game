@@ -64,14 +64,14 @@ async function runScenario(browser, sc) {
   // GC pauses from the trace
   // GC pauses: thread CPU time (tdur), so preemption by the software rasterizer on shared cores is not counted
   // as GC cost. V8 memory-reducer compactions are housekeeping, reported separately.
-  let gcMax = 0, gcTotal = 0, gcCount = 0, gcWorst = null, reducerMax = 0, reducerCount = 0, gcWallMax = 0;
+  let gcMax = 0, gcTotal = 0, gcCount = 0, gcWorst = null, reducerMax = 0, reducerCount = 0, gcWallMax = 0; const pauses = [];
   try {
     const tr = JSON.parse(readFileSync(traceFile, 'utf8')); const evs = tr.traceEvents || tr;
     const reducer = evs.filter((e) => e.name === 'V8.GCFinalizeMCReduceMemory').map((e) => e.ts);
     for (const e of evs) if ((e.name === 'MajorGC' || e.name === 'MinorGC') && e.dur) {
       const cpu = (e.tdur ?? e.dur) / 1000; gcWallMax = Math.max(gcWallMax, e.dur / 1000);
       if (reducer.some((ts) => ts >= e.ts && ts <= e.ts + e.dur)) { reducerCount++; reducerMax = Math.max(reducerMax, cpu); continue; }
-      gcCount++; gcTotal += cpu;
+      gcCount++; gcTotal += cpu; pauses.push(cpu);
       if (cpu > gcMax) { gcMax = cpu; gcWorst = { name: e.name, cpuMs: +cpu.toFixed(2), wallMs: +(e.dur / 1000).toFixed(2), type: e.args?.type }; }
     }
     if (process.env.KEEP_TRACE) console.log('   trace kept at', traceFile); else rmSync(traceFile);
@@ -79,6 +79,7 @@ async function runScenario(browser, sc) {
   await ctx.close();
   const secs = r.seconds || sc.seconds;
   return { scenario: sc.name, ...r, throttleFactor: sc.throttleFactor || 1, loadMs: r.loadMs, loadWallMs, gcPauseMaxMs: +gcMax.toFixed(2), gcTotalMs: +gcTotal.toFixed(1), gcCount, gcWorst, gcWallMaxMs: +gcWallMax.toFixed(2), memoryReducerMaxMs: +reducerMax.toFixed(2), memoryReducerCount: reducerCount,
+    gcPauseP99Ms: +(pauses.sort((a, b) => a - b)[Math.min(pauses.length - 1, Math.floor(pauses.length * 0.99))] || 0).toFixed(2), gcPausesOver5Ms: pauses.filter((p) => p > 5).length,
     heapGrowthMbPer10Min: +(((heap1 - heap0) / 1048576) / secs * 600).toFixed(2), heapRetainedMb: +(heap1 / 1048576).toFixed(1), errors };
 }
 
@@ -88,7 +89,7 @@ function evaluate(results, baseline) {
     const software = /SwiftShader|llvmpipe|Software/i.test(r.gpu || '');
     const gated = software ? GATED : GATED_REAL_GPU;
     lines.push(`\n  ${r.scenario}  (${software ? 'software GPU: CPU-side metrics gate' : 'hardware GPU'})`);
-    for (const k of [...new Set([...GATED_REAL_GPU, 'uiUpdateP95Ms', 'audioUpdateP95Ms', 'heapGrowthMbPer10Min', 'gcWallMaxMs', 'gcCount', 'memoryReducerMaxMs', 'throttleFactor', 'fps', 'onePercentLowFps', 'trianglesMax', 'postPasses', 'longTasks'])]) {
+    for (const k of [...new Set([...GATED_REAL_GPU, 'gcPauseP99Ms', 'gcPausesOver5Ms', 'uiUpdateP95Ms', 'audioUpdateP95Ms', 'heapGrowthMbPer10Min', 'gcWallMaxMs', 'gcCount', 'memoryReducerMaxMs', 'throttleFactor', 'fps', 'onePercentLowFps', 'trianglesMax', 'postPasses', 'longTasks'])]) {
       if (r[k] === undefined) continue;
       const budget = BUDGETS[k]; const isGated = gated.includes(k);
       const ok = budget === undefined || (lowerIsBetter(k) ? r[k] <= budget : r[k] >= budget);
