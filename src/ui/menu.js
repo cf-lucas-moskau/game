@@ -1,4 +1,4 @@
-// Title + hero select: a random hero with one reroll, bot difficulty, controls help.
+// Title + hero select: a random hero with unlimited rerolls, bot difficulty, controls help.
 import { h, clear } from './dom.js';
 import { identity } from './identity.js';
 import { OPTIONS } from './settings.js';
@@ -16,7 +16,7 @@ export class HeroSelect {
    */
   constructor(root, { heroes, pick, settings, touch, onPlay, onSettings }) {
     this.heroes = heroes; this.pick = pick; this.settings = settings; this.onPlay = onPlay;
-    this.heroKey = pick(); this.rerolls = 1;
+    this.heroKey = pick();
     this.card = h('section', { class: 'hero-card', 'aria-live': 'polite' });
     const controls = touch
       ? [['Left thumb', 'Move (floating joystick)'], ['Attack', 'Hit the nearest enemy'], ['Q W E R', 'Tap to auto-aim, drag to aim'], ['Drag to ✕', 'Cancel an aimed ability'], ['Gold button', 'Shop at your fountain']]
@@ -45,13 +45,12 @@ export class HeroSelect {
         h('div', { class: 'seg', role: 'group', 'aria-label': 'Bot difficulty' }, OPTIONS.difficulty.map(([v, label]) =>
           h('button', { class: v === diff ? 'on' : '', 'aria-pressed': v === diff ? 'true' : 'false', onclick: () => { this.settings.set('difficulty', v); this.render(); } }, label)))),
       h('div', { class: 'actions' },
-        h('button', { class: 'btn', disabled: this.rerolls <= 0, onclick: () => this.reroll(), 'data-act': 'reroll' }, this.rerolls > 0 ? 'Reroll (1)' : 'No rerolls'),
+        h('button', { class: 'btn', onclick: () => this.reroll(), 'data-act': 'reroll' }, 'Reroll'),
         h('button', { class: 'btn primary', 'data-act': 'play', onclick: () => this.onPlay({ heroKey: this.heroKey, difficulty: this.settings.get('difficulty') }) }, 'Fight')));
   }
   reroll() {
-    if (this.rerolls <= 0) return;
-    let k = this.pick(); for (let i = 0; i < 8 && k === this.heroKey; i++) k = this.pick();
-    this.heroKey = k; this.rerolls--; this.render();
+    let k = this.pick(); for (let i = 0; i < 8 && k === this.heroKey; i++) k = this.pick(); // always a different hero
+    this.heroKey = k; this.render();
   }
   dispose() { this.el.remove(); }
 }

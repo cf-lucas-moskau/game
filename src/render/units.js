@@ -41,16 +41,18 @@ class HeroView {
     if (this.actions.die) { this.actions.die.setLoop(THREE.LoopOnce); this.actions.die.clampWhenFinished = true; }
     this.current = null; this.play('idle');
     this.oneShotUntil = 0; this.lastYaw = 0;
-    // held props on bones
+    // held props on bones, fitted in the idle pose (the pose players see most; arms hang out ~45 deg from rest)
+    this.mixer.update(0); this.body.updateMatrixWorld(true);
     this.glows = [];
     for (const p of this.look.props || []) {
       let bone = null; this.body.traverse((o) => { if (!bone && o.name === p.bone) bone = o; });
       if (!bone) continue;
       const prop = lib.instance(p.key, p.size);
-      prop.position.fromArray(p.pos); prop.rotation.set(...p.rot);
       // bones are scaled with the rig; compensate so props keep their authored size
       const ws = new THREE.Vector3(); bone.getWorldScale(ws); prop.scale.divide(ws).multiplyScalar(this.body.scale.x || 1);
       bone.add(prop);
+      if (p.hold) holdInHand(this.body, bone, prop, p);
+      else { prop.position.fromArray(p.pos); prop.rotation.set(...p.rot); }
       // glow anchor: the renderer's fixed light pool lights the nearest ones (glow-lights.js)
       if (p.glow) { const a = new THREE.Object3D(); prop.add(a); a.position.y = 0.6; this.glows.push({ anchor: a, color: new THREE.Color(p.glow), phase: this.id, active: false, x: 0, y: 0, z: 0, d: 0 }); }
       bakeProp(this.body, bone, prop);
@@ -131,6 +133,37 @@ function mergeSkinned(root) {
   merged.computeBoundingSphere();
   base.geometry = merged;
   for (let i = 1; i < skinned.length; i++) skinned[i].removeFromParent();
+}
+/**
+ * Put a prop in the fist at the end of an arm bone: the grip is the centre of the arm's farthest
+ * vertices from the joint (found on the mesh, so any rig works), and the prop is oriented in the
+ * hero's own frame (upright, tilted forward by p.tilt, rolled outward by p.roll), then slid down its
+ * own axis by p.grip x its height so the fist closes around the handle.
+ */
+const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion();
+function holdInHand(body, bone, prop, p) {
+  let base = null; body.traverse((o) => { if (!base && o.isSkinnedMesh) base = o; });
+  body.updateMatrixWorld(true);
+  const k = base.skeleton.bones.indexOf(bone), g = base.geometry, SI = g.attributes.skinIndex, SW = g.attributes.skinWeight;
+  const toBone = new THREE.Matrix4().copy(bone.matrixWorld).invert(), pts = []; let far = 0;
+  for (let i = 0; i < g.attributes.position.count; i++) {
+    let bi = 0, bw = -1; for (let c = 0; c < 4; c++) { const w = SW.getComponent(i, c); if (w > bw) { bw = w; bi = SI.getComponent(i, c); } }
+    if (bi !== k) continue;
+    base.getVertexPosition(i, _v); _v.applyMatrix4(base.matrixWorld).applyMatrix4(toBone);
+    const d = _v.length(); pts.push(_v.clone()); if (d > far) far = d;
+  }
+  const grip = new THREE.Vector3(); let n = 0;
+  for (const q of pts) if (q.length() > far * 0.85) { grip.add(q); n++; }
+  if (n) grip.divideScalar(n);
+  // orientation: hero frame (body root) * tilt/roll, expressed in the bone's frame
+  (body.parent || body).getWorldQuaternion(_q); bone.getWorldQuaternion(_q2); // the hero root: upright, facing +z
+  const tilt = new THREE.Quaternion().setFromEuler(new THREE.Euler(p.tilt ?? 0.3, 0, p.roll ?? 0));
+  prop.quaternion.copy(_q2.invert()).multiply(_q).multiply(tilt);
+  // slide down the prop's own up axis so the handle, not its foot, sits in the fist
+  prop.updateMatrix(); const box = new THREE.Box3().setFromObject(prop.children[0] || prop, true);
+  const hgt = (box.max.y - box.min.y) || p.size;
+  _w.set(0, -hgt * (p.grip ?? 0.2), 0).applyQuaternion(prop.quaternion);
+  prop.position.copy(grip).add(_w);
 }
 /** Flat, non-indexed skinned geometry (Float32 attributes, Uint16 skin indices) so parts can be merged. */
 function flatSkinned(src) {

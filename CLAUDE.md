@@ -71,7 +71,7 @@ input path), `skip=<seconds>` (fast-forward the sim), `seed=`, `touch=1`, `cpu=1
      `@fontsource-variable/bricolage-grotesque` (HUD text, tabular numbers). Palette in `src/render/palette.js`
      (abyss #1c1f4a, dusk #f7b267, slate #3e5c6b, bone #e8dcc4, tide #45c4e6, coral #f0476e, gold #f2c14e).
    - The one bold element: a lane-strip minimap across the top (whole whale lane, towers, heroes, whale-roll warning).
-   - Hero select (random hero + 1 reroll, bots may duplicate heroes, default bot difficulty medium),
+   - Hero select (random hero + unlimited rerolls, bots may duplicate heroes, default bot difficulty medium),
      HUD (portrait + level/XP ring, HP and resource bars, ability slots with cooldowns, D/F, 6 items, gold,
      team kills, match clock, kill feed, sudden-death and whale-roll banners, respawn timer),
      shop (P; buy only at fountain or while dead; `BUILDS` recommendations), scoreboard (Tab),

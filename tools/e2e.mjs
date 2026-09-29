@@ -88,8 +88,9 @@ const until = async (page, fn, arg, ms = 20000) => { try { await page.waitForFun
   const menu = await until(page, () => !!document.querySelector('[data-act=play]'), null, 90000);
   check('hero select appears', menu);
   const k0 = await page.evaluate(() => document.querySelector('.hero-card h2').textContent);
-  await page.click('[data-act=reroll]');
-  check('reroll is spent after one use', await page.evaluate(() => document.querySelector('[data-act=reroll]').disabled));
+  const seen = new Set([k0]);
+  for (let i = 0; i < 4; i++) { await page.click('[data-act=reroll]'); seen.add(await page.evaluate(() => document.querySelector('.hero-card h2').textContent)); }
+  check('reroll is unlimited and always changes the hero', seen.size >= 3 && !(await page.evaluate(() => document.querySelector('[data-act=reroll]').disabled)), `${seen.size} heroes after 4 rerolls`);
   const chosen = await page.evaluate(() => document.querySelector('.hero-card h2').textContent);
   await page.click('[data-act=play]');
   check('Fight starts a match with the chosen hero', await until(page, (n) => window.__game && window.__game.world.tick > 30 && window.__game.world.registry.heroes[window.__game.me.heroKey].name === n, chosen, 60000), `${k0} -> ${chosen}`);
