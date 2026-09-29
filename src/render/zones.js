@@ -1,12 +1,12 @@
-// Ground effects that persist: ink strokes/loops/walls and fire trails (one ribbon mesh), pools,
-// echoes and telegraphs (one instanced disc mesh), Brindle's Hive Dome (pooled domes).
+// Zone layer: ground ribbons (ink strokes/loops/walls, fire trails: one mesh), discs (pools, echoes,
+// telegraphs, relics: one instanced mesh) and honeycomb domes (pooled). Generic engine: hero zones are drawn
+// by the presentation packs through render/hero-fx.js (hook in update); relics and telegraphs are drawn here.
 import * as THREE from 'three';
 import { S } from './palette.js';
 import { TICK_HZ } from '../sim/constants.js';
-import { EV } from '../core/events.js';
 
 const RIBBON_CAP = 6000; // vertices
-const DISC = { honey: 0, echo: 1, telegraph: 2, relic: 3 };
+import { DISC } from '../presentation/kit.js';
 
 export class ZoneViews {
   constructor(parent) {
@@ -77,14 +77,7 @@ export class ZoneViews {
           gl_FragColor = vec4(c, a); }` });
     this.domeGeo = new THREE.SphereGeometry(1, 32, 12, 0, Math.PI * 2, 0, Math.PI / 2);
     this.domes = [0, 1].map(() => { const m = new THREE.Mesh(this.domeGeo, this.domeMat.clone()); m.visible = false; m.renderOrder = 8; parent.add(m); return m; });
-    this.telegraphs = [];
-  }
-  onEvent(e, world, now) {
-    if (e.type !== EV.FX) return;
-    if (e.s === 'gus-lob' || e.s === 'gus-avalanche-warn') {
-      const src = world.entities[e.a];
-      this.telegraphs.push({ x: e.x, y: e.y, r: e.s === 'gus-lob' ? 160 : 300, start: now, dur: e.v || 0.6, team: src ? src.team : 0 });
-    }
+    this.telegraphs = []; this.nDome = 0; this.hook = null;
   }
   pushRibbon(pts, kind, alpha, width, wall = false) {
     const P = this.rPos, D = this.rDat, n = pts.length / 2;
@@ -115,31 +108,25 @@ export class ZoneViews {
     }
     this.nv = v;
   }
+  /** A honeycomb dome over (x, y) (sim units), growing in over its first quarter second. */
+  dome(x, y, r, age, fade, now) {
+    if (this.nDome >= this.domes.length) return;
+    const m = this.domes[this.nDome++], k = Math.min(1, age * 4);
+    m.visible = true; m.position.set(x * S, 0, y * S); m.scale.set(r * S * (0.6 + 0.4 * k), r * S * 0.65 * k, r * S * (0.6 + 0.4 * k));
+    m.material.uniforms.uAlpha.value = fade; m.material.uniforms.uTime.value = now;
+  }
   disc(x, y, r, kind, prog, alpha, team, seed) {
     const i = this.nd; if (i >= 64) return; this.nd++;
     this.dA.setXYZW(i, x * S, y * S, r * S, kind); this.dB.setXYZW(i, prog, alpha, team, seed);
   }
   update(world, alpha, dt, now) {
     this.ribbonMat.uniforms.uTime.value = now; this.discMat.uniforms.uTime.value = now;
-    this.nv = 0; this.nd = 0;
-    const t = world.tick;
-    let dome = 0;
-    for (const z of world.zones) {
-      const age = (t - z.born) / TICK_HZ, left = (z.until - t) / TICK_HZ, fade = Math.min(1, age * 8) * Math.min(1, left * 4);
-      switch (z.kind) {
-        case 'vesper-stroke': this.pushRibbon(z.data.pts, 0, fade, 28); break;
-        case 'vesper-loop': this.pushRibbon(z.data.pts, 0, fade, 22); break;
-        case 'vesper-wall': this.pushRibbon(z.data.pts, 1, fade, 0, true); this.pushRibbon(z.data.pts, 0, fade * 0.8, 20); break;
-        case 'saffi-trail': this.pushRibbon([z.x, z.y, z.x2, z.y2], 2, fade, 40); break;
-        case 'brindle-honey': this.disc(z.x, z.y, z.r, DISC.honey, 0, fade, z.team, z.id % 7); break;
-        case 'brindle-dome': if (dome < 2) { const m = this.domes[dome++]; m.visible = true; m.position.set(z.x * S, 0, z.y * S); const k = Math.min(1, age * 4); m.scale.set(z.r * S * (0.6 + 0.4 * k), z.r * S * 0.65 * k, z.r * S * (0.6 + 0.4 * k)); m.material.uniforms.uAlpha.value = fade; m.material.uniforms.uTime.value = now; } break;
-      }
-    }
-    for (let i = dome; i < 2; i++) this.domes[i].visible = false;
-    for (const h of world.heroes) if (h.heroKey === 'morrow' && !h.dead) for (const e of h.heroState.echoes) this.disc(e.x, e.y, 58, DISC.echo, 0, Math.min(1, (e.until - t) / TICK_HZ), h.team, e.id);
-    for (const p of world.pickups) this.disc(p.x, p.y, 70, DISC.relic, 0, 1, 0, p.id % 5);
+    this.nv = 0; this.nd = 0; this.nDome = 0;
+    if (this.hook) this.hook(world, now);
+    for (let i = this.nDome; i < this.domes.length; i++) this.domes[i].visible = false;
+    for (const p of world.pickups) this.disc(p.x, p.y, 70, DISC.RELIC, 0, 1, 0, p.id % 5);
     let w = 0;
-    for (const tg of this.telegraphs) { const k = (now - tg.start) / tg.dur; if (k > 1.1) continue; this.telegraphs[w++] = tg; this.disc(tg.x, tg.y, tg.r, DISC.telegraph, Math.min(1, k), 1 - Math.max(0, k - 1) * 10, tg.team, 0); }
+    for (const tg of this.telegraphs) { const k = (now - tg.start) / tg.dur; if (k > 1.1) continue; this.telegraphs[w++] = tg; this.disc(tg.x, tg.y, tg.r, DISC.TELEGRAPH, Math.min(1, k), 1 - Math.max(0, k - 1) * 10, tg.team, 0); }
     this.telegraphs.length = w;
     this.ribbon.geometry.setDrawRange(0, Math.max(0, (this.nv / 2 - 1) * 6)); this.ribbon.visible = this.nv > 0;
     this.rPos.needsUpdate = this.rDat.needsUpdate = true;

@@ -15,6 +15,7 @@ function addBee(world, e, n = 1) { e.resource = Math.min(MAX_BEES, e.resource + 
 export default {
   key: 'brindle', name: 'Brindle', title: 'the Beekeeper', role: 'Support', resource: 'swarm', difficulty: 'Easy',
   rankOrder: ['W', 'Q', 'E'],
+  build: ['stormglass-orb', 'stormcallers-horn', 'quickcurrent-boots', 'kelp-crown', 'molted-shell', 'cloudwool-cloak'], // recommended items: shop highlights and bot purchase order
   base: { hp: 580, hpL: 92, ad: 48, adL: 2.8, armor: 26, armorL: 4.2, mr: 30, mrL: 1.3, as: 0.64, asL: 0.018, range: 500, speed: 335, projectile: 1300, radius: 32, mana: 0 },
   init(world, e) { e.resource = 8; e.maxResource = MAX_BEES; e.heroState = { lastGain: 0, hitTick: {} }; },
   onTick(world, e) {

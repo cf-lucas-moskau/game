@@ -4,9 +4,8 @@ import { Rng } from '../core/rng.js';
 import { CMD, moveCmd, attackCmd, attackMoveCmd, castCmd, spellCmd, buyCmd, stopCmd } from '../sim/commands.js';
 import { KIND, LANE, MAP, sideX, sec } from '../sim/constants.js';
 import { canShop } from '../sim/match.js';
-import { BUILDS } from '../sim/items/index.js';
 import { snapshot, alive, d, hpr, fwd, power, underTower, minionsTankingTower, predict } from './perception.js';
-import { SCRIPTS } from './heroes.js';
+import { SCRIPTS } from './heroes/index.js';
 
 export const DIFFICULTY = {
   easy: { think: 12, aimError: 95, abilityRate: 0.55, dodge: 0.1 },
@@ -43,7 +42,7 @@ export class Bot {
   }
   shop(world, me, out) {
     if (!canShop(me) || world.tick - this.lastBuyTick < 15) return;
-    const build = BUILDS[me.heroKey] || [];
+    const build = world.registry.heroes[me.heroKey].build || [];
     for (const key of build) {
       if (me.items.includes(key)) continue;
       const it = world.registry.items[key];

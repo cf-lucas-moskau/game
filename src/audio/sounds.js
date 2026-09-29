@@ -3,27 +3,16 @@
 import { tone, noise } from './synth.js';
 import { mtof, degree } from './theory.js';
 
-const CAST = {
-  morrow: (e, b, t, p, g) => { for (let i = 0; i < 3; i++) tone(e, b, { type: 'square', f0: 1400 - i * 180, t: t + i * 0.045, dur: 0.05, gain: 0.05 * g, pan: p, filter: 3000 }); tone(e, b, { f0: 520, f1: 880, t, dur: 0.2, gain: 0.08 * g, pan: p }); },
-  saffi: (e, b, t, p, g) => noise(e, b, { type: 'lowpass', f0: 500, f1: 3200, t, dur: 0.28, gain: 0.22 * g, q: 3, pan: p, attack: 0.03 }),
-  vesper: (e, b, t, p, g) => { noise(e, b, { f0: 5200, f1: 1600, t, dur: 0.32, gain: 0.14 * g, q: 5, pan: p, attack: 0.02 }); tone(e, b, { type: 'triangle', f0: 660, f1: 990, t, dur: 0.3, gain: 0.05 * g, pan: p }); },
-  gus: (e, b, t, p, g) => { tone(e, b, { f0: 140, f1: 55, t, dur: 0.35, gain: 0.3 * g, pan: p }); noise(e, b, { type: 'lowpass', f0: 900, t, dur: 0.18, gain: 0.14 * g, pan: p }); },
-  brindle: (e, b, t, p, g) => tone(e, b, { type: 'sawtooth', f0: 190, f1: 230, t, dur: 0.4, gain: 0.05 * g, pan: p, filter: 1400, vibrato: 0.06, attack: 0.04 }),
-  auctioneer: (e, b, t, p, g) => { tone(e, b, { type: 'triangle', f0: 820, f1: 610, t, dur: 0.08, gain: 0.22 * g, pan: p }); noise(e, b, { f0: 3000, t, dur: 0.03, gain: 0.12 * g, q: 2, pan: p }); },
-};
-const AUTO = {
-  morrow: (e, b, t, p, g) => { tone(e, b, { type: 'square', f0: 1900, t, dur: 0.03, gain: 0.04 * g, pan: p, filter: 4000 }); tone(e, b, { type: 'square', f0: 1300, t: t + 0.035, dur: 0.03, gain: 0.035 * g, pan: p, filter: 3500 }); },
-  saffi: (e, b, t, p, g) => noise(e, b, { type: 'bandpass', f0: 3200, f1: 900, t, dur: 0.09, gain: 0.12 * g, q: 2, pan: p }),
-  vesper: (e, b, t, p, g) => { noise(e, b, { f0: 2600, f1: 5200, t, dur: 0.14, gain: 0.07 * g, q: 4, pan: p }); tone(e, b, { type: 'triangle', f0: 740, f1: 520, t, dur: 0.12, gain: 0.03 * g, pan: p }); },
-  gus: (e, b, t, p, g) => { tone(e, b, { f0: 110, f1: 60, t, dur: 0.16, gain: 0.2 * g, pan: p }); noise(e, b, { type: 'lowpass', f0: 700, t, dur: 0.08, gain: 0.08 * g, pan: p }); },
-  brindle: (e, b, t, p, g) => tone(e, b, { type: 'sawtooth', f0: 260, f1: 330, t, dur: 0.12, gain: 0.03 * g, pan: p, filter: 1600, vibrato: 0.08 }),
-  auctioneer: (e, b, t, p, g) => { tone(e, b, { f0: 2093, t, dur: 0.09, gain: 0.05 * g, pan: p }); tone(e, b, { f0: 3136, t: t + 0.02, dur: 0.12, gain: 0.03 * g, pan: p }); },
-};
+import { HERO_VIEWS } from '../presentation/heroes/index.js';
+
+// Hero casts and auto-attacks come from each hero's presentation pack; voices are handed over, not imported.
+const VOICES = { tone, noise };
+const heroSound = (kind) => (e, b, t, p, g, hero) => { const v = HERO_VIEWS[hero] || HERO_VIEWS.morrow; v.sounds[kind](e, b, t, p, g, VOICES); };
 export const SOUNDS = {
-  auto: (e, b, t, p, g, hero) => (AUTO[hero] || AUTO.morrow)(e, b, t, p, g),
+  auto: heroSound('auto'),
   towerLock: (e, b, t) => [0, 0.12].forEach((dt) => tone(e, b, { type: 'square', f0: 1480, t: t + dt, dur: 0.08, gain: 0.07, filter: 3000 })),
   towerHit: (e, b, t) => { tone(e, b, { f0: 150, f1: 45, t, dur: 0.35, gain: 0.35 }); noise(e, b, { type: 'lowpass', f0: 2400, f1: 300, t, dur: 0.25, gain: 0.2 }); },
-  cast: (e, b, t, p, g, hero) => (CAST[hero] || CAST.morrow)(e, b, t, p, g),
+  cast: heroSound('cast'),
   hitDealt: (e, b, t, p, g) => { noise(e, b, { f0: 2400, t, dur: 0.05, gain: 0.12 * g, q: 1.5, pan: p }); tone(e, b, { f0: 180, f1: 90, t, dur: 0.08, gain: 0.12 * g, pan: p }); },
   hitTaken: (e, b, t, p, g) => { tone(e, b, { type: 'triangle', f0: 120, f1: 70, t, dur: 0.12, gain: 0.25 * g, pan: p }); noise(e, b, { type: 'lowpass', f0: 1200, t, dur: 0.07, gain: 0.12 * g, pan: p }); },
   melee: (e, b, t, p, g) => noise(e, b, { f0: 1500, f1: 700, t, dur: 0.06, gain: 0.05 * g, q: 1, pan: p }),

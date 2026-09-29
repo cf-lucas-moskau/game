@@ -33,8 +33,10 @@ The rules that keep it replaceable:
   the rig's palette texture in its own atlas cell; only that skin's body UVs point at it), prop, rig, accent and
   golem-tint overrides. `resolveLook(hero, skin)` is the only way presentation code gets a look. Skins ride in
   the roster (`session.roster[i].skin`, bots pick one from a presentation RNG); the sim never sees them.
-- **Content is data + hooks.** A hero is one module in `sim/heroes/`, an item is one entry in `sim/items/index.js`.
-  Adding either touches no system code.
+- **Content is data + hooks.** A hero is three modules: its rules in `sim/heroes/<hero>.js` (stats, abilities,
+  recommended build), its bot in `ai/heroes/<hero>.js`, and its presentation pack in `presentation/heroes/<hero>.js`
+  (identity, aim shapes, attack styles, sounds and effect hooks). An item is one entry in `sim/items/index.js`.
+  Adding either touches no system code; `tests/presentation.test.js` checks that every hero is complete.
 
 ## Frame and tick
 
@@ -88,8 +90,10 @@ three.js on a fixed angled camera; gameplay stays on a 2D plane.
   VAT-instanced minions (`vat.js`), structures, the Pebble companion.
 - `overlays.js`: health bars, ground decals, projectile views (shape shader per `attack-styles.js`).
 - `combat-fx.js`: melee swipes, tower range rings, lock-on tethers, launch flashes and impacts (pooled records).
-- `ability-fx.js`: per-hero ability styles (clock, flame, ink, stone, honey, gold decals).
-- `fx.js` + `particles.js`: GPU particles; `zones.js`: persistent ability areas; `indicators.js`: aim shapes.
+- `hero-fx.js`: runs the presentation packs. It dispatches casts, blinks and named effects to the pack that owns
+  them and gives packs one api over three generic engines, each of which calls a hook between its per-frame reset
+  and its GPU upload: `ability-fx.js` (ground decals in each hero's style), `zones.js` (ribbons, discs, domes,
+  telegraphs) and `fx.js` + `particles.js` (GPU particles). `indicators.js`: aim shapes.
 - `atlas.js`: runtime texture atlas + one shared lit material (draw calls stay under 50).
 - `glow-lights.js`: a fixed pool of point lights assigned to the nearest glowing props.
 - `quality.js`: low/medium/high presets and the `ResolutionGuard` that lowers resolution under load.

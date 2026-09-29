@@ -1,25 +1,17 @@
-// Hero ability styles: each hero has its own visual language so a glance tells who did what.
-//   Morrow     brass clockwork: clock faces, ticking hands, tick-marked afterimages
-//   Saffi      candle fire: molten wax wedges, scorch marks, flame rings
-//   Vesper     ink: brush-edged washes and splatter
-//   Gus        stone: radial cracks, dust rings, boulder tracks
-//   Brindle    honey: glossy honeycomb
-//   Auctioneer gold: filigree rings, coin dots, a gilded chain
-// Ground decals are one instanced draw; the fragment shader draws the pattern for each style and
-// shape (circle, ring, cone, line). Event and state driven; presentation only.
+// Ground decals in each hero's visual language (clock, flame, ink, stone, honey, gold): one instanced draw;
+// the fragment shader draws the pattern for each style and shape (disc, ring, cone, line).
+// Generic engine: what to draw comes from the hero presentation packs through render/hero-fx.js, which
+// adds timed decals (add) and puts this frame's lasting states (put) from the hook between reset and upload.
 import * as THREE from 'three';
+import { DECAL_STYLES, DECAL as SHAPE } from '../presentation/kit.js';
 import { S } from './palette.js';
-import { EV } from '../core/events.js';
-import { KIND } from '../sim/constants.js';
 import { rx, ry } from './interp.js';
 
-export const STYLE = { CLOCK: 0, FLAME: 1, INK: 2, STONE: 3, HONEY: 4, GOLD: 5 };
-const SHAPE = { DISC: 0, RING: 1, CONE: 2, LINE: 3 };
-const HERO_STYLE = { morrow: STYLE.CLOCK, saffi: STYLE.FLAME, vesper: STYLE.INK, gus: STYLE.STONE, brindle: STYLE.HONEY, auctioneer: STYLE.GOLD };
-const COLORS = { [STYLE.CLOCK]: '#f2c14e', [STYLE.FLAME]: '#ff8a3d', [STYLE.INK]: '#8b7bff', [STYLE.STONE]: '#cdb894', [STYLE.HONEY]: '#ffc233', [STYLE.GOLD]: '#ffd65a' };
-const RGB = Object.fromEntries(Object.entries(COLORS).map(([k, v]) => [k, new THREE.Color(v)]));
+/** Decal style name -> shader style index. */
+export const STYLE_ID = Object.fromEntries(DECAL_STYLES.map((n, i) => [n, i]));
+const COLORS = { clock: '#f2c14e', flame: '#ff8a3d', ink: '#8b7bff', stone: '#cdb894', honey: '#ffc233', gold: '#ffd65a' };
+const RGB = DECAL_STYLES.map((n) => new THREE.Color(COLORS[n]));
 const CAP = 96;
-const rnd = (a, b) => a + Math.random() * (b - a);
 
 export class AbilityFX {
   constructor(parent) {
@@ -87,7 +79,7 @@ export class AbilityFX {
           if (a < .01 && max(max(c.r, c.g), c.b) < .01) discard;
           gl_FragColor = vec4(c, clamp(a, 0., 1.)); }` }));
     this.mesh.frustumCulled = false; this.mesh.renderOrder = 6; parent.add(this.mesh);
-    this.active = []; this.n = 0; this.rollStamp = new Map();
+    this.active = []; this.n = 0; this.hook = null;
   }
   /** Add a timed decal. o: { x, z (render units), r | len+width, style, shape, angle, half, dur, spin, spinRate, inner, grow } */
   add(o, now) { if (this.active.length < 64) this.active.push({ ...o, start: now, seed: Math.random() * 100 }); }
@@ -96,55 +88,6 @@ export class AbilityFX {
     const c = RGB[style];
     this.iA.setXYZW(i, x, z, hx, hz); this.iB.setXYZW(i, angle, style, shape, half);
     this.iC.setXYZW(i, c.r, c.g, c.b, alpha); this.iD.setXYZW(i, prog, seed, spin, inner);
-  }
-  // --------------------------------------------------------------- events -> decals and signature particles
-  onEvent(e, world, now, r) {
-    const ent = world.entities[e.a], x = e.x * S, z = e.y * S, fx = r.fx;
-    if (e.type === EV.CAST && ent) {
-      const st = HERO_STYLE[e.s]; if (st === undefined) return;
-      const cx = rx(ent) * S, cz = ry(ent) * S;
-      // every cast: a small signature under the caster in the hero's own style
-      this.add({ x: cx, z: cz, r: 0.9, style: st, shape: SHAPE.RING, inner: 0.55, dur: 0.45, spinRate: 6, grow: 0.3 }, now);
-      this.castFx(e.s, e.b, ent, cx, cz, x, z, now, r);
-      return;
-    }
-    if (e.type === EV.BLINK) {
-      const tx = ent ? ent.x * S : x, tz = ent ? ent.y * S : z, len = Math.hypot(tx - x, tz - z) / 2, ang = Math.atan2(tz - z, tx - x);
-      const st = e.s.startsWith('morrow') ? STYLE.CLOCK : e.s.startsWith('saffi') ? STYLE.FLAME : null;
-      if (st !== null && len > 0.05) this.add({ x: (x + tx) / 2, z: (z + tz) / 2, len, width: 0.28, angle: ang, style: st, shape: SHAPE.LINE, dur: 0.7 }, now);
-      if (e.s === 'morrow-rewind') this.add({ x: tx, z: tz, r: 1.6, style: STYLE.CLOCK, shape: SHAPE.DISC, dur: 1, spinRate: -14 }, now);
-      if (e.s === 'saffi-flicker') { this.add({ x, z, r: 0.7, style: STYLE.FLAME, shape: SHAPE.DISC, dur: 1.2 }, now); this.add({ x: tx, z: tz, r: 0.6, style: STYLE.FLAME, shape: SHAPE.DISC, dur: 0.8 }, now); }
-      return;
-    }
-    if (e.type === EV.REWIND) { this.add({ x, z, r: 1.3, style: STYLE.CLOCK, shape: SHAPE.DISC, dur: 0.6, spinRate: -18 }, now); return; }
-    if (e.type !== EV.FX) return;
-    switch (e.s) {
-      case 'saffi-wax': this.add({ x, z, r: 4.2, style: STYLE.FLAME, shape: SHAPE.CONE, angle: e.v, half: Math.PI / 5, dur: 0.7 }, now); break; // the exact hit area (420 units, +-36 deg)
-      case 'saffi-snuff-exec': case 'saffi-mark-pop': this.add({ x, z, r: 1, style: STYLE.FLAME, shape: SHAPE.DISC, dur: 0.5, grow: 0.5 }, now); break;
-      case 'gus-slam': this.add({ x, z, r: 2, style: STYLE.STONE, shape: SHAPE.DISC, dur: 1.4, grow: 1 }, now); break;
-      case 'gus-rock-impact': this.add({ x, z, r: 1.7, style: STYLE.STONE, shape: SHAPE.DISC, dur: 1.2, grow: 1 }, now); break;
-      case 'gus-avalanche': this.add({ x, z, r: 3.2, style: STYLE.STONE, shape: SHAPE.DISC, dur: 2.2, grow: 1 }, now); fx.ring(x, z, 0.3, 40, 0.8, RGB[STYLE.STONE], 0.8, 0.3, 6); break;
-      case 'vesper-masterpiece': this.add({ x, z, r: 2.2, style: STYLE.INK, shape: SHAPE.RING, inner: 1.7, dur: 1 }, now); break;
-      case 'vesper-fizzle': this.add({ x, z, r: 0.6, style: STYLE.INK, shape: SHAPE.DISC, dur: 0.5 }, now); break;
-      case 'brindle-shield': this.add({ x, z, r: 1, style: STYLE.HONEY, shape: SHAPE.RING, inner: 0.7, dur: 0.6 }, now); break;
-      case 'auctioneer-refund': for (let i = 0; i < fx.n(10); i++) fx.p.spawn(x, 1.2, z, rnd(-1.5, 1.5), rnd(3, 5), rnd(-1.5, 1.5), 0.9, 1, 0.84, 0.35, 2.2, 0.12, 0.08, 9, 0.2); break;
-      case 'auctioneer-hook': { const o = ent ? { x: ent.x * S, z: ent.y * S } : { x, z }; const len = Math.hypot(o.x - x, o.z - z) / 2; if (len > 0.05) this.add({ x: (x + o.x) / 2, z: (z + o.z) / 2, len, width: 0.18, angle: Math.atan2(o.z - z, o.x - x), style: STYLE.GOLD, shape: SHAPE.LINE, dur: 0.5 }, now); break; }
-      case 'auctioneer-repossess': case 'auctioneer-return': this.add({ x, z, r: 1.3, style: STYLE.GOLD, shape: SHAPE.RING, inner: 0.9, dur: 1.2, spinRate: 5 }, now); break;
-    }
-  }
-  castFx(hero, slot, ent, cx, cz, tx, tz, now, r) {
-    const fx = r.fx, col = RGB[HERO_STYLE[hero]];
-    switch (hero) {
-      case 'morrow':
-        if (slot === 1) this.add({ x: cx, z: cz, r: 1.25, style: STYLE.CLOCK, shape: SHAPE.DISC, dur: 2, spinRate: 3, follow: ent.id }, now); // wind-up: a ticking face under him
-        else if (slot === 0) for (let i = 0; i < fx.n(8); i++) fx.p.spawn(cx, 1, cz, rnd(-2, 2), rnd(1, 3), rnd(-2, 2), 0.4, col.r, col.g, col.b, 2.2, 0.06, 0.02, 8, 1);
-        break;
-      case 'saffi': if (slot === 3) fx.ring(cx, cz, 0.3, 40, 0.3, col, 0.8, 0.3, 4); break;
-      case 'vesper': fx.burst(cx, cz, 1.1, 10, 1.4, col, 0.5, 0.14, 0.02, { drag: 3, gravity: 3 }); break;
-      case 'gus': if (slot === 3) this.add({ x: tx, z: tz, r: 3, style: STYLE.STONE, shape: SHAPE.RING, inner: 2.7, dur: 0.9 }, now); break;
-      case 'brindle': if (slot === 2) this.add({ x: tx, z: tz, r: 0.9, style: STYLE.HONEY, shape: SHAPE.RING, inner: 0.6, dur: 0.5, grow: 0.8 }, now); break;
-      case 'auctioneer': for (let i = 0; i < fx.n(6); i++) fx.p.spawn(cx, 1.3, cz, rnd(-1, 1), rnd(2, 3.5), rnd(-1, 1), 0.7, col.r, col.g, col.b, 2, 0.1, 0.07, 9, 0.2); break;
-    }
   }
   // --------------------------------------------------------------- per frame
   update(world, alpha, dt, now, r) {
@@ -160,27 +103,8 @@ export class AbilityFX {
       else this.put(x, z, d.r * grow, d.r * grow, d.angle || 0, d.style, d.shape, d.half || 0, fade, Math.min(1, k * 2.5), d.seed, spin, d.inner ? d.inner / d.r : 0);
     }
     this.active.length = w;
-    // lasting states, drawn while they hold
-    const t = world.tick;
-    // Gus's boulder roll leaves cracked ground (stamp times kept here: sim records stay fixed-shape)
-    for (const u of world.entities) if (u.alive && !u.dead && u.dashUntil > t && u.dashFx === 'pebble-roll') {
-      const last = this.rollStamp.get(u.id) || 0; if (now - last < 0.09) continue;
-      this.rollStamp.set(u.id, now); this.add({ x: rx(u) * S, z: ry(u) * S, r: 0.8, style: STYLE.STONE, shape: SHAPE.DISC, dur: 1.2, grow: 0.6 }, now);
-    }
-    for (const h of world.heroes) {
-      if (h.dead) continue;
-      const x = rx(h) * S, z = ry(h) * S, hs = h.heroState;
-      if (h.heroKey === 'saffi' && hs.blazeUntil > t) this.put(x, z, 1.3, 1.3, 0, STYLE.FLAME, SHAPE.RING, 0, Math.min(1, (hs.blazeUntil - t) / 15), 1, h.id, 0, 0.72);
-      if (h.heroKey === 'vesper' && hs.mpUntil > t) this.put(x, z, 1.4, 1.4, 0, STYLE.INK, SHAPE.RING, 0, Math.min(1, (hs.mpUntil - t) / 15), 1, h.id, 0, 0.8);
-      if (h.ampUntil > t) this.put(x, z, 0.95, 0.95, 0, STYLE.GOLD, SHAPE.RING, 0, Math.min(1, (h.ampUntil - t) / 10), 1, h.id, now * 2, 0.62); // appraised: a gilded price ring
-      if (h.markUntil > t) this.put(x, z, 0.8, 0.8, 0, STYLE.FLAME, SHAPE.RING, 0, 0.8, 1, h.id + 3, 0, 0.66); // Saffi's wax mark
-      if (h.shield > 0 && h.shieldUntil > t) {
-        const st = h.heroKey === 'morrow' && hs.windupShield ? STYLE.CLOCK : STYLE.HONEY; // Morrow shields himself, Brindle shields allies
-        this.put(x, z, 0.85, 0.85, 0, st, SHAPE.RING, 0, 0.9, 1, h.id + 7, now * 3, 0.7);
-      }
-    }
-    for (const zn of world.zones) if (zn.kind === 'brindle-honey') this.put(zn.x * S, zn.y * S, zn.r * S, zn.r * S, 0, STYLE.HONEY, SHAPE.DISC, 0, Math.min(1, (zn.until - t) / 10, (t - zn.born) / 5), 1, zn.id, 0, 0);
-    for (const u of world.entities) if (u.alive && !u.dead && u.kind !== KIND.HERO && u.ampUntil > t) this.put(rx(u) * S, ry(u) * S, 0.8, 0.8, 0, STYLE.GOLD, SHAPE.RING, 0, 0.8, 1, u.id, now * 2, 0.62);
+    // lasting states (packs, via hero-fx.js)
+    if (this.hook) this.hook(world, now);
     this.mesh.geometry.instanceCount = this.n; this.mesh.visible = this.n > 0;
     if (this.n) this.iA.needsUpdate = this.iB.needsUpdate = this.iC.needsUpdate = this.iD.needsUpdate = true;
   }
