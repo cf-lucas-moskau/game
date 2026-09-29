@@ -4,7 +4,6 @@ import { h, clear, setText } from './dom.js';
 import { statLines } from './format.js';
 import { buyCmd, sellCmd } from '../sim/commands.js';
 import { canShop } from '../sim/match.js';
-import { BUILDS } from '../sim/items/index.js';
 import { RULES } from '../sim/constants.js';
 import { itemImpact } from './numbers.js';
 import { itemIcon } from './identity.js';
@@ -38,7 +37,7 @@ export class Shop {
     const me = this.s.me, w = this.s.world, items = w.registry.items, here = canShop(me), full = me.items.length >= RULES.MAX_ITEMS;
     this.sig = this.signature();
     setText(this.status, `${Math.floor(me.gold)} gold`);
-    const build = BUILDS[me.heroKey] || [];
+    const build = w.registry.heroes[me.heroKey].build || [];
     const card = (key) => {
       const it = items[key], owned = me.items.includes(key), rec = build.includes(key);
       const why = !here ? 'Return to your fountain to buy' : full ? 'Inventory full: sell something first' : it.unique && owned ? 'Already owned' : me.gold < it.cost ? `Need ${Math.ceil(it.cost - me.gold)} more gold` : '';

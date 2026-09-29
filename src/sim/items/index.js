@@ -105,12 +105,3 @@ export const ITEMS = {
 for (const [k, v] of Object.entries(ITEMS)) v.key = k;
 export const ITEM_KEYS = Object.keys(ITEMS);
 
-/** Recommended builds per hero (shop highlights + bot purchase order). */
-export const BUILDS = {
-  morrow: ['stormglass-orb', 'lanternfish-lens', 'quickcurrent-boots', 'kelp-crown', 'borrowed-seconds', 'cloudwool-cloak'],
-  saffi: ['iron-fin', 'harpoon-chain', 'quickcurrent-boots', 'cursed-coin', 'borrowed-seconds', 'whalehide-vest'],
-  vesper: ['stormglass-orb', 'kelp-crown', 'quickcurrent-boots', 'lanternfish-lens', 'borrowed-seconds', 'cloudwool-cloak'],
-  gus: ['tidal-heart', 'barnacle-plate', 'magnet-boots', 'molted-shell', 'iron-fin', 'whalehide-vest'],
-  brindle: ['stormglass-orb', 'stormcallers-horn', 'quickcurrent-boots', 'kelp-crown', 'molted-shell', 'cloudwool-cloak'],
-  auctioneer: ['stormglass-orb', 'lanternfish-lens', 'magnet-boots', 'kelp-crown', 'borrowed-seconds', 'cloudwool-cloak'],
-};

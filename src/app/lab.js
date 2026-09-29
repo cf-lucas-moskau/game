@@ -1,7 +1,7 @@
 // Leviathan Lab: an isolated stage for looking at heroes, animations and effects up close, without
 // playing a match. One hero, training dummies that never die, no minions, towers that hold fire.
 // Time is frame-exact when paused (step), so tooling gets identical frames every run.
-//   URL:  index.html?lab=1&hero=saffi&cam=front
+//   URL:  index.html?lab=1&hero=saffi&skin=bluewick&cam=front
 //   JS:   window.__lab  (setHero, camera, anim, cast, attack, walk, step, play, pause, info)
 //   CLI:  node tools/lab.mjs ...   (drives the same API and writes PNGs)
 import { createMatch } from '../sim/match.js';
@@ -12,6 +12,7 @@ import { castCmd, attackCmd, moveCmd, stopCmd } from '../sim/commands.js';
 import { GameRenderer } from '../render/renderer.js';
 import { S } from '../render/palette.js';
 import { h, clear } from '../ui/dom.js';
+import { skinsFor, validSkin, DEFAULT_SKIN } from '../assets/skins.js';
 
 const STAGE = { x: 1900, y: 450, gap: 300 };
 // camera presets around the hero (render units); the hero faces +x, towards the dummies
@@ -22,16 +23,17 @@ export const CAMERAS = {
 };
 
 export class Lab {
-  constructor({ root, lib, quality = 'high', hero = 'vesper', dummy = 'morrow', dummies = 2 }) {
+  constructor({ root, lib, quality = 'high', hero = 'vesper', skin = DEFAULT_SKIN, dummy = 'morrow', dummies = 2 }) {
     this.root = root; this.lib = lib; this.quality = quality; this.dummy = dummy; this.dummies = dummies;
     this.camName = 'three'; this.zoom = 1; this.now = 0; this.running = false; this.frameDt = 1 / 60; this.acc = 0; this.cmds = [];
-    this.setHero(hero);
+    this.setHero(hero, { skin });
   }
   // --------------------------------------------------------------- scene
-  setHero(key, { dummy = this.dummy, dummies = this.dummies } = {}) {
+  setHero(key, { skin = DEFAULT_SKIN, dummy = this.dummy, dummies = this.dummies } = {}) {
     if (!HEROES[key]) throw new Error(`unknown hero ${key}; one of ${HERO_KEYS.join(', ')}`);
+    if (!validSkin(key, skin)) throw new Error(`unknown skin ${skin} for ${key}; one of ${skinsFor(key).map((s) => s.key).join(', ')}`);
     this.dispose();
-    this.heroKey = key; this.dummy = dummy; this.dummies = dummies;
+    this.heroKey = key; this.skin = skin; this.dummy = dummy; this.dummies = dummies;
     const roster = [{ playerId: 0, heroKey: key, team: 0, isBot: false }];
     for (let i = 0; i < dummies; i++) roster.push({ playerId: 1 + i, heroKey: dummy, team: 1, isBot: true });
     const w = this.world = createMatch({ seed: 7, roster, content: CONTENT });
@@ -45,7 +47,7 @@ export class Lab {
     this.canvas = h('canvas', { style: { position: 'fixed', inset: '0', width: '100vw', height: '100vh', display: 'block' } });
     this.root.prepend(this.canvas);
     this.renderer = new GameRenderer(this.canvas, this.lib, w, { quality: this.quality });
-    this.renderer.focusId = me.id; this.renderer.myTeam = 0;
+    this.renderer.focusId = me.id; this.renderer.myTeam = 0; this.renderer.units.skins.set(0, skin);
     this.camera(this.camName, this.zoom);
     this.step(0.05); // settle views
     return this.info();
@@ -116,7 +118,7 @@ export class Lab {
   pause() { this.running = false; }
   info() {
     const v = this.heroView(), def = HEROES[this.heroKey];
-    return { hero: this.heroKey, heroes: HERO_KEYS, clips: v ? Object.keys(v.actions) : [], abilities: ['Q', 'W', 'E', 'R'].map((k) => `${k} ${def.abilities[k].name}`), cameras: Object.keys(CAMERAS), tick: this.world.tick };
+    return { hero: this.heroKey, skin: this.skin, skins: skinsFor(this.heroKey).map((x) => x.key), heroes: HERO_KEYS, clips: v ? Object.keys(v.actions) : [], abilities: ['Q', 'W', 'E', 'R'].map((k) => `${k} ${def.abilities[k].name}`), cameras: Object.keys(CAMERAS), tick: this.world.tick };
   }
   dispose() { this.pause(); if (this.renderer) { this.renderer.dispose(); this.canvas.remove(); this.renderer = null; } }
 }
@@ -132,6 +134,7 @@ export function labPanel(root, lab) {
     clear(el).append(...[
       h('b', {}, 'Leviathan Lab'),
       row('Hero', ...info.heroes.map((k) => btn(k, () => { lab.setHero(k); clip = null; }, k === info.hero))),
+      row('Skin', ...info.skins.map((k) => btn(k, () => { lab.setHero(info.hero, { skin: k }); clip = null; }, k === info.skin))),
       row('Camera', ...info.cameras.map((c) => btn(c, () => lab.camera(c, lab.zoom), c === lab.camName)), btn('−', () => lab.camera(lab.camName, lab.zoom * 1.25)), btn('+', () => lab.camera(lab.camName, lab.zoom / 1.25))),
       row('Clip', btn('auto', () => { clip = null; lab.anim(null); }, !clip), ...info.clips.map((c) => btn(c, () => { clip = c; scrub = null; lab.anim(c); }, c === clip))),
       clip ? row('Scrub', h('input', { type: 'range', min: '0', max: '1', step: '0.01', value: String(scrub ?? 0), oninput: (e) => { scrub = +e.target.value; const v = lab.heroView(); const d = v.actions[clip].getClip().duration; lab.anim(clip, scrub * d); } })) : null,

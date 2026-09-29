@@ -112,9 +112,14 @@ for (const [w, hgt] of [[844, 390], [390, 844]]) {
   const seen = new Set([k0]);
   for (let i = 0; i < 4; i++) { await page.click('[data-act=reroll]'); seen.add(await page.evaluate(() => document.querySelector('.hero-card h2').textContent)); }
   check('reroll is unlimited and always changes the hero', seen.size >= 3 && !(await page.evaluate(() => document.querySelector('[data-act=reroll]').disabled)), `${seen.size} heroes after 4 rerolls`);
+  // pick a hero from the roster and a skin; both must reach the match
+  await page.click('[data-hero=saffi]');
+  check('clicking a roster tile selects that hero', await page.evaluate(() => document.querySelector('.hero-card h2').textContent === 'Saffi Blinkwick' && document.querySelector('[data-hero=saffi]').classList.contains('on')));
+  await page.click('[data-skin=bluewick]');
   const chosen = await page.evaluate(() => document.querySelector('.hero-card h2').textContent);
   await page.click('[data-act=play]');
   check('Fight starts a match with the chosen hero', await until(page, (n) => window.__game && window.__game.world.tick > 30 && window.__game.world.registry.heroes[window.__game.me.heroKey].name === n, chosen, 60000), `${k0} -> ${chosen}`);
+  check('the chosen hero and skin reach the match', await page.evaluate(() => window.__game.me.heroKey === 'saffi' && window.__game.roster[0].skin === 'bluewick'));
   check('HUD shows the hero', await page.evaluate(() => !!document.querySelector('.hud .dock') && !document.querySelector('.menu')));
   check('audio unlocks on the first click and plays music and effects', await until(page, () => { const a = window.__app.audio; return a.ready && a.played > 20; }, null, 20000),
     await page.evaluate(() => { const a = window.__app.audio; return `${a.ctx && a.ctx.state}, ${a.played} voices played, ${a.dropped} dropped`; }));
@@ -131,9 +136,26 @@ for (const [w, hgt] of [[844, 390], [390, 844]]) {
   await page.click('[aria-label=Scoreboard] tbody tr[data-id]:not(.me)');
   check('clicking a scoreboard row shows that hero\'s details and items', await until(page, () => { const p = document.querySelector('.inspect'); return p && !p.classList.contains('hidden') && p.querySelectorAll('.ins-item').length === 6; }));
   await page.keyboard.press('Escape');
-  const ally = await page.evaluate(() => { const g = window.__game, a = g.world.heroes.find((h) => h !== g.me && h.team === g.me.team); return g.renderer.worldToScreen(a.x, a.y, 0.6); });
+  // click a unit where it is drawn (screen-space picking: what you see is what you click): a hero if one is on the
+  // canvas and not under the HUD (allies first), else a minion, tower or Heartstone (bots may all be down the lane
+  // while the player shops at the fountain). Time is frozen for the click: a bot moves ~15 px between reading its
+  // position and the click landing, which is not what this checks.
+  const ally = await page.evaluate(() => {
+    const g = window.__game; g.stop();
+    // kinds by preference: hero, Pebble, minions, tower, Heartstone; aim at the middle of the body
+    const ORDER = [1, 7, 2, 3, 4, 5, 6], MID = { 1: 1.2, 7: 0.7, 2: 0.5, 3: 0.5, 4: 0.6, 5: 2.5, 6: 1.3 };
+    const us = g.world.entities.filter((u) => u && u.alive && !u.dead && u !== g.me && ORDER.includes(u.kind))
+      .sort((a, b) => ORDER.indexOf(a.kind) - ORDER.indexOf(b.kind) || (a.team === g.me.team ? 0 : 1) - (b.team === g.me.team ? 0 : 1));
+    for (const u of us) {
+      const p = g.renderer.worldToScreen(u.x, u.y, MID[u.kind]), el = document.elementFromPoint(p.x, p.y);
+      if (p.visible && el && el.tagName === 'CANVAS') return { x: p.x, y: p.y, name: u.kind === 1 ? g.world.registry.heroes[u.heroKey].name : `kind ${u.kind}` };
+    }
+    return { x: 0, y: 0, name: 'nothing visible' };
+  });
   await page.mouse.click(ally.x, ally.y);
-  check('left-clicking a unit on the battlefield inspects it', await until(page, () => !document.querySelector('.inspect').classList.contains('hidden')), await page.evaluate(() => document.querySelector('.ins-name') ? document.querySelector('.ins-name').textContent : 'no panel'));
+  await page.evaluate(() => window.__game.start());
+  check('left-clicking a unit on the battlefield inspects it', await until(page, () => !document.querySelector('.inspect').classList.contains('hidden')),
+    `clicked ${ally.name}, panel ${await page.evaluate(() => document.querySelector('.inspect').classList.contains('hidden') ? 'closed' : document.querySelector('.ins-name').textContent)}`);
   await page.evaluate(() => window.__app.match.inspect.hide());
   await page.click('[data-act=menu]');
   await page.click('[data-act=surrender]'); await page.click('[data-act=confirm-surrender]');
@@ -146,6 +168,23 @@ for (const [w, hgt] of [[844, 390], [390, 844]]) {
   check('audio voices are released (no leak across matches)', await page.evaluate(() => { const v = window.__app.audio.voices; return v.sfx <= 28 && v.music <= 22; }),
     await page.evaluate(() => JSON.stringify(window.__app.audio.voices)));
   check('no page errors (loop)', errors.length === 0, errors[0] || '');
+  await page.close();
+}
+// ---------------- painted portraits: every hero paints, distinct, and the menu shows one
+{
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  const errors = []; page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto(url(''));
+  await page.waitForSelector('[data-act=play]', { timeout: 90000 });
+  const shown = await until(page, () => !!document.querySelector('.hero-card .emblem.painted'), null, 30000);
+  const res = await page.evaluate(async () => {
+    const heroes = ['morrow', 'saffi', 'vesper', 'gus', 'brindle', 'auctioneer', 'nimbus', 'coralie', 'kestrel', 'mistral', 'rime', 'thorne', 'cantor', 'lumen', 'dredge', 'wisp'];
+    const urls = []; for (const h of heroes) urls.push(await window.__portraits.paint(h, 'classic'));
+    urls.push(await window.__portraits.paint('saffi', 'bluewick'));
+    return { n: urls.length, ok: urls.every((u) => u.startsWith('data:image/png') && u.length > 20000), distinct: new Set(urls).size };
+  });
+  check('menu shows a painted portrait', shown);
+  check('portraits paint for every hero and skins, all distinct', res.ok && res.distinct === res.n && errors.length === 0, errors[0] || `${res.n} portraits, ${res.distinct} distinct`);
   await page.close();
 }
 // ---------------- Leviathan Lab: every hero loads, casts every ability and plays every clip
@@ -164,9 +203,26 @@ for (const [w, hgt] of [[844, 390], [390, 844]]) {
       lab.attack(); lab.step(1);
       done.push(h);
     }
-    return done.length;
+    return { done: done.length, total: lab.info().heroes.length };
   });
-  check('lab: every hero plays every clip and casts every ability', r === 6 && errors.length === 0, errors[0] || `${r} heroes`);
+  check('lab: every hero plays every clip and casts every ability', r.done === r.total && r.total >= 6 && errors.length === 0, errors[0] || `${r.done} heroes`);
+  // every skin loads, and a palette skin's body samples its own recoloured atlas cell
+  const sk = await page.evaluate(() => {
+    const lab = window.__lab, bad = []; let n = 0;
+    for (const h of lab.info().heroes) for (const k of lab.info().skins.length ? (lab.setHero(h), lab.info().skins) : []) {
+      lab.setHero(h, { skin: k }); lab.step(1 / 30); n++;
+      const v = lab.heroView(), variant = lab.lib.atlas.variants[`${h}:${k}`];
+      if (!variant) continue;
+      // held props bake into the same mesh with their own cells: count only the palette cells
+      const inCell = (u, w, du, dv) => u >= variant.u0 + du - 1e-4 && u <= variant.u0 + du + variant.size + 1e-4 && w >= variant.v0 + dv - 1e-4 && w <= variant.v0 + dv + variant.size + 1e-4;
+      let moved = 0, left = 0;
+      v.body.traverse((o) => { if (!o.isSkinnedMesh) return; const a = o.geometry.attributes.uv.array;
+        for (let i = 0; i < a.length; i += 2) { if (inCell(a[i], a[i + 1], variant.du, variant.dv)) moved++; else if (inCell(a[i], a[i + 1], 0, 0)) left++; } });
+      if (!moved || left) bad.push(`${h}:${k} moved ${moved}, left in the base cell ${left}`);
+    }
+    return { n, bad };
+  });
+  check('lab: every skin loads and palette skins use their own atlas cell', sk.n > r.total && !sk.bad.length && errors.length === 0, errors[0] || sk.bad[0] || `${sk.n} hero/skin looks`);
   await page.close();
 }
 await browser.close();

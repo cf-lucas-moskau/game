@@ -38,7 +38,7 @@ export class InspectPanel {
       const stats = [['Attack damage', Math.round(e.ad)], ['Ability power', Math.round(e.ap)], ['Armor', Math.round(e.armor)], ['Magic resist', Math.round(e.mr)],
         ['Attack speed', e.as.toFixed(2)], ['Auto DPS', Math.round(a.dps)], ['Move speed', Math.round(e.speed)], ['Range', Math.round(e.range)]];
       clear(this.body).append(
-        h('div', { class: 'ins-head' }, emblem(e.heroKey), h('div', {}, h('div', { class: `ins-name ${tcls}` }, def.name), h('div', { class: 'ins-sub' }, `${e === me ? 'You' : mine ? 'Ally' : 'Enemy'} · Level ${e.level} `, h('span', { class: 'kda' }, `· ${e.kills} / ${e.deaths} / ${e.assists}`)))),
+        h('div', { class: 'ins-head' }, emblem(e.heroKey, '', this.s.skinOf ? this.s.skinOf(e) : 'classic'), h('div', {}, h('div', { class: `ins-name ${tcls}` }, def.name), h('div', { class: 'ins-sub' }, `${e === me ? 'You' : mine ? 'Ally' : 'Enemy'} · Level ${e.level} `, h('span', { class: 'kda' }, `· ${e.kills} / ${e.deaths} / ${e.assists}`)))),
         hp, h('div', { class: 'ins-label' }, 'Items'), h('div', { class: 'ins-items' }, slots),
         h('div', { class: 'ins-stats' }, stats.map(([k, v]) => [h('span', {}, k), h('b', {}, String(v))])));
     } else {

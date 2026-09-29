@@ -12,7 +12,7 @@ export class EndScreen {
       h('div', { class: 'panel' },
         h('h1', { class: win ? 'win' : 'loss' }, win ? 'Victory' : 'Defeat'),
         h('div', { class: 'why' }, why),
-        ...teamTables(w, me),
+        ...teamTables(w, me, null, (x) => session.skinOf(x)),
         h('div', { class: 'actions' },
           h('button', { class: 'btn', onclick: onRematch, 'data-act': 'rematch' }, 'Rematch (same hero)'),
           h('button', { class: 'btn primary', onclick: onPlayAgain, 'data-act': 'again' }, 'Play again'))));

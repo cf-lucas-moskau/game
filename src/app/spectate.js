@@ -6,6 +6,8 @@ import { BotDirector } from '../ai/director.js';
 import { FixedLoop } from '../core/fixed-loop.js';
 import { TICK_HZ } from '../sim/constants.js';
 import { GameRenderer } from '../render/renderer.js';
+import { Rng } from '../core/rng.js';
+import { pickSkin } from '../assets/skins.js';
 
 export function startSpectate({ canvas, lib, seed = 1, quality = 'medium', telemetry, heroes = null, difficulty = 'medium', timeScale = 1, skipSeconds = 0, fixedBuffer = null }) {
   const roster = (heroes || [...HERO_KEYS]).map((k, p) => ({ playerId: p, heroKey: k, team: p < 3 ? 0 : 1, isBot: true }));
@@ -15,6 +17,8 @@ export function startSpectate({ canvas, lib, seed = 1, quality = 'medium', telem
   world.events.drain(() => {});
   const renderer = new GameRenderer(canvas, lib, world, { quality, telemetry, fixedBuffer });
   renderer.focusId = world.heroes[0].id;
+  const look = new Rng(seed ^ 0x51c1), rand = () => look.next();
+  for (const r of roster) renderer.units.skins.set(r.playerId, pickSkin(r.heroKey, rand));
   let last = performance.now();
   const loop = new FixedLoop({ hz: TICK_HZ,
     step: () => { dir.commands(world, cmds); const t0 = performance.now(); world.step(cmds); telemetry && telemetry.sim.push(performance.now() - t0); },

@@ -4,7 +4,7 @@
 //   Vesper: hold Q/W/E and move the mouse to draw, release to cast
 //   D / F: summoner spells, S: stop, A + left click: attack-move, 1-6: item actives
 import { moveCmd, attackCmd, attackMoveCmd, castCmd, spellCmd, stopCmd, itemActiveCmd } from '../sim/commands.js';
-import { hoverTarget, clampToRange } from './intent.js';
+import { screenPick, clampToRange } from './intent.js';
 import { aimFor, isDrawn, SPELL_AIM } from './aim.js';
 
 const SLOT_KEYS = { KeyQ: 0, KeyW: 1, KeyE: 2, KeyR: 3 };
@@ -25,10 +25,12 @@ export class DesktopInput {
   }
   get me() { return this.s.me; }
   world() { return this.s.world; }
+  /** Unit under the mouse (screen-space pick; see intent.screenPick). */
+  pick(me, any = false) { const r = this.canvas.getBoundingClientRect(); return screenPick(this.s.renderer, this.world(), me, this.mouse.sx - r.left, this.mouse.sy - r.top, any); }
   toWorld() { const p = this.s.renderer.screenToWorld(this.mouse.sx, this.mouse.sy); if (p) { this.mouse.x = p.x; this.mouse.y = p.y; } return this.mouse; }
   move(e) {
     this.mouse.sx = e.clientX; this.mouse.sy = e.clientY; this.toWorld();
-    const h = hoverTarget(this.world(), this.me, this.mouse.x, this.mouse.y);
+    const h = this.pick(this.me);
     this.s.renderer.hoverId = h && h.team !== this.me.team ? h.id : -1;
     if (this.stroke) this.addStrokePoint();
     if (this.aim.active) { this.aim.x = this.mouse.x; this.aim.y = this.mouse.y; }
@@ -38,7 +40,7 @@ export class DesktopInput {
     const p = this.s.player, m = this.mouse;
     if (e.button === 2) {
       this.mouse.right = true; this.attackArmed = false;
-      const h = hoverTarget(this.world(), this.me, m.x, m.y);
+      const h = this.pick(this.me);
       if (this.aim.active && !this.stroke) { this.cancelAim(); return; } // right click cancels a Shift preview
       if (h && h.team !== this.me.team) { this.s.send(attackCmd(p, h.id)); this.s.renderer.marker(h.x, h.y, 'attack'); }
       else { this.s.send(moveCmd(p, m.x, m.y)); this.s.renderer.marker(m.x, m.y, 'move'); }
@@ -47,7 +49,7 @@ export class DesktopInput {
       if (this.aim.active && !this.stroke) { this.release(this.aim.slot); return; }
       if (this.attackArmed) { this.attackArmed = false; this.s.send(attackMoveCmd(p, m.x, m.y)); this.s.renderer.marker(m.x, m.y, 'attack'); return; }
       // left click on a unit (ally, enemy, yourself, minion or tower) opens its details; on the ground closes them
-      const u = hoverTarget(this.world(), null, m.x, m.y, 60, true);
+      const u = this.pick(null, true);
       this.onInspect(u ? u.id : -1);
     }
   }
@@ -56,7 +58,7 @@ export class DesktopInput {
     const now = performance.now();
     if (this.mouse.right && !this.stroke && now - this.lastSteer > 125) {
       this.lastSteer = now; this.toWorld();
-      const h = hoverTarget(this.world(), this.me, this.mouse.x, this.mouse.y);
+      const h = this.pick(this.me);
       if (!(h && h.team !== this.me.team)) this.s.send(moveCmd(this.s.player, this.mouse.x, this.mouse.y));
     }
     if (this.aim.active) { this.toWorld(); this.aim.x = this.mouse.x; this.aim.y = this.mouse.y; }
@@ -98,7 +100,7 @@ export class DesktopInput {
     s.push(m.x, m.y); this.aim.pts = s;
   }
   cast(slot, a, x = this.mouse.x, y = this.mouse.y, pts = null) {
-    const h = hoverTarget(this.world(), this.me, x, y);
+    const h = this.pick(this.me);
     const id = h && (a.kind === 'ally' ? h.team === this.me.team : h.team !== this.me.team) ? h.id : -1;
     this.s.send(castCmd(this.s.player, slot, x, y, pts, id));
   }

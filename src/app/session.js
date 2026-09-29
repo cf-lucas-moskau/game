@@ -11,19 +11,25 @@ import { LocalTransport } from '../net/transport.js';
 import { Rng } from '../core/rng.js';
 import { GameRenderer } from '../render/renderer.js';
 import { Predictor } from './predictor.js';
+import { pickSkin, validSkin, DEFAULT_SKIN } from '../assets/skins.js';
 
 export class GameSession {
   /**
    * @param o.heroKey  hero for the local player
+   * @param o.skin     skin for the local player (presentation only; bots pick their own)
    * @param o.net      { ping, jitter, loss } simulated network conditions
    * @param o.autopilot  drive the local player with a bot through the same input path (benchmarks)
    */
-  constructor({ canvas, lib, seed = 1, heroKey, heroes = null, quality, telemetry, difficulty = 'medium', net = {}, autopilot = false, fixedBuffer = null, skipSeconds = 0 }) {
+  constructor({ canvas, lib, seed = 1, heroKey, skin = DEFAULT_SKIN, heroes = null, quality, telemetry, difficulty = 'medium', net = {}, autopilot = false, fixedBuffer = null, skipSeconds = 0 }) {
     const rng = new Rng(seed ^ 0x5eed);
     const pick = () => rng.pick(HERO_KEYS);
     const valid = (k) => HERO_KEYS.includes(k);
     const roster = [{ playerId: 0, heroKey: (heroes && valid(heroes[0]) && heroes[0]) || heroKey || pick(), team: 0, isBot: false }];
     for (let p = 1; p < 6; p++) roster.push({ playerId: p, heroKey: (heroes && valid(heroes[p]) && heroes[p]) || pick(), team: p < 3 ? 0 : 1, isBot: true });
+    // skins ride in the roster like they will in a lobby; the sim ignores them
+    const look = new Rng(seed ^ 0x51c1), rand = () => look.next();
+    for (const r of roster) r.skin = r.isBot ? pickSkin(r.heroKey, rand) : (validSkin(r.heroKey, skin) ? skin : DEFAULT_SKIN);
+    this.roster = roster;
     this.world = createMatch({ seed, roster, content: CONTENT });
     this.bots = new BotDirector(this.world, difficulty);
     this.transport = new LocalTransport({ ...net, seed });
@@ -34,6 +40,7 @@ export class GameSession {
     this.world.events.drain(() => {});
     this.renderer = new GameRenderer(canvas, lib, this.world, { quality, telemetry, fixedBuffer });
     this.renderer.focusId = this.me.id; this.renderer.myTeam = this.me.team;
+    for (const r of roster) this.renderer.units.skins.set(r.playerId, r.skin);
     this.predictor = new Predictor(this.world, this.me, telemetry);
     this.renderer.predictor = this.predictor;
     this.listeners = new Set();
@@ -41,6 +48,8 @@ export class GameSession {
     this.loop = new FixedLoop({ hz: TICK_HZ, step: () => this.tick(), render: (alpha) => this.frame(alpha) });
   }
   start() { this.loop.start(); return this; }
+  /** The skin a hero wears in this match (presentation only). */
+  skinOf(e) { const r = this.roster[e.playerId]; return r ? r.skin : 'classic'; }
   stop() { this.loop.stop(); }
   /** Receive every sim event the renderer drains (UI: kill feed, banners, damage numbers). */
   tapEvents(fn) { const tap = { onEvent: fn, update() {} }; this.renderer.extra.push(tap); return () => { const i = this.renderer.extra.indexOf(tap); if (i >= 0) this.renderer.extra.splice(i, 1); }; }

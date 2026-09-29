@@ -1,25 +1,18 @@
-// Hero ability styles: each hero has its own visual language so a glance tells who did what.
-//   Morrow     brass clockwork: clock faces, ticking hands, tick-marked afterimages
-//   Saffi      candle fire: molten wax wedges, scorch marks, flame rings
-//   Vesper     ink: brush-edged washes and splatter
-//   Gus        stone: radial cracks, dust rings, boulder tracks
-//   Brindle    honey: glossy honeycomb
-//   Auctioneer gold: filigree rings, coin dots, a gilded chain
-// Ground decals are one instanced draw; the fragment shader draws the pattern for each style and
-// shape (circle, ring, cone, line). Event and state driven; presentation only.
+// Ground decals in each hero's visual language (DECAL_STYLES in presentation/kit.js): one instanced draw;
+// the fragment shader draws the pattern for each style and shape (disc, ring, cone, line).
+// Generic engine: what to draw comes from the hero presentation packs through render/hero-fx.js, which
+// adds timed decals (add) and puts this frame's lasting states (put) from the hook between reset and upload.
 import * as THREE from 'three';
+import { DECAL_STYLES, DECAL as SHAPE } from '../presentation/kit.js';
 import { S } from './palette.js';
-import { EV } from '../core/events.js';
-import { KIND } from '../sim/constants.js';
 import { rx, ry } from './interp.js';
 
-export const STYLE = { CLOCK: 0, FLAME: 1, INK: 2, STONE: 3, HONEY: 4, GOLD: 5 };
-const SHAPE = { DISC: 0, RING: 1, CONE: 2, LINE: 3 };
-const HERO_STYLE = { morrow: STYLE.CLOCK, saffi: STYLE.FLAME, vesper: STYLE.INK, gus: STYLE.STONE, brindle: STYLE.HONEY, auctioneer: STYLE.GOLD };
-const COLORS = { [STYLE.CLOCK]: '#f2c14e', [STYLE.FLAME]: '#ff8a3d', [STYLE.INK]: '#8b7bff', [STYLE.STONE]: '#cdb894', [STYLE.HONEY]: '#ffc233', [STYLE.GOLD]: '#ffd65a' };
-const RGB = Object.fromEntries(Object.entries(COLORS).map(([k, v]) => [k, new THREE.Color(v)]));
+/** Decal style name -> shader style index. */
+export const STYLE_ID = Object.fromEntries(DECAL_STYLES.map((n, i) => [n, i]));
+const COLORS = { clock: '#f2c14e', flame: '#ff8a3d', ink: '#8b7bff', stone: '#cdb894', honey: '#ffc233', gold: '#ffd65a',
+  storm: '#a8f0ff', coral: '#ff9e8a', sight: '#d4ff5a', wind: '#bff5e6', frost: '#9ec9ff', vine: '#6fd66a', sound: '#ff9ee6', star: '#ffe9b0', iron: '#b7c3cf', shadow: '#d65cff' };
+const RGB = DECAL_STYLES.map((n) => new THREE.Color(COLORS[n]));
 const CAP = 96;
-const rnd = (a, b) => a + Math.random() * (b - a);
 
 export class AbilityFX {
   constructor(parent) {
@@ -77,17 +70,67 @@ export class AbilityFX {
             float h = hex(p * 3.2 + seed), cell = smoothstep(.42, .38, h), line = smoothstep(.36, .46, h) - smoothstep(.46, .5, h);
             float gloss = pow(max(0., sin(ang * 2. + uTime * .8 + r * 6.)), 8.) * .35;
             c = col * (cell * .35 + line * 1.1 + gloss + rim * .9); a = cell * .35 + line * .7 + rim * .5;
-          } else { // GOLD: filigree ring with orbiting coins
+          } else if (style == 5) { // GOLD: filigree ring with orbiting coins
             float fil = smoothstep(.04, 0., abs(sin(ang * 6. + spin) * .25 - (r - .8))) * step(.6, r);
             float coins = 0.; for (int i = 0; i < 6; i++) { float ca = spin * .5 + float(i) * 1.0472; coins += smoothstep(.1, .06, length(p - .88 * vec2(cos(ca), sin(ca)))); }
             float glow = smoothstep(1., .5, r) * .12;
             c = col * (fil * 1.3 + coins * 1.6 + rim * 1.1 + glow); a = fil * .6 + coins * .8 + rim * .5 + glow;
+          } else if (style == 6) { // STORM: jagged bolts forking out from the centre, flickering; dark cloud wash
+            float bolt = 0.;
+            for (int i = 0; i < 5; i++) { float ca = seed * 6.2832 + float(i) * 1.2566 + (noise(vec2(r * 7., float(i) + seed)) - .5) * .9; bolt += smoothstep(.04, 0., abs(sin(ang - ca)) * r) * step(0., cos(ang - ca)) * step(r, prog * .9 + .1); }
+            if (shape == 3) bolt = smoothstep(.12, 0., abs(p.y - (noise(vec2(p.x * 6., seed)) - .5) * .9));
+            float flick = .55 + .45 * step(.35, fract(uTime * 9. + seed * 3.)), wash = .12 * (1. - r);
+            c = col * (wash * .5 + rim * 1.1) + vec3(.92, .97, 1.) * bolt * 1.7 * flick; a = wash * .5 + min(1., bolt) * .9 * flick + rim * .5;
+          } else if (style == 7) { // CORAL: caustic ripples over teal water, coral polyps near the rim
+            float n = noise(p * 6. + uTime * .6 + seed), caust = smoothstep(.6, .85, abs(sin((n + r * 2.) * 6.)));
+            vec2 g = floor(p * 9.); float dot_ = step(.72, hash(g + seed)) * smoothstep(.45, .2, length(fract(p * 9.) - .5)) * step(.5, r);
+            c = mix(vec3(.08, .4, .5), col, .45) * (.25 + caust * .7) + col * dot_ * 1.3 + col * rim; a = .2 + caust * .3 + dot_ * .6 + rim * .5;
+          } else if (style == 8) { // SIGHT: a turning reticle with cross ticks and a centre dot; dashed tracers on lines
+            float cs = cos(spin), sn = sin(spin); vec2 q = vec2(p.x * cs - p.y * sn, p.x * sn + p.y * cs);
+            float ticks = step(abs(q.x), .035) * step(.35, abs(q.y)) * step(abs(q.y), .75) + step(abs(q.y), .035) * step(.35, abs(q.x)) * step(abs(q.x), .75);
+            float ring = smoothstep(.04, 0., abs(r - .86)), inner = smoothstep(.09, .05, r);
+            c = col * (ring * 1.4 + ticks * 1.3 + inner * 1.6 + rim * .8 + .05); a = ring * .8 + ticks * .8 + inner * .8 + rim * .4 + .05;
+            if (shape == 3) { float dash_ = step(.45, fract(p.x * 7. - uTime * 5.)) * smoothstep(.6, 0., r); c = col * (dash_ * 1.4 + rim * .6); a = dash_ * .8 + rim * .3; }
+          } else if (style == 9) { // WIND: spiral streaks sweeping around (along the line on corridors)
+            float sw = shape == 3 ? sin(p.x * 12. - uTime * 10. + p.y * 3. + seed) : sin(ang * 3. + r * 10. - uTime * 6. + seed);
+            float streak = smoothstep(.7, 1., sw) * (1. - r * .3);
+            c = col * (streak * 1.1 + rim * .7 + .08); a = streak * .55 + rim * .35 + .06;
+          } else if (style == 10) { // FROST: crystal facets, six snowflake arms, a frosted rim
+            float h = hex(p * 4. + seed), facet = smoothstep(.42, .5, h);
+            float flake = smoothstep(.045, 0., abs(sin(ang * 3. + spin * .2)) * r) * step(r, .9) + smoothstep(.03, 0., abs(sin(ang * 3. + 1.5708 + spin * .2)) * r) * step(r, .45);
+            vec3 ice = mix(vec3(.78, .92, 1.), col, .4);
+            c = ice * (.16 + facet * .45 + flake * 1.2 + rim * 1.1); a = .2 + facet * .28 + flake * .6 + rim * .6;
+          } else if (style == 11) { // VINE: curling tendrils that grow outward, thorns, a leafy wash
+            float vine = 0.;
+            for (int i = 0; i < 4; i++) { float ca = seed * 6.2832 + float(i) * 1.5708 + sin(r * 9. + float(i)) * .35; vine += smoothstep(.045, 0., abs(sin(ang - ca)) * r) * step(0., cos(ang - ca)) * step(r, prog * .95 + .05); }
+            if (shape == 3) vine = smoothstep(.16, 0., abs(p.y - sin(p.x * 8. + seed) * .4));
+            float thorn = step(.88, fract(r * 14. + seed)) * min(1., vine * 3.), wash = noise(p * 5. + seed) * .25;
+            c = col * (min(1., vine) * 1.2 + thorn * .8 + rim * .7) + vec3(.12, .3, .08) * wash * 2.; a = min(1., vine) * .8 + wash * .5 + rim * .4 + thorn * .3;
+          } else if (style == 12) { // SOUND: rings of sound rolling outward
+            float q = fract((shape == 3 ? abs(p.x) : r) * 3.5 - uTime * 1.4 + seed), ring = smoothstep(.2, .0, abs(q - .5));
+            c = col * (ring * 1.2 * (1. - r * .5) + rim * .9 + .06); a = ring * .6 * (1. - r * .4) + rim * .5 + .05;
+          } else if (style == 13) { // STAR: a five-point star, constellation points on the rim, twinkles
+            float k = cos(ang * 5. + spin) * .5 + .5, sr = mix(.24, .56, k) * .9;
+            float outline = smoothstep(.035, 0., abs(r - sr)), inside = step(r, sr) * .22, dots = 0.;
+            for (int i = 0; i < 5; i++) { float ca = float(i) * 1.2566 + spin * .3; dots += smoothstep(.07, .03, length(p - .86 * vec2(cos(ca), sin(ca)))); }
+            float tw = step(.975, hash(floor(p * 18.) + floor(uTime * 4.)));
+            c = col * (outline * 1.4 + inside + dots * 1.6 + tw * 1.5 + rim * .8); a = outline * .7 + inside * .6 + dots * .8 + tw * .6 + rim * .4 + .05;
+          } else if (style == 14) { // IRON: a riveted steel band with a chain along it
+            float band = step(.62, r) * step(r, .95), rv = 0.;
+            for (int i = 0; i < 10; i++) { float ca = float(i) * .6283 + seed; rv += smoothstep(.06, .03, length(p - .78 * vec2(cos(ca), sin(ca)))); }
+            float link = smoothstep(.05, 0., abs(abs(fract(ang * 2.546 + spin) - .5) - .25)) * smoothstep(.1, 0., abs(r - .78));
+            if (shape == 3) { band = step(r, .7); link = smoothstep(.08, 0., abs(length(vec2(fract(p.x * 5.) - .5, p.y * 1.4)) - .3)); rv = 0.; }
+            c = vec3(.22, .24, .28) * band * .9 + col * (rv * 1.4 + link * 1.2 + rim * 1.1); a = band * .45 + rv * .7 + link * .6 + rim * .5;
+          } else { // SHADOW: drifting smoke, black at the heart, a violet glow at the edge
+            float n = noise(p * 4. + vec2(uTime * .5, -uTime * .3) + seed) * .6 + noise(p * 9. - uTime) * .4;
+            float smoke = smoothstep(.35, .8, n + (1. - r) * .35);
+            c = mix(vec3(.02, 0., .05), col * .7, smoothstep(.18, 0., edge)) * (.6 + smoke * .5); a = smoke * .75 + rim * .45;
           }
           float alpha = vC.a; c *= alpha; a *= alpha;
           if (a < .01 && max(max(c.r, c.g), c.b) < .01) discard;
           gl_FragColor = vec4(c, clamp(a, 0., 1.)); }` }));
     this.mesh.frustumCulled = false; this.mesh.renderOrder = 6; parent.add(this.mesh);
-    this.active = []; this.n = 0; this.rollStamp = new Map();
+    this.active = []; this.n = 0; this.hook = null;
   }
   /** Add a timed decal. o: { x, z (render units), r | len+width, style, shape, angle, half, dur, spin, spinRate, inner, grow } */
   add(o, now) { if (this.active.length < 64) this.active.push({ ...o, start: now, seed: Math.random() * 100 }); }
@@ -96,55 +139,6 @@ export class AbilityFX {
     const c = RGB[style];
     this.iA.setXYZW(i, x, z, hx, hz); this.iB.setXYZW(i, angle, style, shape, half);
     this.iC.setXYZW(i, c.r, c.g, c.b, alpha); this.iD.setXYZW(i, prog, seed, spin, inner);
-  }
-  // --------------------------------------------------------------- events -> decals and signature particles
-  onEvent(e, world, now, r) {
-    const ent = world.entities[e.a], x = e.x * S, z = e.y * S, fx = r.fx;
-    if (e.type === EV.CAST && ent) {
-      const st = HERO_STYLE[e.s]; if (st === undefined) return;
-      const cx = rx(ent) * S, cz = ry(ent) * S;
-      // every cast: a small signature under the caster in the hero's own style
-      this.add({ x: cx, z: cz, r: 0.9, style: st, shape: SHAPE.RING, inner: 0.55, dur: 0.45, spinRate: 6, grow: 0.3 }, now);
-      this.castFx(e.s, e.b, ent, cx, cz, x, z, now, r);
-      return;
-    }
-    if (e.type === EV.BLINK) {
-      const tx = ent ? ent.x * S : x, tz = ent ? ent.y * S : z, len = Math.hypot(tx - x, tz - z) / 2, ang = Math.atan2(tz - z, tx - x);
-      const st = e.s.startsWith('morrow') ? STYLE.CLOCK : e.s.startsWith('saffi') ? STYLE.FLAME : null;
-      if (st !== null && len > 0.05) this.add({ x: (x + tx) / 2, z: (z + tz) / 2, len, width: 0.28, angle: ang, style: st, shape: SHAPE.LINE, dur: 0.7 }, now);
-      if (e.s === 'morrow-rewind') this.add({ x: tx, z: tz, r: 1.6, style: STYLE.CLOCK, shape: SHAPE.DISC, dur: 1, spinRate: -14 }, now);
-      if (e.s === 'saffi-flicker') { this.add({ x, z, r: 0.7, style: STYLE.FLAME, shape: SHAPE.DISC, dur: 1.2 }, now); this.add({ x: tx, z: tz, r: 0.6, style: STYLE.FLAME, shape: SHAPE.DISC, dur: 0.8 }, now); }
-      return;
-    }
-    if (e.type === EV.REWIND) { this.add({ x, z, r: 1.3, style: STYLE.CLOCK, shape: SHAPE.DISC, dur: 0.6, spinRate: -18 }, now); return; }
-    if (e.type !== EV.FX) return;
-    switch (e.s) {
-      case 'saffi-wax': this.add({ x, z, r: 4.2, style: STYLE.FLAME, shape: SHAPE.CONE, angle: e.v, half: Math.PI / 5, dur: 0.7 }, now); break; // the exact hit area (420 units, +-36 deg)
-      case 'saffi-snuff-exec': case 'saffi-mark-pop': this.add({ x, z, r: 1, style: STYLE.FLAME, shape: SHAPE.DISC, dur: 0.5, grow: 0.5 }, now); break;
-      case 'gus-slam': this.add({ x, z, r: 2, style: STYLE.STONE, shape: SHAPE.DISC, dur: 1.4, grow: 1 }, now); break;
-      case 'gus-rock-impact': this.add({ x, z, r: 1.7, style: STYLE.STONE, shape: SHAPE.DISC, dur: 1.2, grow: 1 }, now); break;
-      case 'gus-avalanche': this.add({ x, z, r: 3.2, style: STYLE.STONE, shape: SHAPE.DISC, dur: 2.2, grow: 1 }, now); fx.ring(x, z, 0.3, 40, 0.8, RGB[STYLE.STONE], 0.8, 0.3, 6); break;
-      case 'vesper-masterpiece': this.add({ x, z, r: 2.2, style: STYLE.INK, shape: SHAPE.RING, inner: 1.7, dur: 1 }, now); break;
-      case 'vesper-fizzle': this.add({ x, z, r: 0.6, style: STYLE.INK, shape: SHAPE.DISC, dur: 0.5 }, now); break;
-      case 'brindle-shield': this.add({ x, z, r: 1, style: STYLE.HONEY, shape: SHAPE.RING, inner: 0.7, dur: 0.6 }, now); break;
-      case 'auctioneer-refund': for (let i = 0; i < fx.n(10); i++) fx.p.spawn(x, 1.2, z, rnd(-1.5, 1.5), rnd(3, 5), rnd(-1.5, 1.5), 0.9, 1, 0.84, 0.35, 2.2, 0.12, 0.08, 9, 0.2); break;
-      case 'auctioneer-hook': { const o = ent ? { x: ent.x * S, z: ent.y * S } : { x, z }; const len = Math.hypot(o.x - x, o.z - z) / 2; if (len > 0.05) this.add({ x: (x + o.x) / 2, z: (z + o.z) / 2, len, width: 0.18, angle: Math.atan2(o.z - z, o.x - x), style: STYLE.GOLD, shape: SHAPE.LINE, dur: 0.5 }, now); break; }
-      case 'auctioneer-repossess': case 'auctioneer-return': this.add({ x, z, r: 1.3, style: STYLE.GOLD, shape: SHAPE.RING, inner: 0.9, dur: 1.2, spinRate: 5 }, now); break;
-    }
-  }
-  castFx(hero, slot, ent, cx, cz, tx, tz, now, r) {
-    const fx = r.fx, col = RGB[HERO_STYLE[hero]];
-    switch (hero) {
-      case 'morrow':
-        if (slot === 1) this.add({ x: cx, z: cz, r: 1.25, style: STYLE.CLOCK, shape: SHAPE.DISC, dur: 2, spinRate: 3, follow: ent.id }, now); // wind-up: a ticking face under him
-        else if (slot === 0) for (let i = 0; i < fx.n(8); i++) fx.p.spawn(cx, 1, cz, rnd(-2, 2), rnd(1, 3), rnd(-2, 2), 0.4, col.r, col.g, col.b, 2.2, 0.06, 0.02, 8, 1);
-        break;
-      case 'saffi': if (slot === 3) fx.ring(cx, cz, 0.3, 40, 0.3, col, 0.8, 0.3, 4); break;
-      case 'vesper': fx.burst(cx, cz, 1.1, 10, 1.4, col, 0.5, 0.14, 0.02, { drag: 3, gravity: 3 }); break;
-      case 'gus': if (slot === 3) this.add({ x: tx, z: tz, r: 3, style: STYLE.STONE, shape: SHAPE.RING, inner: 2.7, dur: 0.9 }, now); break;
-      case 'brindle': if (slot === 2) this.add({ x: tx, z: tz, r: 0.9, style: STYLE.HONEY, shape: SHAPE.RING, inner: 0.6, dur: 0.5, grow: 0.8 }, now); break;
-      case 'auctioneer': for (let i = 0; i < fx.n(6); i++) fx.p.spawn(cx, 1.3, cz, rnd(-1, 1), rnd(2, 3.5), rnd(-1, 1), 0.7, col.r, col.g, col.b, 2, 0.1, 0.07, 9, 0.2); break;
-    }
   }
   // --------------------------------------------------------------- per frame
   update(world, alpha, dt, now, r) {
@@ -160,27 +154,8 @@ export class AbilityFX {
       else this.put(x, z, d.r * grow, d.r * grow, d.angle || 0, d.style, d.shape, d.half || 0, fade, Math.min(1, k * 2.5), d.seed, spin, d.inner ? d.inner / d.r : 0);
     }
     this.active.length = w;
-    // lasting states, drawn while they hold
-    const t = world.tick;
-    // Gus's boulder roll leaves cracked ground (stamp times kept here: sim records stay fixed-shape)
-    for (const u of world.entities) if (u.alive && !u.dead && u.dashUntil > t && u.dashFx === 'pebble-roll') {
-      const last = this.rollStamp.get(u.id) || 0; if (now - last < 0.09) continue;
-      this.rollStamp.set(u.id, now); this.add({ x: rx(u) * S, z: ry(u) * S, r: 0.8, style: STYLE.STONE, shape: SHAPE.DISC, dur: 1.2, grow: 0.6 }, now);
-    }
-    for (const h of world.heroes) {
-      if (h.dead) continue;
-      const x = rx(h) * S, z = ry(h) * S, hs = h.heroState;
-      if (h.heroKey === 'saffi' && hs.blazeUntil > t) this.put(x, z, 1.3, 1.3, 0, STYLE.FLAME, SHAPE.RING, 0, Math.min(1, (hs.blazeUntil - t) / 15), 1, h.id, 0, 0.72);
-      if (h.heroKey === 'vesper' && hs.mpUntil > t) this.put(x, z, 1.4, 1.4, 0, STYLE.INK, SHAPE.RING, 0, Math.min(1, (hs.mpUntil - t) / 15), 1, h.id, 0, 0.8);
-      if (h.ampUntil > t) this.put(x, z, 0.95, 0.95, 0, STYLE.GOLD, SHAPE.RING, 0, Math.min(1, (h.ampUntil - t) / 10), 1, h.id, now * 2, 0.62); // appraised: a gilded price ring
-      if (h.markUntil > t) this.put(x, z, 0.8, 0.8, 0, STYLE.FLAME, SHAPE.RING, 0, 0.8, 1, h.id + 3, 0, 0.66); // Saffi's wax mark
-      if (h.shield > 0 && h.shieldUntil > t) {
-        const st = h.heroKey === 'morrow' && hs.windupShield ? STYLE.CLOCK : STYLE.HONEY; // Morrow shields himself, Brindle shields allies
-        this.put(x, z, 0.85, 0.85, 0, st, SHAPE.RING, 0, 0.9, 1, h.id + 7, now * 3, 0.7);
-      }
-    }
-    for (const zn of world.zones) if (zn.kind === 'brindle-honey') this.put(zn.x * S, zn.y * S, zn.r * S, zn.r * S, 0, STYLE.HONEY, SHAPE.DISC, 0, Math.min(1, (zn.until - t) / 10, (t - zn.born) / 5), 1, zn.id, 0, 0);
-    for (const u of world.entities) if (u.alive && !u.dead && u.kind !== KIND.HERO && u.ampUntil > t) this.put(rx(u) * S, ry(u) * S, 0.8, 0.8, 0, STYLE.GOLD, SHAPE.RING, 0, 0.8, 1, u.id, now * 2, 0.62);
+    // lasting states (packs, via hero-fx.js)
+    if (this.hook) this.hook(world, now);
     this.mesh.geometry.instanceCount = this.n; this.mesh.visible = this.n > 0;
     if (this.n) this.iA.needsUpdate = this.iB.needsUpdate = this.iC.needsUpdate = this.iD.needsUpdate = true;
   }

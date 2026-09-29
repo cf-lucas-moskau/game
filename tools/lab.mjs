@@ -8,8 +8,9 @@
 //   node tools/lab.mjs ability --hero gus --slot R [--frames 6 --every 0.15] timeline after a cast
 //   node tools/lab.mjs attack  --hero vesper [--frames 6 --every 0.08]    auto-attack timeline
 //   node tools/lab.mjs heroes  [--cam front] [--clip idle]                 every hero, one tile each
+//   node tools/lab.mjs skins   [--hero saffi] [--cam front]                every skin (of one hero, or of all), one tile each
 // Common: --cam front|side|back|three|close|top|wide|game  --zoom 1  --size 640x480  --quality high
-//         --dummy morrow --dummies 2  --out path.png (default .shots/lab-<command>-<hero>.png)
+//         --skin bluewick  --dummy morrow --dummies 2  --out path.png (default .shots/lab-<command>-<hero>.png)
 // Needs `npm run build` first (reads dist/index.html). PW_PATH points at a playwright install.
 import { createRequire } from 'node:module';
 import { writeFileSync, mkdirSync, rmSync } from 'node:fs';
@@ -25,14 +26,14 @@ const opt = {}; for (let i = 0; i < rest.length; i++) if (rest[i].startsWith('--
 const hero = opt.hero || 'vesper', cam = opt.cam || (cmd === 'ability' || cmd === 'attack' ? 'wide' : 'three'), zoom = +(opt.zoom || 1);
 const [W, H] = (opt.size || (cmd === 'shot' ? '960x640' : '480x360')).split('x').map(Number);
 const frames = +(opt.frames || (cmd === 'strip' ? 8 : 6)), every = +(opt.every || (cmd === 'attack' ? 0.08 : 0.15));
-const out = opt.out || join(root, '.shots', `lab-${cmd}-${cmd === 'heroes' ? 'all' : hero}${opt.clip ? '-' + opt.clip : ''}${opt.slot ? '-' + opt.slot : ''}.png`);
+const out = opt.out || join(root, '.shots', `lab-${cmd}-${cmd === 'heroes' || (cmd === 'skins' && !opt.hero) ? 'all' : hero}${opt.skin ? '-' + opt.skin : ''}${opt.clip ? '-' + opt.clip : ''}${opt.slot ? '-' + opt.slot : ''}.png`);
 
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 const errors = [];
-async function openLab(h) {
+async function openLab(h, skin = opt.skin || 'classic') {
   const page = await browser.newPage({ viewport: { width: W, height: H } });
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto(`file://${root}/dist/index.html?lab=1&panel=0&paused=1&hero=${h}&cam=${cam}&zoom=${zoom}&quality=${opt.quality || 'high'}&dummy=${opt.dummy || 'morrow'}&dummies=${opt.dummies || 2}`);
+  await page.goto(`file://${root}/dist/index.html?lab=1&panel=0&paused=1&hero=${h}&skin=${skin}&cam=${cam}&zoom=${zoom}&quality=${opt.quality || 'high'}&dummy=${opt.dummy || 'morrow'}&dummies=${opt.dummies || 2}`);
   await page.waitForFunction(() => window.__lab, null, { timeout: 90000 });
   await page.evaluate(() => window.__lab.step(0.3));
   return page;
@@ -55,8 +56,15 @@ if (cmd === 'info') {
   const page = await openLab(hero), slot = opt.slot || 'Q';
   const name = await page.evaluate(([c, s]) => (c === 'attack' ? (window.__lab.attack(), 'auto-attack') : window.__lab.cast(s, 'dummy')), [cmd, slot]);
   for (let i = 0; i < frames; i++) { await page.evaluate((dt) => window.__lab.step(dt), i === 0 ? 1 / 30 : every); await snap(page, `${hero} ${cmd === 'attack' ? 'auto' : slot + ' ' + name} +${(i === 0 ? 1 / 30 : 1 / 30 + i * every).toFixed(2)}s`); }
+} else if (cmd === 'skins') {
+  const first = await openLab(opt.hero || 'vesper'), all = await first.evaluate(() => window.__lab.info().heroes); await first.close();
+  for (const h of opt.hero ? [opt.hero] : all) {
+    const probe = await openLab(h), skins = await probe.evaluate(() => window.__lab.info().skins); await probe.close();
+    for (const k of skins) { const page = await openLab(h, k); await snap(page, `${h} · ${k}`); await page.close(); }
+  }
 } else if (cmd === 'heroes') {
-  for (const h of ['morrow', 'saffi', 'vesper', 'gus', 'brindle', 'auctioneer']) {
+  const first = await openLab(hero), all = await first.evaluate(() => window.__lab.info().heroes); await first.close();
+  for (const h of all) {
     const page = await openLab(h);
     if (opt.clip) await page.evaluate((c) => { window.__lab.anim(c, 0.3); window.__lab.step(1 / 60); }, opt.clip);
     await snap(page, h); await page.close();

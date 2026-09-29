@@ -8,21 +8,20 @@ import { itemIcon } from './identity.js';
 import { cdKey, cdLabel } from './format.js';
 import { EV } from '../core/events.js';
 import { KIND, RULES, TICK_HZ, xpToNext } from '../sim/constants.js';
-import { byRank } from '../sim/abilities.js';
+import { abilityCost, abilityCooldown } from '../sim/abilities.js';
+import { poolAmount } from '../sim/resources.js';
 import { canShop } from '../sim/match.js';
 import { itemActiveCmd } from '../sim/commands.js';
 import { abilityNumbers } from './numbers.js';
 
 const KEYS = ['Q', 'W', 'E', 'R'];
-const RES_COLOR = { mana: 'linear-gradient(180deg,#7aa2ff,#4a6fe0)', ink: 'linear-gradient(180deg,#a99cff,#7564e8)', flame: 'linear-gradient(180deg,#ffc27a,#f07a3a)', swarm: 'linear-gradient(180deg,#ffe07a,#e0a82e)' };
+const RES_COLOR = { mana: 'linear-gradient(180deg,#7aa2ff,#4a6fe0)', ink: 'linear-gradient(180deg,#a99cff,#7564e8)', flame: 'linear-gradient(180deg,#ffc27a,#f07a3a)', swarm: 'linear-gradient(180deg,#ffe07a,#e0a82e)', energy: 'linear-gradient(180deg,#b7f5c4,#4fc98a)' };
 const RING = 2 * Math.PI * 34;
+/** Smaller label type for names whose longest word would not fit a slot ("Thunderhead", "Masterpiece"). */
+const fitClass = (name) => { const w = Math.max(...String(name).split(/\s+/).map((x) => x.length)); return w >= 10 || String(name).length > 14 ? ' xs' : w >= 9 ? ' s' : ''; };
 const fmtClock = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 const fmtPair = (k) => `${Math.floor(k / 1e5)} / ${k % 1e5}`;
 const RANK_UP = [{ transform: 'translateY(-6px)' }, { transform: 'none' }];
-/** Current amount of the pool an ability spends, or -1 when it costs nothing trackable. */
-function resourcePool(me, type) {
-  switch (type) { case 'mana': return me.mana; case 'ink': case 'swarm': return me.resource; case 'gold': return me.gold; default: return -1; }
-}
 const READY_FLASH = [{ boxShadow: '0 0 0 3px rgba(247,178,103,.9), 0 0 18px rgba(247,178,103,.8)' }, { boxShadow: '0 0 0 0 rgba(247,178,103,0)' }];
 const BANNER_IN = [{ transform: 'scale(1.3)', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }];
 
@@ -46,7 +45,7 @@ export class Hud {
     this.ring.innerHTML = `<circle cx="38" cy="38" r="34" stroke="rgba(0,0,0,.45)" stroke-width="5" fill="none"/><circle class="xp" cx="38" cy="38" r="34" stroke="#f2c14e" stroke-width="5" fill="none" stroke-dasharray="${RING}" stroke-dashoffset="${RING}" stroke-linecap="round"/>`;
     this.xpArc = this.ring.querySelector('.xp');
     this.lvl = h('div', { class: 'lvl' }, '3');
-    const portrait = h('div', { class: 'portrait' }, emblem(me.heroKey), this.ring, this.lvl);
+    const portrait = h('div', { class: 'portrait' }, emblem(me.heroKey, '', session.skinOf ? session.skinOf(me) : 'classic'), this.ring, this.lvl);
     this.slots = KEYS.map((k, i) => this.slot(k, def.abilities[k].name, 'ability', i));
     this.spells = ['D', 'F'].map((k, i) => this.slot(k, me.spells[i] === 'dash' ? 'Dash' : 'Heal', 'spell', i, true));
     this.hpFill = h('i', { class: 'hp' }); this.hpLag = h('i', { class: 'lag' }); this.shield = h('i', { class: 'sh' }); this.hpText = h('b');
@@ -81,7 +80,7 @@ export class Hud {
   slot(key, name, kind, i, small = false) {
     const cd = h('div', { class: 'cd' }), cdn = h('div', { class: 'cdn' }), pips = h('div', { class: 'pips' });
     if (kind === 'ability') for (let r = 0; r < (key === 'R' ? 3 : 5); r++) pips.append(h('i'));
-    const el = h('div', { class: `slot interactive${small ? ' sm' : ''}` }, h('span', { class: 'key' }, key), h('span', { class: 'nm' }, name), cd, cdn, pips);
+    const el = h('div', { class: `slot interactive${small ? ' sm' : ''}` }, h('span', { class: 'key' }, key), h('span', { class: `nm${fitClass(name)}` }, name), cd, cdn, pips);
     el.addEventListener('pointerenter', () => this.abilityTip(kind, i, el)); el.addEventListener('pointerleave', () => this.tip.hide());
     return { el, cd, cdn, pips: [...pips.children] };
   }
@@ -89,8 +88,7 @@ export class Hud {
     const me = this.s.me;
     if (kind === 'spell') { const n = me.spells[i]; this.tip.show(el, n === 'dash' ? 'Dash' : 'Heal', n === 'dash' ? 'Dash a short distance toward the cursor.' : 'Heal yourself and the nearest ally, and gain a burst of speed.', `${n === 'dash' ? 30 : 60} s cooldown`); return; }
     const k = KEYS[i], a = this.def.abilities[k], rank = me.ranks[k];
-    const cost = typeof a.cost === 'function' ? null : byRank(a.cost || 0, Math.max(1, rank));
-    const cd = typeof a.cd === 'function' ? null : byRank(a.cd, Math.max(1, rank));
+    const w = this.s.world, cost = abilityCost(w, me, a, Math.max(1, rank)), cd = abilityCooldown(w, me, a, Math.max(1, rank));
     const meta = [rank > 0 ? `Rank ${rank}` : `Unlocks at level ${k === 'R' ? 6 : 'up'}`, cd != null ? `${Math.round(cd * (1 - me.cdr) * 10) / 10} s cooldown` : '', cost ? `${cost} ${a.costType || this.def.resource}` : ''].filter(Boolean).join(' · ');
     const rows = abilityNumbers(this.s.world, me)[i].rows.map((r) => [r.label, String(Math.round(r.value)), r.type, r.formula]);
     this.tip.show(el, `${k} · ${a.name}`, a.desc || '', meta, rows);
@@ -171,8 +169,8 @@ export class Hud {
       this.prevCd[i] = cd;
       setSweep(sl.cd, cd > 0 ? cd / this.cdTotal[i] : 0);
       setNum(sl.cdn, cd > 0 ? cdKey(cd) : 0, cdLabel);
-      const cost = rank > 0 ? (typeof a.cost === 'function' ? 0 : byRank(a.cost || 0, rank)) : 0;
-      const pool = resourcePool(me, a.costType || def.resource);
+      const cost = rank > 0 ? abilityCost(w, me, a, rank) : 0;
+      const pool = poolAmount(me, a.costType || def.resource);
       toggle(sl.el, 'locked', rank <= 0 || me.dead); toggle(sl.el, 'poor', rank > 0 && pool >= 0 && pool < cost);
       toggle(sl.el, 'ready', rank > 0 && cd === 0 && !me.dead);
       if (rank !== this.prevRanks[k]) { const first = this.prevRanks[k] < 0; this.prevRanks[k] = rank; sl.pips.forEach((p, r) => p.classList.toggle('on', r < rank)); if (!first) sl.el.animate(RANK_UP, 300); }

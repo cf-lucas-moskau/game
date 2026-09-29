@@ -24,12 +24,16 @@ import { MusicDirector } from '../audio/music.js';
 import { SfxDirector } from '../audio/sfx.js';
 import { SOUNDS } from '../audio/sounds.js';
 import { intensityFor } from '../audio/theory.js';
+import { PortraitStudio } from '../render/portraits.js';
+import { setPortraitSource } from '../ui/identity.js';
 
 const END_SCREEN_DELAY = 2600; // let the Heartstone shatter before the result covers it
 
 export class App {
   constructor({ root, lib, telemetry, params = new URLSearchParams() }) {
     this.root = root; this.lib = lib; this.telemetry = telemetry; this.params = params;
+    // painted portraits for every hero and skin, from the loaded models (render/portraits.js)
+    this.portraits = window.__portraits = new PortraitStudio(lib); setPortraitSource(this.portraits);
     this.settings = new Settings();
     this.touch = matchMedia('(pointer: coarse)').matches || params.get('touch') === '1';
     this.ui = h('div', { class: `ui${this.touch ? ' touch' : ''}` });
@@ -71,16 +75,16 @@ export class App {
   }
 
   // ---------------------------------------------------------------- match
-  /** cfg: { heroKey, difficulty, heroes?, seed?, net?, autopilot?, skipSeconds? } */
+  /** cfg: { heroKey, skin?, difficulty, heroes?, seed?, net?, autopilot?, skipSeconds? } */
   startMatch(cfg) {
     this.teardown();
-    this.last = { heroKey: cfg.heroKey, difficulty: cfg.difficulty };
+    this.last = { heroKey: cfg.heroKey, skin: cfg.skin, difficulty: cfg.difficulty };
     const canvas = this.canvas();
     const ping = this.settings.get('ping');
     const net = cfg.net || { ping, jitter: Math.round(ping * 0.15), loss: ping ? 0.01 : 0 };
     const session = new GameSession({
       canvas, lib: this.lib, seed: cfg.seed ?? ((Math.random() * 0xffff) | 0 || 7), quality: this.quality(), telemetry: this.telemetry,
-      heroKey: cfg.heroKey, heroes: cfg.heroes || null, net, autopilot: !!cfg.autopilot, difficulty: cfg.difficulty || 'medium',
+      heroKey: cfg.heroKey, skin: cfg.skin, heroes: cfg.heroes || null, net, autopilot: !!cfg.autopilot, difficulty: cfg.difficulty || 'medium',
       skipSeconds: cfg.skipSeconds || 0, fixedBuffer: this.params.get('cpu') ? [160, 90] : null,
     });
     session.renderer.shakeScale = this.settings.get('shake');
