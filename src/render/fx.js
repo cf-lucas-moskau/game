@@ -136,7 +136,7 @@ export class FX {
       else if (z.kind === 'brindle-sting-dot') { const u = world.entities[z.data.target]; if (u && u.alive && !u.dead && Math.random() < rate * 0.5) { const a = now * 9 + Math.random(); this.p.spawn(rx(u) * S + Math.cos(a) * 0.3, 1 + rnd(0, 0.5), ry(u) * S + Math.sin(a) * 0.3, 0, 0, 0, 0.3, COL.honey.r, COL.honey.g, COL.honey.b, 1.6, 0.1, 0.05); } }
     }
     for (const p of world.projectiles) {
-      if (!p.alive || !(p.kind === 'morrow-cog' || p.kind === 'auctioneer-gavel' || p.kind === 'tower-bolt' || p.kind === 'brindle-sting')) continue;
+      if (!p.alive || !(p.kind === 'morrow-cog' || p.kind === 'auctioneer-gavel' || p.kind === 'brindle-sting')) continue; // autos and towers: combat-fx.js
       if (Math.random() < rate * 0.8) { const col = p.kind === 'brindle-sting' ? COL.honey : p.kind === 'tower-bolt' ? COL.ember : COL.gold; this.p.spawn((p.px + (p.x - p.px) * alpha) * S, p.kind === 'tower-bolt' ? 2.4 : 0.85, (p.py + (p.y - p.py) * alpha) * S, 0, 0, 0, 0.3, col.r, col.g, col.b, 1.4, 0.16, 0.02); }
     }
     this.p.update(dt);

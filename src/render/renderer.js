@@ -13,6 +13,7 @@ import { Indicators } from './indicators.js';
 import { FX } from './fx.js';
 import { ZoneViews } from './zones.js';
 import { GlowLights } from './glow-lights.js';
+import { CombatFX } from './combat-fx.js';
 
 export class GameRenderer {
   constructor(canvas, lib, world, { quality = 'medium', telemetry = null, fixedBuffer = null } = {}) {
@@ -36,7 +37,8 @@ export class GameRenderer {
     this.bars = new HealthBars(this.env.root); this.decals = new GroundDecals(this.env.root); this.projectiles = new ProjectileViews(this.env.root);
     this.extra = []; // pluggable views (fx, zones) with update(world, alpha, dt, now, renderer)
     this.zones = new ZoneViews(this.env.root); this.fx = new FX(this.env.root, this.q);
-    this.indicators = new Indicators(this.env.root); this.extra.push(this.zones, this.fx, this.indicators);
+    this.indicators = new Indicators(this.env.root); this.combat = new CombatFX(this.env.root);
+    this.extra.push(this.zones, this.fx, this.combat, this.indicators);
     this.units.fx = this.fx;
     this.glowLights = new GlowLights(this.env.root, this.q.glowLights || 0);
     this.aim = { active: false }; this.hoverId = -1; this.showRange = false;
@@ -88,7 +90,7 @@ export class GameRenderer {
     const me = w.entities[this.focusId];
     this.gl.getDrawingBufferSize(this._res || (this._res = new THREE.Vector2())); this.bars.update(w, alpha, this.myTeam, me ? me.id : -1, this._res);
     this.decals.update(w, alpha, this.myTeam, me ? me.id : -1, dt);
-    this.projectiles.update(w, alpha);
+    this.projectiles.update(w, alpha, dt);
     for (const x of this.extra) x.update(w, alpha, dt, this.now, this);
     this.updateCamera(alpha, dt);
     this.glowLights.update(this.units.glowAnchors, this.cam, this.now);

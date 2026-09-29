@@ -38,6 +38,7 @@ export class Hud {
     this.strip = new LaneStrip(canvas);
     this.feed = h('div', { class: 'feed', 'aria-live': 'polite' });
     this.banner = h('div', { class: 'banner hidden' }, h('div', { class: 'b' }), h('div', { class: 's' }));
+    this.lock = h('div', { class: 'tower-lock hidden', role: 'status' }, h('div', { class: 'edge' }), h('div', { class: 'label' }, 'Tower is targeting you'));
     this.respawn = h('div', { class: 'respawn hidden' }, h('div', { class: 'n' }), h('div', { class: 's' }, 'Respawning. Open the shop while you wait.'));
     // ---- dock
     this.ring = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); this.ring.setAttribute('class', 'ring'); this.ring.setAttribute('viewBox', '0 0 76 76');
@@ -69,7 +70,7 @@ export class Hud {
       h('button', { onclick: onMenu, 'aria-label': 'Menu', 'data-act': 'menu' }, touch ? 'Menu' : 'Esc'));
     this.el = h('div', { class: 'hud' },
       h('div', { class: 'topbar' }, this.blue, h('div', { class: 'strip-wrap' }, canvas, this.clock), this.red),
-      this.feed, this.banner, this.respawn, this.dock, quick);
+      this.lock, this.feed, this.banner, this.respawn, this.dock, quick);
     root.append(this.el);
     this.cdTotal = [1, 1, 1, 1]; this.prevCd = [0, 0, 0, 0]; this.prevRanks = { Q: -1, W: -1, E: -1, R: -1 }; this.prevLevel = me.level;
     this.lag = 1; this.feedItems = []; this.bannerUntil = 0; this.bannerQueue = [];
@@ -140,6 +141,9 @@ export class Hud {
     // banners + feed expiry
     if (this.bannerUntil && now > this.bannerUntil) { if (this.bannerQueue.length) { this.bannerUntil = 0; this.showBanner(...this.bannerQueue.shift()); } else { this.bannerUntil = 0; this.banner.classList.add('hidden'); } }
     while (this.feedItems.length && this.feedItems[0].until < now) this.feedItems.shift().row.remove();
+    // an enemy tower is shooting at you: red edges and a label while the lock holds
+    let locked = false; if (!me.dead) for (const st of w.structures) if (st.alive && st.kind === KIND.TOWER && st.team !== me.team && st.targetId === me.id) { locked = true; break; }
+    toggle(this.lock, 'hidden', !locked);
     // respawn
     toggle(this.respawn, 'hidden', !me.dead);
     if (me.dead) setNum(this.respawn.firstChild, cdKey(Math.max(0, me.respawnAt - t)), cdLabel);

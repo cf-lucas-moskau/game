@@ -9,7 +9,7 @@ import { spatial, Throttle } from './theory.js';
 
 const RING = 64;
 const PER_FRAME = 3; // graphs built per frame; the rest of a burst is dropped (the ear cannot separate them anyway)
-const GAPS = { hitDealt: 0.05, hitTaken: 0.09, melee: 0.07, tower: 0.25, gold: 0.08, cast: 0.03, blink: 0.05, heroDeath: 0.2, relic: 0.3 };
+const GAPS = { auto: 0.06, towerLock: 1, towerHit: 0.2, hitDealt: 0.05, hitTaken: 0.09, melee: 0.07, tower: 0.25, gold: 0.08, cast: 0.03, blink: 0.05, heroDeath: 0.2, relic: 0.3 };
 export class SfxDirector {
   constructor(engine, session) {
     this.e = engine; this.s = session;
@@ -27,8 +27,14 @@ export class SfxDirector {
     const w = this.s.world, me = this.s.me;
     switch (ev.type) {
       case EV.CAST: this.push('cast', ev.x, ev.s, ev.a === me.id); break;
-      case EV.DAMAGE: if (ev.b === me.id && ev.a !== me.id) this.push('hitDealt', ev.x); else if (ev.a === me.id && ev.v >= 4) this.push('hitTaken', ev.x, '', true); break;
-      case EV.AUTO_ATTACK: { const a = w.entities[ev.a]; if (a && a.kind === KIND.MELEE) this.push('melee', ev.x); break; }
+      case EV.DAMAGE: {
+        const src = ev.b >= 0 ? w.entities[ev.b] : null;
+        if (ev.b === me.id && ev.a !== me.id) this.push('hitDealt', ev.x);
+        else if (ev.a === me.id && src && src.kind === KIND.TOWER) this.push('towerHit', ev.x, '', true);
+        else if (ev.a === me.id && ev.v >= 4) this.push('hitTaken', ev.x, '', true);
+        break;
+      }
+      case EV.AUTO_ATTACK: { const a = w.entities[ev.a]; if (!a) break; if (a.kind === KIND.MELEE) this.push('melee', ev.x); else if (a.kind === KIND.HERO) this.push('auto', ev.x, a.heroKey, a === me); break; }
       case EV.TOWER_SHOT: this.push('tower', ev.x); break;
       case EV.BLINK: this.push('blink', ev.x); break;
       case EV.KILL: if (ev.b === me.id) this.push('kill', ev.x, '', true); else this.push('heroDeath', ev.x); break;
@@ -44,6 +50,11 @@ export class SfxDirector {
     }
   }
   update() {
+    // a tower acquiring you gets an alarm (once per lock)
+    const me = this.s.me; let locked = false;
+    if (!me.dead) for (const st of this.s.world.structures) if (st.alive && st.kind === KIND.TOWER && st.team !== me.team && st.targetId === me.id) { locked = true; break; }
+    if (locked && !this.locked && this.e.ready) this.push('towerLock', me.x, '', true);
+    this.locked = locked;
     if (!this.len) return;
     const e = this.e, t = e.now, camX = this.s.renderer.cam.x / S;
     let built = 0;
