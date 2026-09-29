@@ -1,11 +1,15 @@
 // Title + hero select: a random hero with unlimited rerolls, bot difficulty, controls help.
 import { h, clear } from './dom.js';
-import { identity } from './identity.js';
+import { identity, portraitFor } from './identity.js';
 import { OPTIONS } from './settings.js';
 
 const RES = { mana: 'Mana', flame: 'Flame', ink: 'Ink', swarm: 'Bee swarm', gold: 'Gold', energy: 'Energy', none: 'Cooldowns' };
-export function emblem(key, cls = '') {
-  const id = identity(key); const el = h('div', { class: `emblem ${cls}`, style: { '--accent': id.accent } }); el.innerHTML = id.emblem; return el;
+/** A hero's round badge: the painted portrait (in the given skin) once ready, the emblem until then. */
+export function emblem(key, cls = '', skin = 'classic') {
+  const id = identity(key); const el = h('div', { class: `emblem ${cls}`, style: { '--accent': id.accent } }); el.innerHTML = id.emblem;
+  const show = (url) => { el.classList.add('painted'); el.style.backgroundImage = `url("${url}")`; };
+  const url = portraitFor(key, skin, show); if (url) show(url);
+  return el;
 }
 export class HeroSelect {
   /**

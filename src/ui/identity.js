@@ -7,6 +7,18 @@ const svg = (body) => `<svg viewBox="0 0 48 48" aria-hidden="true" fill="none" s
 export const IDENTITY = Object.fromEntries(Object.entries(HERO_VIEWS).map(([k, v]) => [k, { accent: v.accent, emblem: svg(v.emblem) }]));
 export const identity = (key) => IDENTITY[key] || { accent: '#e8dcc4', emblem: svg('<circle cx="24" cy="24" r="14"/>') };
 
+// Painted portraits: a source with get(hero, skin) -> url | null and paint(hero, skin) -> Promise<url>
+// (the app wires render/portraits.js). Screens call portraitFor and keep the emblem until the painting is ready.
+let portraits = null;
+export function setPortraitSource(src) { portraits = src; }
+/** The portrait URL if painted, else null; `onReady(url)` is called once it is (painting starts on first ask). */
+export function portraitFor(hero, skin = 'classic', onReady = null) {
+  if (!portraits) return null;
+  const url = portraits.get(hero, skin); if (url) return url;
+  const p = portraits.paint(hero, skin); if (onReady) p.then(onReady);
+  return null;
+}
+
 // Item icons: one original glyph per item (24 x 24, stroked in the category colour). The only place the UI
 // names item art; swap for painted icons later without touching the screens.
 const icon = (body) => `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;

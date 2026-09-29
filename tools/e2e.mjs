@@ -131,8 +131,11 @@ for (const [w, hgt] of [[844, 390], [390, 844]]) {
   await page.click('[aria-label=Scoreboard] tbody tr[data-id]:not(.me)');
   check('clicking a scoreboard row shows that hero\'s details and items', await until(page, () => { const p = document.querySelector('.inspect'); return p && !p.classList.contains('hidden') && p.querySelectorAll('.ins-item').length === 6; }));
   await page.keyboard.press('Escape');
-  const ally = await page.evaluate(() => { const g = window.__game, a = g.world.heroes.find((h) => h !== g.me && h.team === g.me.team); return g.renderer.worldToScreen(a.x, a.y, 0.6); });
+  // click the ally's head (screen-space picking: what you see is what you click). Time is frozen for the click:
+  // a bot moves ~15 px between reading its position and the click landing, which is not what this checks.
+  const ally = await page.evaluate(() => { const g = window.__game; g.stop(); const a = g.world.heroes.find((h) => h !== g.me && h.team === g.me.team && !h.dead); return g.renderer.worldToScreen(a.x, a.y, 1.2); });
   await page.mouse.click(ally.x, ally.y);
+  await page.evaluate(() => window.__game.start());
   check('left-clicking a unit on the battlefield inspects it', await until(page, () => !document.querySelector('.inspect').classList.contains('hidden')), await page.evaluate(() => document.querySelector('.ins-name') ? document.querySelector('.ins-name').textContent : 'no panel'));
   await page.evaluate(() => window.__app.match.inspect.hide());
   await page.click('[data-act=menu]');
@@ -146,6 +149,23 @@ for (const [w, hgt] of [[844, 390], [390, 844]]) {
   check('audio voices are released (no leak across matches)', await page.evaluate(() => { const v = window.__app.audio.voices; return v.sfx <= 28 && v.music <= 22; }),
     await page.evaluate(() => JSON.stringify(window.__app.audio.voices)));
   check('no page errors (loop)', errors.length === 0, errors[0] || '');
+  await page.close();
+}
+// ---------------- painted portraits: every hero paints, distinct, and the menu shows one
+{
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  const errors = []; page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto(url(''));
+  await page.waitForSelector('[data-act=play]', { timeout: 90000 });
+  const shown = await until(page, () => !!document.querySelector('.hero-card .emblem.painted'), null, 30000);
+  const res = await page.evaluate(async () => {
+    const heroes = ['morrow', 'saffi', 'vesper', 'gus', 'brindle', 'auctioneer', 'nimbus', 'coralie', 'kestrel', 'mistral', 'rime', 'thorne', 'cantor', 'lumen', 'dredge', 'wisp'];
+    const urls = []; for (const h of heroes) urls.push(await window.__portraits.paint(h, 'classic'));
+    urls.push(await window.__portraits.paint('saffi', 'bluewick'));
+    return { n: urls.length, ok: urls.every((u) => u.startsWith('data:image/png') && u.length > 20000), distinct: new Set(urls).size };
+  });
+  check('menu shows a painted portrait', shown);
+  check('portraits paint for every hero and skins, all distinct', res.ok && res.distinct === res.n && errors.length === 0, errors[0] || `${res.n} portraits, ${res.distinct} distinct`);
   await page.close();
 }
 // ---------------- Leviathan Lab: every hero loads, casts every ability and plays every clip

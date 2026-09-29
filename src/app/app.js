@@ -24,12 +24,16 @@ import { MusicDirector } from '../audio/music.js';
 import { SfxDirector } from '../audio/sfx.js';
 import { SOUNDS } from '../audio/sounds.js';
 import { intensityFor } from '../audio/theory.js';
+import { PortraitStudio } from '../render/portraits.js';
+import { setPortraitSource } from '../ui/identity.js';
 
 const END_SCREEN_DELAY = 2600; // let the Heartstone shatter before the result covers it
 
 export class App {
   constructor({ root, lib, telemetry, params = new URLSearchParams() }) {
     this.root = root; this.lib = lib; this.telemetry = telemetry; this.params = params;
+    // painted portraits for every hero and skin, from the loaded models (render/portraits.js)
+    this.portraits = window.__portraits = new PortraitStudio(lib); setPortraitSource(this.portraits);
     this.settings = new Settings();
     this.touch = matchMedia('(pointer: coarse)').matches || params.get('touch') === '1';
     this.ui = h('div', { class: `ui${this.touch ? ' touch' : ''}` });

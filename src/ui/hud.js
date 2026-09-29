@@ -45,7 +45,7 @@ export class Hud {
     this.ring.innerHTML = `<circle cx="38" cy="38" r="34" stroke="rgba(0,0,0,.45)" stroke-width="5" fill="none"/><circle class="xp" cx="38" cy="38" r="34" stroke="#f2c14e" stroke-width="5" fill="none" stroke-dasharray="${RING}" stroke-dashoffset="${RING}" stroke-linecap="round"/>`;
     this.xpArc = this.ring.querySelector('.xp');
     this.lvl = h('div', { class: 'lvl' }, '3');
-    const portrait = h('div', { class: 'portrait' }, emblem(me.heroKey), this.ring, this.lvl);
+    const portrait = h('div', { class: 'portrait' }, emblem(me.heroKey, '', session.skinOf ? session.skinOf(me) : 'classic'), this.ring, this.lvl);
     this.slots = KEYS.map((k, i) => this.slot(k, def.abilities[k].name, 'ability', i));
     this.spells = ['D', 'F'].map((k, i) => this.slot(k, me.spells[i] === 'dash' ? 'Dash' : 'Heal', 'spell', i, true));
     this.hpFill = h('i', { class: 'hp' }); this.hpLag = h('i', { class: 'lag' }); this.shield = h('i', { class: 'sh' }); this.hpText = h('b');

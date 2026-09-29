@@ -48,6 +48,8 @@ export class GameSession {
     this.loop = new FixedLoop({ hz: TICK_HZ, step: () => this.tick(), render: (alpha) => this.frame(alpha) });
   }
   start() { this.loop.start(); return this; }
+  /** The skin a hero wears in this match (presentation only). */
+  skinOf(e) { const r = this.roster[e.playerId]; return r ? r.skin : 'classic'; }
   stop() { this.loop.stop(); }
   /** Receive every sim event the renderer drains (UI: kill feed, banners, damage numbers). */
   tapEvents(fn) { const tap = { onEvent: fn, update() {} }; this.renderer.extra.push(tap); return () => { const i = this.renderer.extra.indexOf(tap); if (i >= 0) this.renderer.extra.splice(i, 1); }; }
