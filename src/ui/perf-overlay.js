@@ -3,7 +3,7 @@ import { h, setText, toggle } from './dom.js';
 
 const ROWS = [
   ['FPS', (s) => s.fps, (v) => v < 50], ['Frame p95 ms', (s) => s.frameP95Ms, (v) => v > 20], ['Sim tick p95 ms', (s) => s.simTickP95Ms, (v) => v > 2],
-  ['Render CPU p95 ms', (s) => s.renderCpuP95Ms, (v) => v > 6], ['UI update p95 ms', (s) => s.uiUpdateP95Ms, (v) => v > 1], ['Draw calls', (s) => s.drawCallsMax, (v) => v > 50], ['Input latency p95', (s) => s.inputLatencyP95Ms, (v) => v > 150],
+  ['Render CPU p95 ms', (s) => s.renderCpuP95Ms, (v) => v > 6], ['UI update mean ms', (s) => s.uiUpdateMeanMs, (v) => v > 0.6], ['Audio mean ms', (s) => s.audioUpdateMeanMs, (v) => v > 0.3], ['Draw calls', (s) => s.drawCallsMax, (v) => v > 50], ['Input latency p95', (s) => s.inputLatencyP95Ms, (v) => v > 150],
   ['Corrections /10 s', (s) => s.correctionsPer10s, (v) => v > 1], ['Heap MB', (s) => s.heapMb, () => false], ['Quality', (s) => s.quality, () => false],
 ];
 export class PerfOverlay {

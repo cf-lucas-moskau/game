@@ -17,52 +17,69 @@ export class LaneStrip {
     if (w && h && (w !== this.w || h !== this.h)) { this.c.width = this.w = w; this.c.height = this.h = h; }
   }
   dispose() { this.ro.disconnect(); }
+  sx(x) { const pad = this.h * 0.5; return pad + (x / LANE.W) * (this.w - pad * 2); }
+  sy(y) { return this.h * 0.15 + (y / LANE.H) * this.h * 0.7; }
+  /** Structures and the spine change rarely: cache them on a layer, redrawn only when their state changes. */
+  staticLayer(world) {
+    let sig = this.w * 7 + this.h;
+    for (const st of world.structures) sig = (sig * 31 + (st.alive ? 1 + (st.vulnerable ? 2 : 0) + Math.ceil(st.hp / st.maxHp * 20) * 4 : 0)) | 0;
+    if (this.layer && sig === this.layerSig) return this.layer;
+    const { w, h } = this;
+    if (!this.layer) this.layer = document.createElement('canvas');
+    if (this.layer.width !== w || this.layer.height !== h) { this.layer.width = w; this.layer.height = h; }
+    const ctx = this.layer.getContext('2d'); ctx.clearRect(0, 0, w, h);
+    const pad = h * 0.5;
+    ctx.strokeStyle = 'rgba(232,220,196,.18)'; ctx.lineWidth = Math.max(1, h * 0.04);
+    ctx.beginPath(); ctx.moveTo(pad, h / 2); ctx.lineTo(w - pad, h / 2); ctx.stroke();
+    for (const st of world.structures) {
+      const x = this.sx(st.x), y = h / 2, r = st.kind === KIND.HEART ? h * 0.2 : h * 0.15;
+      if (!st.alive) { ctx.strokeStyle = 'rgba(232,220,196,.25)'; ctx.lineWidth = 1; ctx.strokeRect(x - r, y - r, r * 2, r * 2); continue; }
+      ctx.fillStyle = COL[st.team]; ctx.globalAlpha = st.vulnerable ? 1 : 0.55;
+      if (st.kind === KIND.HEART) { ctx.beginPath(); ctx.moveTo(x, y - r * 1.2); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r * 1.2); ctx.lineTo(x - r, y); ctx.closePath(); ctx.fill(); }
+      else ctx.fillRect(x - r, y - r, r * 2, r * 2);
+      ctx.globalAlpha = 1;
+      const f = st.hp / st.maxHp; if (f < 0.999) { ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(x - r, y + r + 1, r * 2, 2.5); ctx.fillStyle = COL[st.team]; ctx.fillRect(x - r, y + r + 1, r * 2 * f, 2.5); }
+    }
+    this.layerSig = sig; return this.layer;
+  }
   update(world, me, renderer, now) {
     if (now < this.next) return; this.next = now + 66;
     this.fit(); const { ctx, w, h } = this; if (!w) return;
-    const pad = h * 0.5, sx = (x) => pad + (x / LANE.W) * (w - pad * 2), sy = (y) => h * 0.15 + (y / LANE.H) * h * 0.7;
+    const pad = h * 0.5;
     ctx.clearRect(0, 0, w, h);
     // whale-roll warning: the endangered edge glows
     const wh = world.state.whale;
-    if (wh.phase !== 'idle') {
-      const on = wh.phase === 'roll' || ((now / 180) | 0) % 2 === 0;
-      if (on) { ctx.fillStyle = wh.phase === 'roll' ? 'rgba(240,71,110,.55)' : 'rgba(247,178,103,.55)'; const y = wh.dir > 0 ? sy(LANE.EDGE_MAX) : sy(0); ctx.fillRect(pad, y, w - pad * 2, wh.dir > 0 ? sy(LANE.H) - y : sy(LANE.EDGE_MIN) - y); }
+    if (wh.phase !== 'idle' && (wh.phase === 'roll' || ((now / 180) | 0) % 2 === 0)) {
+      ctx.fillStyle = wh.phase === 'roll' ? 'rgba(240,71,110,.55)' : 'rgba(247,178,103,.55)';
+      const y = wh.dir > 0 ? this.sy(LANE.EDGE_MAX) : this.sy(0);
+      ctx.fillRect(pad, y, w - pad * 2, wh.dir > 0 ? this.sy(LANE.H) - y : this.sy(LANE.EDGE_MIN) - y);
     }
-    // spine of the lane
-    ctx.strokeStyle = 'rgba(232,220,196,.18)'; ctx.lineWidth = Math.max(1, h * 0.04);
-    ctx.beginPath(); ctx.moveTo(pad, h / 2); ctx.lineTo(w - pad, h / 2); ctx.stroke();
+    ctx.drawImage(this.staticLayer(world), 0, 0);
     // camera window
     if (renderer) {
       const cx = renderer.cam.x / S, half = 900;
       ctx.strokeStyle = 'rgba(232,220,196,.45)'; ctx.lineWidth = Math.max(1, h * 0.04);
-      ctx.strokeRect(sx(cx - half), h * 0.1, sx(cx + half) - sx(cx - half), h * 0.8);
+      ctx.strokeRect(this.sx(cx - half), h * 0.1, this.sx(cx + half) - this.sx(cx - half), h * 0.8);
     }
-    const ents = world.entities;
-    // minions
-    const mr = Math.max(1.2, h * 0.045);
-    for (let i = 0; i < ents.length; i++) {
-      const e = ents[i]; if (!e.alive || e.dead || (e.kind !== KIND.MELEE && e.kind !== KIND.RANGED && e.kind !== KIND.SIEGE)) continue;
-      ctx.fillStyle = DIM[e.team]; ctx.fillRect(sx(e.x) - mr, sy(e.y) - mr, mr * 2, mr * 2);
+    // minions: one path and one fill per team
+    const ents = world.entities, mr = Math.max(1.2, h * 0.045);
+    for (let team = 0; team < 2; team++) {
+      ctx.beginPath();
+      for (let i = 0; i < ents.length; i++) {
+        const e = ents[i]; if (!e.alive || e.dead || e.team !== team || (e.kind !== KIND.MELEE && e.kind !== KIND.RANGED && e.kind !== KIND.SIEGE)) continue;
+        ctx.rect(this.sx(e.x) - mr, this.sy(e.y) - mr, mr * 2, mr * 2);
+      }
+      ctx.fillStyle = DIM[team]; ctx.fill();
     }
-    // structures
-    for (const s of world.structures) {
-      const x = sx(s.x), y = h / 2, r = s.kind === KIND.HEART ? h * 0.2 : h * 0.15;
-      if (!s.alive) { ctx.strokeStyle = 'rgba(232,220,196,.25)'; ctx.lineWidth = 1; ctx.strokeRect(x - r, y - r, r * 2, r * 2); continue; }
-      ctx.fillStyle = COL[s.team]; ctx.globalAlpha = s.vulnerable ? 1 : 0.55;
-      if (s.kind === KIND.HEART) { ctx.beginPath(); ctx.moveTo(x, y - r * 1.2); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r * 1.2); ctx.lineTo(x - r, y); ctx.closePath(); ctx.fill(); }
-      else ctx.fillRect(x - r, y - r, r * 2, r * 2);
-      ctx.globalAlpha = 1;
-      const f = s.hp / s.maxHp; if (f < 0.999) { ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(x - r, y + r + 1, r * 2, 2.5); ctx.fillStyle = COL[s.team]; ctx.fillRect(x - r, y + r + 1, r * 2 * f, 2.5); }
-    }
+    // relics
+    if (world.pickups.length) { ctx.beginPath(); for (const p of world.pickups) { const x = this.sx(p.x), y = this.sy(p.y); ctx.moveTo(x + mr * 1.4, y); ctx.arc(x, y, mr * 1.4, 0, Math.PI * 2); } ctx.fillStyle = '#7ee07a'; ctx.fill(); }
     // heroes
-    const hr = Math.max(3, h * 0.13);
+    const hr = Math.max(3, h * 0.13); ctx.lineWidth = Math.max(1, h * 0.04);
     for (const e of world.heroes) {
       if (e.dead) continue;
-      const x = sx(e.x), y = sy(e.y);
-      ctx.beginPath(); ctx.arc(x, y, e === me ? hr * 1.2 : hr, 0, Math.PI * 2);
+      ctx.beginPath(); ctx.arc(this.sx(e.x), this.sy(e.y), e === me ? hr * 1.2 : hr, 0, Math.PI * 2);
       ctx.fillStyle = COL[e.team]; ctx.fill();
-      ctx.lineWidth = Math.max(1, h * 0.04); ctx.strokeStyle = e === me ? '#fff' : 'rgba(12,14,36,.9)'; ctx.stroke();
+      ctx.strokeStyle = e === me ? '#fff' : 'rgba(12,14,36,.9)'; ctx.stroke();
     }
-    for (const p of world.pickups) { ctx.fillStyle = '#7ee07a'; ctx.beginPath(); ctx.arc(sx(p.x), sy(p.y), mr * 1.4, 0, Math.PI * 2); ctx.fill(); }
   }
 }

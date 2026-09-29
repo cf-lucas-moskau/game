@@ -2,7 +2,7 @@
 // arpeggio and light percussion. Intensity (0..1) thins or fills the arrangement and opens the pad
 // filter; tempo rises in sudden death. A lookahead scheduler queues notes 0.25 s ahead, so the
 // timer's jitter never reaches the beat.
-import { tone, noise } from './synth.js';
+import { tone, noise, Pad } from './synth.js';
 import { mtof, chord, PROGRESSION, sixteenth } from './theory.js';
 
 const LOOKAHEAD = 0.25, TICK_MS = 50;
@@ -14,7 +14,7 @@ export class MusicDirector {
     if (this.timer) return;
     this.timer = setInterval(() => this.schedule(), TICK_MS);
   }
-  stop() { clearInterval(this.timer); this.timer = 0; this.next = 0; }
+  stop() { clearInterval(this.timer); this.timer = 0; this.next = 0; if (this.pad) this.pad.silence(this.e.now); }
   set(intensity, bpm) { this.intensity = intensity; if (bpm) this.bpm = bpm; }
   schedule() {
     const e = this.e; if (!e.ready) return;
@@ -24,13 +24,10 @@ export class MusicDirector {
   note(step, t) {
     const e = this.e, bus = e.music, I = this.intensity, s16 = step % 16, bar = Math.floor(step / 16);
     const deg = PROGRESSION[Math.floor(bar / 2) % PROGRESSION.length], notes = chord(deg, I > 0.6);
-    const barLen = sixteenth(this.bpm) * 16;
-    // pad: a new chord every two bars, two detuned voices per note
+    // pad: persistent detuned voices glide to a new chord every two bars
     if (s16 === 0 && bar % 2 === 0) {
-      for (const n of notes) for (const det of [-6, 6]) {
-        tone(e, bus, { type: 'sawtooth', f0: mtof(n) * Math.pow(2, det / 1200), t, dur: barLen * 2 + 0.4, gain: 0.018, attack: 0.9, filter: 500 + 1800 * I, q: 0.7, curve: 'lin' });
-      }
-      tone(e, bus, { type: 'sine', f0: mtof(notes[0] - 12), t, dur: barLen * 2, gain: 0.07, attack: 0.3, curve: 'lin' });
+      if (!this.pad) this.pad = new Pad(e);
+      this.pad.chord(t, notes.map(mtof), mtof(notes[0] - 12), I);
     }
     // arpeggio: eighth notes, denser and higher as intensity rises
     const density = 0.25 + I * 0.6;

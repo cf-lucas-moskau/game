@@ -8,6 +8,7 @@ import { SOUNDS } from './sounds.js';
 import { spatial, Throttle } from './theory.js';
 
 const RING = 64;
+const PER_FRAME = 3; // graphs built per frame; the rest of a burst is dropped (the ear cannot separate them anyway)
 const GAPS = { hitDealt: 0.05, hitTaken: 0.09, melee: 0.07, tower: 0.25, gold: 0.08, cast: 0.03, blink: 0.05, heroDeath: 0.2, relic: 0.3 };
 export class SfxDirector {
   constructor(engine, session) {
@@ -45,12 +46,14 @@ export class SfxDirector {
   update() {
     if (!this.len) return;
     const e = this.e, t = e.now, camX = this.s.renderer.cam.x / S;
+    let built = 0;
     while (this.len) {
       const r = this.q[this.head]; this.head = (this.head + 1) % RING; this.len--;
       if (!this.throttle.ok(r.name, t)) continue;
       let pan = 0, gain = 1;
       if (!r.local) { const sp = spatial(r.x, camX); if (sp.gain < 0.05) continue; pan = sp.pan; gain = sp.gain; }
-      SOUNDS[r.name](e, e.sfx, t, pan, gain, r.hero);
+      if (built >= PER_FRAME) continue;
+      SOUNDS[r.name](e, e.sfx, t, pan, gain, r.hero); built++;
     }
   }
   /** One-shot sounds that are not sim events (UI, match result). */

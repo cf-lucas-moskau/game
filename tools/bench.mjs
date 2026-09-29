@@ -37,6 +37,8 @@ async function runScenario(browser, sc) {
   await page.goto(`file://${root}/dist/index.html?bench=1&cpu=1&${sc.query}&warmup=${warm}&seconds=${sc.seconds}`);
   await page.waitForFunction(() => window.__game, null, { timeout: 180000 });
   const loadWallMs = Date.now() - t0;
+  // players hear the game: unlock audio as their first click would (launched with the autoplay flag)
+  await page.evaluate(() => window.__app && window.__app.audio.unlock());
   // (re)attach after navigation: a file:// load can swap renderer processes and drop emulation state
   cdp = await ctx.newCDPSession(page);
   await cdp.send('Performance.enable');
@@ -86,7 +88,7 @@ function evaluate(results, baseline) {
     const software = /SwiftShader|llvmpipe|Software/i.test(r.gpu || '');
     const gated = software ? GATED : GATED_REAL_GPU;
     lines.push(`\n  ${r.scenario}  (${software ? 'software GPU: CPU-side metrics gate' : 'hardware GPU'})`);
-    for (const k of [...new Set([...GATED_REAL_GPU, 'heapGrowthMbPer10Min', 'gcWallMaxMs', 'gcCount', 'memoryReducerMaxMs', 'throttleFactor', 'fps', 'onePercentLowFps', 'trianglesMax', 'postPasses', 'longTasks'])]) {
+    for (const k of [...new Set([...GATED_REAL_GPU, 'uiUpdateP95Ms', 'audioUpdateP95Ms', 'heapGrowthMbPer10Min', 'gcWallMaxMs', 'gcCount', 'memoryReducerMaxMs', 'throttleFactor', 'fps', 'onePercentLowFps', 'trianglesMax', 'postPasses', 'longTasks'])]) {
       if (r[k] === undefined) continue;
       const budget = BUDGETS[k]; const isGated = gated.includes(k);
       const ok = budget === undefined || (lowerIsBetter(k) ? r[k] <= budget : r[k] >= budget);
@@ -122,7 +124,7 @@ const commit = argOf('--commit') || (existsSync(join(root, 'dist/.commit')) ? re
 const partialPath = (name) => join(dir, `partial-${name}.json`);
 
 async function runAndStore(list) {
-  const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+  const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
   const out = [];
   for (const sc of list) { process.stdout.write(`   running ${sc.name} (${sc.seconds}s)...\n`); const r = await runScenario(browser, sc); r.commit = commit; out.push(r); writeFileSync(partialPath(sc.name), JSON.stringify(r, null, 2)); }
   await browser.close();

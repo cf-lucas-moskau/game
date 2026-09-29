@@ -108,8 +108,9 @@ export class App {
         const now = performance.now();
         m.hud.update(now); m.floaters.update(now); m.shop.update(); m.scoreboard.update(now); this.perf.update(now);
         toggle(this.dim, 'on', session.me.dead);
+        const t1 = performance.now();
         m.sfx.update(); this.updateMusic(m);
-        if (this.telemetry) this.telemetry.ui.push(performance.now() - now);
+        if (this.telemetry) { this.telemetry.ui.push(t1 - now); this.telemetry.audio.push(performance.now() - t1); }
       } else if (ev === 'end') this.onMatchEnd(arg);
     });
     window.__game = session;

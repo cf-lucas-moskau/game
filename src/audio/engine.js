@@ -1,12 +1,12 @@
 // Web Audio engine: one context (created and resumed on the first user gesture), a master chain
-// (master gain -> compressor -> output), separate music and sfx buses, a shared noise buffer and a
-// voice budget so bursts of combat never pile up hundreds of nodes.
-const BUDGET = { sfx: 28, music: 22 };
+// (master gain -> compressor -> output), separate music and sfx buses, a shared noise buffer and
+// fixed voice pools (synth.js), so bursts of combat never build or discard nodes.
+import { Synth } from './synth.js';
 // measured: peaks about 0.15 at unity (20 s of autopilot combat); the compressor catches the rest
 const MAKEUP = 2.4;
 export class AudioEngine {
   constructor(settings) {
-    this.settings = settings; this.ctx = null; this.voices = { sfx: 0, music: 0 }; this.dropped = 0; this.played = 0;
+    this.settings = settings; this.ctx = null; this.synth = null; this.dropped = 0; this.played = 0;
     settings.on((k) => { if (k === 'volume' || k === 'music' || k === 'sfx') this.applyVolumes(); });
     const unlock = () => this.unlock();
     addEventListener('pointerdown', unlock, true); addEventListener('keydown', unlock, true); addEventListener('touchend', unlock, true);
@@ -34,6 +34,7 @@ export class AudioEngine {
     const n = c.createBuffer(1, c.sampleRate, c.sampleRate), d = n.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
     this.noise = n;
+    this.synth = new Synth(this);
     this.applyVolumes();
   }
   applyVolumes() {
@@ -45,11 +46,6 @@ export class AudioEngine {
   }
   /** Muffle the music (respawn screen, menus over a match). */
   muffle(on) { if (this.ctx) this.musicTone.frequency.setTargetAtTime(on ? 700 : 18000, this.ctx.currentTime, 0.25); }
-  /** Reserve a voice on a bus ('sfx' | 'music'); false when its budget is spent (the sound is skipped). */
-  claim(bus) {
-    if (!this.ready) return false;
-    if (this.voices[bus] >= BUDGET[bus]) { this.dropped++; return false; }
-    this.voices[bus]++; this.played++; return true;
-  }
-  release(bus) { this.voices[bus] = Math.max(0, this.voices[bus] - 1); }
+  /** Voices currently sounding per bus (pools are fixed, so this can never grow). */
+  get voices() { return this.synth ? { sfx: this.synth.busy('sfx'), music: this.synth.busy('music') } : { sfx: 0, music: 0 }; }
 }

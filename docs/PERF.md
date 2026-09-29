@@ -92,3 +92,25 @@ From PR #10 on, the gate runs in a new container (4 vCPU Xeon, SwiftShader). The
 4.41 / 1.62 / 13.17 ms (desktop / play / phone), and one build of `play-ping100` gave 11.9, 4.3 and
 3.4 ms on three runs. The budget is unchanged. Merges where only this metric fails are justified in
 the PR write-up with same-container comparisons against `main`.
+
+## Short sections under emulated throttling (PR #12)
+UI and audio each take well under a millisecond per frame. Under `Emulation.setCPUThrottlingRate` the
+throttler pauses the main thread in slices, so any short section that happens to span a pause reads
+long. Calibration on the emulated phone (4x): an empty section p95 0.0 ms, a fixed ~0.1 ms loop
+p50 < 0.1 ms but p95 0.8 ms, the whole UI update p95 0.8 ms. The p95 of such sections measures the
+throttler, not the code, so `uiUpdateMeanMs` (budget 0.6) and `audioUpdateMeanMs` (budget 0.3) gate
+instead and the p95 values are reported as info. The mean still catches real regressions: the
+forced-layout bug from PR #11 read 0.84 ms mean on the phone.
+
+## Audio allocation (PR #12)
+Building a Web Audio graph per sound (oscillator, filter, gain, panner) made the emulated phone's GC
+total over the 2-minute scenario rise from 294 to 449 ms with a 71 ms MajorGC. Voices now come from
+fixed pools that run silently and are retriggered by AudioParam automation; the pad glides between
+chords on persistent oscillators. GC total went back to 277 ms, audio update p95 1.0 -> 0.2 ms.
+The benchmark and the soak unlock audio (autoplay flag + `unlock()`), since players hear the game.
+
+## Heap accounting of inlined models (PR #12)
+Decoding the inlined GLB data URLs with `atob` (instead of `fetch`, which a strict CSP blocks) moved
+about 2.47 MB of base64 strings from Blink's external string storage onto the V8 heap. The heap
+snapshot diff is +2.49 MB strings, -2.47 MB ExternalStringData: total memory is unchanged, but
+`heapRetainedMb` reads about 12.1 instead of 9.8 MB. The soak slope (leaks) is unaffected.

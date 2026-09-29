@@ -8,8 +8,13 @@ export const ROOT = 50; // D3
 export const degree = (d, root = ROOT) => root + SCALE[((d % 7) + 7) % 7] + 12 * Math.floor(d / 7);
 /** Chord progression as scale degrees of the chord root (i - VII - IV - v, then i - VI - VII - i). */
 export const PROGRESSION = [0, 6, 3, 4, 0, 5, 6, 0];
-/** Triad (plus seventh when rich) built on a scale degree, as MIDI notes. */
-export const chord = (d, rich = false) => (rich ? [0, 2, 4, 6] : [0, 2, 4]).map((k) => degree(d + k));
+const CHORDS = new Map();
+/** Triad (plus seventh when rich) built on a scale degree, as MIDI notes. Cached: the scheduler asks every sixteenth. */
+export function chord(d, rich = false) {
+  const key = d * 2 + (rich ? 1 : 0); let c = CHORDS.get(key);
+  if (!c) { c = Object.freeze((rich ? [0, 2, 4, 6] : [0, 2, 4]).map((k) => degree(d + k))); CHORDS.set(key, c); }
+  return c;
+}
 /** Seconds per sixteenth note at a tempo. */
 export const sixteenth = (bpm) => 60 / bpm / 4;
 /** Stereo position (-1..1) and gain (0..1) of a sound at world x, heard from the camera at camX. */
