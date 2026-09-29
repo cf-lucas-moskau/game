@@ -60,10 +60,13 @@ input path), `skip=<seconds>` (fast-forward the sim), `seed=`, `touch=1`, `cpu=1
 - `src/app/app.js` owns the flow (menu with a bot-match backdrop, match, end screen) and tears each match
   down completely (renderer GL context, inputs, UI). URL shortcuts `hero= heroes= play=` skip hero select.
 - Surrender is a sim command (`CMD.SURRENDER`), so it will work unchanged with the server.
-- Numbers from the last full runs (headless Chromium, SwiftShader software GPU, 1 CPU):
-  sim tick p95 0.1-0.2 ms, render update p95 0.3 ms desktop / 2.6 ms emulated phone,
-  GC max 0.3-0.5 ms desktop / 3.4 ms phone, scene draw calls 40-43 (budget 50),
-  corrections 0.3-0.7 per 10 s at 100 ms ping, retained heap slope about 1.5 MB per 10 min.
+- Numbers from the last full runs (gate for PRs 22-27; headless Chromium, SwiftShader software GPU):
+  sim tick p95 0.1-0.2 ms desktop / 0.8 ms emulated phone, render update p95 0.3 ms desktop / 1.3 ms phone,
+  scene draw calls 34-45 (budget 50: little headroom, batch pack props and domes next), heap 17.4 MB (inlined models
+  of 16 heroes; dist 5.4 MB), corrections 0.3-0.6 per 10 s at 100 ms ping, soak slope 2.8 MB per 10 min.
+  `gcPauseMaxMs` fails bench-eval on contention outliers (scavenger threads waiting behind SwiftShader GPU tasks);
+  the A/B method and trace breakdown are in docs/prs/0027-hero-select.md. A justified bench-eval gets a `.ok` whose
+  text points at the write-up.
 
 ## Next work, in order
 1. Done: PR #10 merged, PR #11 UI (`src/ui/`) built as designed below. Remaining UI polish: painted hero
@@ -100,7 +103,7 @@ input path), `skip=<seconds>` (fast-forward the sim), `seed=`, `touch=1`, `cpu=1
    rendered at runtime (`src/render/portraits.js`), sunk-head fix in `mergeSkinned`, screen-space picking, and the
    hero select screen. Balance by bot matches is recorded in docs/prs/0024-ten-heroes.md (the original six were
    already spread 37-73%; melee divers Saffi/Wisp are low because of shared bot engagement logic, not their kits).
-8. Next: bots that play melee divers better (Saffi, Wisp), more skins, then phase 5: `NetTransport` + Node.js
+8. Next: batch pack props/domes (draw-call headroom), bots that play melee divers better (Saffi, Wisp), more skins, then phase 5: `NetTransport` + Node.js
    WebSocket authoritative server (the owner can host Node).
 
 ## Architecture map
