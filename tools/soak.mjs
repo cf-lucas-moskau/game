@@ -12,7 +12,7 @@ const b = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-un
 const ctx = await b.newContext({ viewport: { width: 960, height: 540 } }); const page = await ctx.newPage();
 await page.goto(`file://${root}/dist/index.html?cpu=1&quality=medium&seed=11&${mode}`);
 await page.waitForFunction(() => window.__game, null, { timeout: 90000 });
-await page.evaluate(() => window.__app && window.__app.audio.unlock()); // sound graphs are part of what must not leak
+await page.evaluate(() => window.__app?.audio?.unlock()); // sound graphs are part of what must not leak
 const cdp = await ctx.newCDPSession(page); await cdp.send('HeapProfiler.enable');
 await page.waitForTimeout(+(process.env.SOAK_WARMUP || 40) * 1000);
 const pts = [];

@@ -38,7 +38,7 @@ async function runScenario(browser, sc) {
   await page.waitForFunction(() => window.__game, null, { timeout: 180000 });
   const loadWallMs = Date.now() - t0;
   // players hear the game: unlock audio as their first click would (launched with the autoplay flag)
-  await page.evaluate(() => window.__app && window.__app.audio.unlock());
+  await page.evaluate(() => window.__app?.audio?.unlock());
   // (re)attach after navigation: a file:// load can swap renderer processes and drop emulation state
   cdp = await ctx.newCDPSession(page);
   await cdp.send('Performance.enable');
