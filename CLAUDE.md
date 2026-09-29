@@ -65,7 +65,7 @@ input path), `skip=<seconds>` (fast-forward the sim), `seed=`, `touch=1`, `cpu=1
 ## Next work, in order
 1. Done: PR #10 merged, PR #11 UI (`src/ui/`) built as designed below. Remaining UI polish: painted hero
    portraits and item icons (swap `src/ui/identity.js` emblems and the item abbreviations), volume setting
-   once audio exists.
+   in settings now exists too.
 2. (Design record for PR #11, UI:)
    - Fonts bundled offline via npm: `@fontsource/gloock` (titles, hero names) and
      `@fontsource-variable/bricolage-grotesque` (HUD text, tabular numbers). Palette in `src/render/palette.js`
@@ -79,7 +79,8 @@ input path), `skip=<seconds>` (fast-forward the sim), `seed=`, `touch=1`, `cpu=1
      (quality, volume, camera shake, simulated ping), floating damage numbers (pooled DOM).
    - Input already dispatches `ll-toggle` events ('shop', 'scoreboard', 'perf', 'escape'); desktop ability bar
      hidden on touch (touch buttons live in `src/input/touch.js`).
-3. **Audio**: Web Audio synthesized SFX + generative music, no external files.
+3. Done (PR #12): audio in `src/audio/` (engine, synth voices, sound palette, sfx director, generative music).
+   Sound design is tuned by measurement only (levels, voice counts); a listening pass by the owner is still due.
 4. **Texture atlas** for characters and props: 43 materials / 20 programs cause about 12 ms WebGL submission
    on the emulated phone (report-only in CI but a real risk). Goal: shared materials, fewer program switches.
 5. Mobile polish, `docs/ARCHITECTURE.md`, update the spec doc, final deliverables (zip + dist/index.html).
@@ -100,6 +101,9 @@ input path), `skip=<seconds>` (fast-forward the sim), `seed=`, `touch=1`, `cpu=1
   `interp.js` is the single source of render positions (interpolation + prediction offset).
 - `src/assets/`: `manifest.js` (only place naming assets), `models/*.glb` (CC0, produced by
   `tools/assets.mjs` from `tools/assets.config.js`), `CREDITS.md`.
+- `src/ui/`: DOM UI (hero select, HUD, lane strip, shop, scoreboard, end screen, settings, perf overlay).
+- `src/audio/`: Web Audio engine, synth voices, sounds, sfx director (sim events -> sounds), music director.
+- `src/app/app.js`: application flow and lifecycle.
 - `src/perf/`: telemetry (`window.__perf`) and budgets.
 
 ## Lessons learned (keep these)

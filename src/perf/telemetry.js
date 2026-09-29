@@ -12,7 +12,7 @@ class Series {
 }
 export class Telemetry {
   constructor() {
-    this.frame = new Series(); this.sim = new Series(); this.render = new Series(); this.renderUpdate = new Series(); this.renderSubmit = new Series(); this.ui = new Series(); this.input = new Series(512);
+    this.frame = new Series(); this.sim = new Series(); this.render = new Series(); this.renderUpdate = new Series(); this.renderSubmit = new Series(); this.ui = new Series(); this.audio = new Series(); this.input = new Series(512);
     this.draws = new Series(); this.tris = new Series(); this.lastFrame = 0; this.startedAt = performance.now();
     this.pendingInputs = []; this.corrections = 0; this.gauges = { entities: 0, particles: 0, ping: 0, jitter: 0, loss: 0, quality: 'medium', renderScale: 1 };
     this.heapStart = this.heap(); this.longTasks = 0; this.markers = {};
@@ -24,7 +24,7 @@ export class Telemetry {
   inputProcessed(issuedAt) { this.pendingInputs.push(issuedAt); }
   /** Called right after a frame is submitted: every processed input is now on screen. */
   inputsPresented(now) { for (let i = 0; i < this.pendingInputs.length; i++) this.input.push(now - this.pendingInputs[i]); this.pendingInputs.length = 0; }
-  reset() { for (const s of [this.frame, this.sim, this.render, this.renderUpdate, this.renderSubmit, this.ui, this.input, this.draws, this.tris]) s.reset(); this.corrections = 0; this.heapStart = this.heap(); this.startedAt = performance.now(); this.longTasks = 0; this.lastFrame = 0; }
+  reset() { for (const s of [this.frame, this.sim, this.render, this.renderUpdate, this.renderSubmit, this.ui, this.audio, this.input, this.draws, this.tris]) s.reset(); this.corrections = 0; this.heapStart = this.heap(); this.startedAt = performance.now(); this.longTasks = 0; this.lastFrame = 0; }
   summary() {
     const seconds = (performance.now() - this.startedAt) / 1000;
     const f = this.frame.values().sort(); const n = f.length;
@@ -39,6 +39,7 @@ export class Telemetry {
       renderCpuP95Ms: +this.render.pct(0.95).toFixed(3), renderCpuMeanMs: +this.render.mean().toFixed(3),
       renderUpdateP95Ms: +this.renderUpdate.pct(0.95).toFixed(3), renderSubmitP95Ms: +this.renderSubmit.pct(0.95).toFixed(3),
       uiUpdateP95Ms: +this.ui.pct(0.95).toFixed(3), uiUpdateMeanMs: +this.ui.mean().toFixed(3),
+      audioUpdateP95Ms: +this.audio.pct(0.95).toFixed(3), audioUpdateMeanMs: +this.audio.mean().toFixed(3),
       inputLatencyP95Ms: +this.input.pct(0.95).toFixed(1),
       drawCallsMax: this.draws.max(), drawCallsMean: +this.draws.mean().toFixed(1), trianglesMax: this.tris.max(),
       heapMb: +this.heap().toFixed(1), heapGrowthMb: +(this.heap() - this.heapStart).toFixed(2),

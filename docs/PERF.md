@@ -92,3 +92,35 @@ From PR #10 on, the gate runs in a new container (4 vCPU Xeon, SwiftShader). The
 4.41 / 1.62 / 13.17 ms (desktop / play / phone), and one build of `play-ping100` gave 11.9, 4.3 and
 3.4 ms on three runs. The budget is unchanged. Merges where only this metric fails are justified in
 the PR write-up with same-container comparisons against `main`.
+
+## Short sections under emulated throttling (PR #12)
+UI and audio each take well under a millisecond per frame. Under `Emulation.setCPUThrottlingRate` the
+throttler pauses the main thread in slices, so any short section that happens to span a pause reads
+long. Calibration on the emulated phone (4x): an empty section p95 0.0 ms, a fixed ~0.1 ms loop
+p50 < 0.1 ms but p95 0.8 ms, the whole UI update p95 0.8 ms. The p95 of such sections measures the
+throttler, not the code, so `uiUpdateMeanMs` (budget 0.6) and `audioUpdateMeanMs` (budget 0.3) gate
+instead and the p95 values are reported as info. The mean still catches real regressions: the
+forced-layout bug from PR #11 read 0.84 ms mean on the phone.
+
+## Audio allocation (PR #12)
+Building a Web Audio graph per sound (oscillator, filter, gain, panner) made the emulated phone's GC
+total over the 2-minute scenario rise from 294 to 449 ms with a 71 ms MajorGC. Voices now come from
+fixed pools that run silently and are retriggered by AudioParam automation; the pad glides between
+chords on persistent oscillators. GC total went back to 277 ms, audio update p95 1.0 -> 0.2 ms.
+The benchmark and the soak unlock audio (autoplay flag + `unlock()`), since players hear the game.
+
+## Heap accounting of inlined models (PR #12)
+Decoding the inlined GLB data URLs with `atob` (instead of `fetch`, which a strict CSP blocks) moved
+about 2.47 MB of base64 strings from Blink's external string storage onto the V8 heap. The heap
+snapshot diff is +2.49 MB strings, -2.47 MB ExternalStringData: total memory is unchanged, but
+`heapRetainedMb` reads about 12.1 instead of 9.8 MB. The soak slope (leaks) is unaffected.
+
+## GC pauses on a software GPU: p99 gates, max is reported (PR #12)
+Traces of `desktop-medium` (spectate: no UI, no audio) on the PR #11 build and the PR #12 build, two runs
+each: 101-116 GCs per run, MinorGC p50 0.18-0.19 ms and p95 0.25-0.38 ms on both, and at most one pause
+over 2 ms per run. Every worst pause sits next to a ~32 ms `GPUTask` (SwiftShader rasterizing on the same
+four cores), inside the scavenger's parallel phase (`V8.GC_SCAVENGER_BACKGROUND_SCAVENGE_PARALLEL`),
+which waits for helper threads the rasterizer is starving. Gate runs recorded such single outliers at
+13-19 ms on builds with and without the code under review. On a software GPU the worst single pause
+measures that contention, so `gcPauseP99Ms` (budget 5) gates there and `gcPauseMaxMs` plus
+`gcPausesOver5Ms` are reported; on a real GPU `gcPauseMaxMs` still gates. The budget value is unchanged.

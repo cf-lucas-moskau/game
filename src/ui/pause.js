@@ -29,6 +29,9 @@ export class PauseMenu {
 }
 
 const ROWS = [
+  ['volume', 'Volume', ''],
+  ['music', 'Music', ''],
+  ['sfx', 'Sound effects', ''],
   ['quality', 'Graphics quality', 'Applies from the next match'],
   ['shake', 'Camera shake', ''],
   ['damageNumbers', 'Damage numbers', ''],
