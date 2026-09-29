@@ -94,6 +94,8 @@ const until = async (page, fn, arg, ms = 20000) => { try { await page.waitForFun
   await page.click('[data-act=play]');
   check('Fight starts a match with the chosen hero', await until(page, (n) => window.__game && window.__game.world.tick > 30 && window.__game.world.registry.heroes[window.__game.me.heroKey].name === n, chosen, 60000), `${k0} -> ${chosen}`);
   check('HUD shows the hero', await page.evaluate(() => !!document.querySelector('.hud .dock') && !document.querySelector('.menu')));
+  check('audio unlocks on the first click and plays music and effects', await until(page, () => { const a = window.__app.audio; return a.ready && a.played > 20; }, null, 20000),
+    await page.evaluate(() => { const a = window.__app.audio; return `${a.ctx && a.ctx.state}, ${a.played} voices played, ${a.dropped} dropped`; }));
   await page.keyboard.press('p');
   const gold0 = await page.evaluate(() => window.__game.me.gold);
   await page.click('.card:not([disabled])');
@@ -110,6 +112,8 @@ const until = async (page, fn, arg, ms = 20000) => { try { await page.waitForFun
   await page.click('[data-act=play]');
   check('a second match starts cleanly', await until(page, () => window.__game && window.__game.world.tick > 30 && window.__game.me.items.length === 0, null, 60000),
     `${await page.evaluate(() => document.querySelectorAll('canvas').length)} canvases`);
+  check('audio voices are released (no leak across matches)', await page.evaluate(() => { const v = window.__app.audio.voices; return v.sfx <= 28 && v.music <= 22; }),
+    await page.evaluate(() => JSON.stringify(window.__app.audio.voices)));
   check('no page errors (loop)', errors.length === 0, errors[0] || '');
   await page.close();
 }

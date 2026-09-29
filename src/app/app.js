@@ -18,6 +18,11 @@ import { PauseMenu, SettingsPanel } from '../ui/pause.js';
 import { PerfOverlay } from '../ui/perf-overlay.js';
 import { Tooltip } from '../ui/tooltip.js';
 import { h, toggle } from '../ui/dom.js';
+import { AudioEngine } from '../audio/engine.js';
+import { MusicDirector } from '../audio/music.js';
+import { SfxDirector } from '../audio/sfx.js';
+import { SOUNDS } from '../audio/sounds.js';
+import { intensityFor } from '../audio/theory.js';
 
 const END_SCREEN_DELAY = 2600; // let the Heartstone shatter before the result covers it
 
@@ -37,7 +42,11 @@ export class App {
     addEventListener('ll-toggle', (e) => this.onToggle(e.detail));
     addEventListener('keydown', (e) => { if (!this.match && e.code === 'Escape') this.settingsPanel.hide(); if (!this.match && e.code === 'F3') { e.preventDefault(); this.perf.toggle(); } });
     this.last = { heroKey: null, difficulty: 'medium' };
+    this.audio = new AudioEngine(this.settings);
+    this.music = new MusicDirector(this.audio); this.music.start();
+    this.ui.addEventListener('pointerdown', (e) => { if (e.target.closest('button')) this.sound('ui'); });
   }
+  sound(name) { const a = this.audio; if (a.ready) SOUNDS[name](a, a.sfx, a.now, 0, 1); }
   quality() { const q = this.params.get('quality') || this.settings.get('quality'); return q === 'auto' || !q ? defaultQuality() : q; }
   canvas() {
     const c = h('canvas', { class: 'view', style: { position: 'fixed', inset: '0', width: '100vw', height: '100vh', display: 'block', touchAction: 'none' } });
@@ -51,6 +60,7 @@ export class App {
     const canvas = this.canvas();
     this.backdrop = startSpectate({ canvas, lib: this.lib, seed: (Math.random() * 0xffff) | 0, quality: this.touch ? 'low' : this.quality(), skipSeconds: 95 });
     this.backdrop.canvas = canvas;
+    this.music.set(intensityFor({ inMenu: true }), 84); this.audio.muffle(false);
     this.menu = new HeroSelect(this.ui, {
       heroes: HEROES, settings: this.settings, touch: this.touch,
       pick: () => HERO_KEYS[(Math.random() * HERO_KEYS.length) | 0],
@@ -83,6 +93,7 @@ export class App {
     const m = this.match = { session, canvas, ended: false };
     m.hud = new Hud(this.ui, session, { touch: this.touch, tooltip: this.tooltip, onShop: () => this.onToggle('shop'), onScoreboard: () => this.onToggle('scoreboard'), onMenu: () => this.onToggle('escape') });
     m.floaters = new Floaters(this.ui, session, this.settings);
+    m.sfx = new SfxDirector(this.audio, session);
     m.shop = new Shop(this.ui, session, { onClose: () => m.shop.hide() });
     m.scoreboard = new Scoreboard(this.ui, session, { onClose: () => m.scoreboard.hide() });
     m.pause = new PauseMenu(this.ui, {
@@ -97,6 +108,7 @@ export class App {
         const now = performance.now();
         m.hud.update(now); m.floaters.update(now); m.shop.update(); m.scoreboard.update(now); this.perf.update(now);
         toggle(this.dim, 'on', session.me.dead);
+        m.sfx.update(); this.updateMusic(m);
         if (this.telemetry) this.telemetry.ui.push(performance.now() - now);
       } else if (ev === 'end') this.onMatchEnd(arg);
     });
@@ -104,8 +116,18 @@ export class App {
     session.start();
     return session;
   }
-  onMatchEnd() {
+  /** Music follows the local player's situation: calm lane, combat, sudden death, respawn. */
+  updateMusic(m) {
+    const w = m.session.world, me = m.session.me;
+    if (w.tick === m.musicTick) return; m.musicTick = w.tick;
+    const combat = w.tick - me.lastCombatTick < 90;
+    this.music.set(intensityFor({ suddenDeath: w.state.suddenDeath, combat, dead: me.dead, over: w.state.over }), w.state.suddenDeath ? 112 : 96);
+    if (me.dead !== m.muffled) { m.muffled = me.dead; this.audio.muffle(me.dead); }
+  }
+  onMatchEnd(winner) {
     const m = this.match; if (!m || m.ended) return; m.ended = true;
+    this.audio.muffle(false); m.muffled = false;
+    this.sound(winner === m.session.me.team ? 'victory' : 'defeat');
     for (const i of m.session.inputs) i.dispose(); m.session.inputs = [];
     m.endTimer = setTimeout(() => {
       if (this.match !== m) return;
@@ -146,7 +168,7 @@ export class App {
     const m = this.match;
     if (m) {
       clearTimeout(m.endTimer);
-      for (const x of [m.hud, m.floaters, m.shop, m.scoreboard, m.pause, m.end]) if (x) x.dispose();
+      for (const x of [m.hud, m.floaters, m.sfx, m.shop, m.scoreboard, m.pause, m.end]) if (x) x.dispose();
       m.session.dispose(); m.canvas.remove();
       this.match = null; if (window.__game === m.session) window.__game = null;
     }
