@@ -80,6 +80,27 @@ const until = async (page, fn, arg, ms = 20000) => { try { await page.waitForFun
   check('no page errors (touch)', errors.length === 0, errors[0] || '');
   await ctx.close();
 }
+// HUD pieces must not overlap each other on phones, in both orientations
+for (const [w, hgt] of [[844, 390], [390, 844]]) {
+  const ctx = await browser.newContext({ viewport: { width: w, height: hgt }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+  const page = await ctx.newPage();
+  await page.goto(url('hero=gus&touch=1'));
+  await page.waitForFunction(() => window.__game && window.__game.world.tick > 20, null, { timeout: 90000 });
+  const hits = await page.evaluate(() => {
+    const sel = { dock: '.dock', strip: '.topbar', clock: '.clock', score: '[data-act=score]', attack: '.tc-atk', D: '.tc-sp', R: '.tc-ab' };
+    const r = {}; for (const k in sel) { const all = document.querySelectorAll(sel[k]), el = all[all.length - 1]; if (el) r[k] = el.getBoundingClientRect(); }
+    const over = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
+    const out = [], ks = Object.keys(r);
+    for (let i = 0; i < ks.length; i++) for (let j = i + 1; j < ks.length; j++) {
+      if ((ks[i] === 'strip' && ks[j] === 'clock')) continue; // the clock hangs off the strip by design
+      if (over(r[ks[i]], r[ks[j]])) out.push(`${ks[i]}/${ks[j]}`);
+    }
+    const offscreen = ks.filter((k) => r[k].left < 0 || r[k].top < 0 || r[k].right > innerWidth + 1 || r[k].bottom > innerHeight + 1);
+    return { out, offscreen, found: ks.length };
+  });
+  check(`phone HUD has no overlaps at ${w}x${hgt}`, hits.found === 7 && !hits.out.length && !hits.offscreen.length, `${hits.found} parts${hits.out.length ? `, overlaps ${hits.out.join(' ')}` : ''}${hits.offscreen.length ? `, off screen ${hits.offscreen.join(' ')}` : ''}`);
+  await ctx.close();
+}
 // ---------------- the game loop: hero select -> match -> shop -> surrender -> end screen -> hero select -> match
 {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
