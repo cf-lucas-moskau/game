@@ -1,8 +1,13 @@
 // The Auctioneer: abilities cost gold, and his ultimate repossesses an enemy's best item.
 import { KIND } from '../constants.js';
-import { skillshot, dealDamage, DMG, scale, sec, fx, pickTarget } from './kit.js';
+import { skillshot, dealDamage, DMG, scale, sec, fx, pickTarget, amount } from './kit.js';
 import { stun, knock, giveGold } from '../damage.js';
 import { recomputeHero } from '../stats.js';
+
+// Ability numbers: one declaration used by the cast and by tooltips (kit.amount).
+const Q_VAL1 = { label: 'Magic damage', type: 'magic', base: [70, 110, 150, 190, 230], ratio: 0.6, stat: 'ap' };
+const W_VAL1 = { label: 'Magic damage', type: 'magic', base: [30, 45, 60, 75, 90], ratio: 0.25, stat: 'ap' };
+const E_VAL1 = { label: 'Magic damage', type: 'magic', base: [60, 90, 120, 150, 180], ratio: 0.45, stat: 'ap' };
 
 export default {
   key: 'auctioneer', name: 'The Auctioneer', title: 'Everything Has a Price', role: 'Utility mage', resource: 'gold', difficulty: 'Medium',
@@ -14,34 +19,34 @@ export default {
   },
   onAssist(world, e) { giveGold(world, e, 25); },
   abilities: {
-    Q: { name: 'Gavel', cd: 4, cost: 40, range: 900, freeTarget: true,
+    Q: { values: [Q_VAL1], name: 'Gavel', cd: 4, cost: 40, range: 900, freeTarget: true,
       desc: 'Skill shot that stuns briefly. Refunds its cost on hitting a hero.',
       cast(world, e, c) {
         const rank = c.rank;
         skillshot(world, e, c.x, c.y, { kind: 'auctioneer-gavel', speed: 1650, range: 900, radius: 45,
           onHit: (w, p, u) => {
             stun(w, u, 0.6);
-            dealDamage(w, e, u, scale(rank, [70, 110, 150, 190, 230], 0.6, e.ap), DMG.MAGIC, { ability: true });
+            dealDamage(w, e, u, amount(e, Q_VAL1, rank), DMG.MAGIC, { ability: true });
             if (u.kind === KIND.HERO) { e.gold += 40; fx(w, e, 'auctioneer-refund', u.x, u.y, 40); }
           } });
       } },
-    W: { name: 'Appraise', cd: [10, 9.5, 9, 8.5, 8], cost: 60, range: 800, freeTarget: true,
+    W: { values: [W_VAL1], name: 'Appraise', cd: [10, 9.5, 9, 8.5, 8], cost: 60, range: 800, freeTarget: true,
       desc: 'Mark an enemy: they take 15% more damage for 4 s.',
       cast(world, e, c) {
         const t = pickTarget(world, e, c.rawX, c.rawY, 820, false, c.targetId);
         if (!t) return false;
         t.ampUntil = world.tick + sec(4); t.ampPct = 0.15 + 0.01 * c.rank;
-        dealDamage(world, e, t, scale(c.rank, [30, 45, 60, 75, 90], 0.25, e.ap), DMG.MAGIC, { ability: true });
+        dealDamage(world, e, t, amount(e, W_VAL1, c.rank), DMG.MAGIC, { ability: true });
         fx(world, t, 'auctioneer-appraise', t.x, t.y, 4);
       } },
-    E: { name: 'Going Once', cd: [14, 13, 12, 11, 10], cost: 80, range: 700, freeTarget: true,
+    E: { values: [E_VAL1], name: 'Going Once', cd: [14, 13, 12, 11, 10], cost: 80, range: 700, freeTarget: true,
       desc: 'Yank an enemy toward you.',
       cast(world, e, c) {
         const t = pickTarget(world, e, c.rawX, c.rawY, 720, false, c.targetId);
         if (!t) return false;
         const d = Math.hypot(e.x - t.x, e.y - t.y), pull = Math.max(0, Math.min(380, d - 160));
         knock(world, t, e.x - t.x, e.y - t.y, pull, 0.25, true);
-        dealDamage(world, e, t, scale(c.rank, [60, 90, 120, 150, 180], 0.45, e.ap), DMG.MAGIC, { ability: true });
+        dealDamage(world, e, t, amount(e, E_VAL1, c.rank), DMG.MAGIC, { ability: true });
         fx(world, e, 'auctioneer-hook', t.x, t.y);
       } },
     R: { name: 'Repossess', cd: [90, 75, 60], cost: 300, range: 700, freeTarget: true,

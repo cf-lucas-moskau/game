@@ -17,6 +17,7 @@ import { EndScreen } from '../ui/endscreen.js';
 import { PauseMenu, SettingsPanel } from '../ui/pause.js';
 import { PerfOverlay } from '../ui/perf-overlay.js';
 import { Tooltip } from '../ui/tooltip.js';
+import { InspectPanel } from '../ui/inspect.js';
 import { h, toggle } from '../ui/dom.js';
 import { AudioEngine } from '../audio/engine.js';
 import { MusicDirector } from '../audio/music.js';
@@ -86,16 +87,18 @@ export class App {
     const toggle = (what) => dispatchEvent(new CustomEvent('ll-toggle', { detail: what }));
     const inputs = [];
     if (!cfg.autopilot) {
-      if (matchMedia('(pointer: fine)').matches || !this.touch) inputs.push(new DesktopInput(session, canvas, { onToggle: toggle }));
-      if (this.touch || 'ontouchstart' in window) inputs.push(new TouchInput(session, this.root, { onToggle: toggle }));
+      const onInspect = (id) => { if (!this.match) return; if (id < 0) this.match.inspect.hide(); else this.match.inspect.show(id); };
+      if (matchMedia('(pointer: fine)').matches || !this.touch) inputs.push(new DesktopInput(session, canvas, { onToggle: toggle, onInspect }));
+      if (this.touch || 'ontouchstart' in window) inputs.push(new TouchInput(session, this.root, { onToggle: toggle, onInspect }));
     }
     session.inputs = inputs;
     const m = this.match = { session, canvas, ended: false };
     m.hud = new Hud(this.ui, session, { touch: this.touch, tooltip: this.tooltip, onShop: () => this.onToggle('shop'), onScoreboard: () => this.onToggle('scoreboard'), onMenu: () => this.onToggle('escape') });
     m.floaters = new Floaters(this.ui, session, this.settings);
     m.sfx = new SfxDirector(this.audio, session);
-    m.shop = new Shop(this.ui, session, { onClose: () => m.shop.hide() });
-    m.scoreboard = new Scoreboard(this.ui, session, { onClose: () => m.scoreboard.hide() });
+    m.shop = new Shop(this.ui, session, { onClose: () => m.shop.hide(), tooltip: this.tooltip });
+    m.inspect = new InspectPanel(this.ui, session, { tooltip: this.tooltip });
+    m.scoreboard = new Scoreboard(this.ui, session, { onClose: () => m.scoreboard.hide(), onPick: (id) => { m.scoreboard.hide(); m.inspect.show(id); } });
     m.pause = new PauseMenu(this.ui, {
       onResume: () => m.pause.hide(),
       onSettings: () => this.settingsPanel.show(),
@@ -106,7 +109,7 @@ export class App {
       if (ev === 'frame') {
         for (const i of inputs) i.update();
         const now = performance.now();
-        m.hud.update(now); m.floaters.update(now); m.shop.update(); m.scoreboard.update(now); this.perf.update(now);
+        m.hud.update(now); m.floaters.update(now); m.shop.update(); m.scoreboard.update(now); m.inspect.update(now); this.perf.update(now);
         toggle(this.dim, 'on', session.me.dead);
         const t1 = performance.now();
         m.sfx.update(); this.updateMusic(m);
@@ -145,7 +148,7 @@ export class App {
     const m = this.match;
     if (what === 'perf') { this.perf.toggle(); return; }
     if (!m || m.ended) return;
-    const panels = [this.settingsPanel, m.shop, m.scoreboard, m.pause];
+    const panels = [this.settingsPanel, m.shop, m.scoreboard, m.inspect, m.pause];
     if (what === 'escape') {
       const top = panels.find((p) => p.open);
       if (top) top.hide(); else m.pause.show();
@@ -169,7 +172,7 @@ export class App {
     const m = this.match;
     if (m) {
       clearTimeout(m.endTimer);
-      for (const x of [m.hud, m.floaters, m.sfx, m.shop, m.scoreboard, m.pause, m.end]) if (x) x.dispose();
+      for (const x of [m.hud, m.floaters, m.sfx, m.shop, m.scoreboard, m.inspect, m.pause, m.end]) if (x) x.dispose();
       m.session.dispose(); m.canvas.remove();
       this.match = null; if (window.__game === m.session) window.__game = null;
     }

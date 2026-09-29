@@ -2,14 +2,14 @@
 import { KIND, LANE } from '../sim/constants.js';
 
 const alive = (e) => e && e.alive && !e.dead;
-/** Unit under the cursor (enemy preferred), within its radius + pad. */
-export function hoverTarget(world, me, x, y, pad = 55) {
+/** Unit under the cursor (enemy preferred), within its radius + pad. me = null and any = true: any unit (inspection). */
+export function hoverTarget(world, me, x, y, pad = 55, any = false) {
   let best = null, bs = Infinity;
   for (const e of world.entities) {
-    if (!alive(e) || e === me || e.untargetableUntil > world.tick) continue;
+    if (!alive(e) || e === me || (!any && e.untargetableUntil > world.tick)) continue;
     const d = Math.sqrt((e.x - x) ** 2 + (e.y - y) ** 2) - e.radius;
     if (d > pad) continue;
-    let s = d; if (e.team === me.team) s += 400; if (e.kind === KIND.HERO) s -= 25;
+    let s = d; if (me && e.team === me.team) s += 400; if (e.kind === KIND.HERO) s -= 25;
     if (s < bs) { bs = s; best = e; }
   }
   return best;

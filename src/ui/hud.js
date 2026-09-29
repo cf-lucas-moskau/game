@@ -10,6 +10,7 @@ import { KIND, RULES, TICK_HZ, xpToNext } from '../sim/constants.js';
 import { byRank } from '../sim/abilities.js';
 import { canShop } from '../sim/match.js';
 import { itemActiveCmd } from '../sim/commands.js';
+import { abilityNumbers } from './numbers.js';
 
 const KEYS = ['Q', 'W', 'E', 'R'];
 const RES_COLOR = { mana: 'linear-gradient(180deg,#7aa2ff,#4a6fe0)', ink: 'linear-gradient(180deg,#a99cff,#7564e8)', flame: 'linear-gradient(180deg,#ffc27a,#f07a3a)', swarm: 'linear-gradient(180deg,#ffe07a,#e0a82e)' };
@@ -90,8 +91,9 @@ export class Hud {
     const k = KEYS[i], a = this.def.abilities[k], rank = me.ranks[k];
     const cost = typeof a.cost === 'function' ? null : byRank(a.cost || 0, Math.max(1, rank));
     const cd = typeof a.cd === 'function' ? null : byRank(a.cd, Math.max(1, rank));
-    const meta = [rank > 0 ? `Rank ${rank}` : `Unlocks at level ${k === 'R' ? 6 : 'up'}`, cd != null ? `${cd} s cooldown` : '', cost ? `${cost} ${a.costType || this.def.resource}` : ''].filter(Boolean).join(' · ');
-    this.tip.show(el, `${k} · ${a.name}`, a.desc || '', meta);
+    const meta = [rank > 0 ? `Rank ${rank}` : `Unlocks at level ${k === 'R' ? 6 : 'up'}`, cd != null ? `${Math.round(cd * (1 - me.cdr) * 10) / 10} s cooldown` : '', cost ? `${cost} ${a.costType || this.def.resource}` : ''].filter(Boolean).join(' · ');
+    const rows = abilityNumbers(this.s.world, me)[i].rows.map((r) => [r.label, String(Math.round(r.value)), r.type, r.formula]);
+    this.tip.show(el, `${k} · ${a.name}`, a.desc || '', meta, rows);
   }
   itemTip(i, el) {
     const key = this.s.me.items[i]; if (!key) return;

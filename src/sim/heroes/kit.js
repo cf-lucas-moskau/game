@@ -8,6 +8,12 @@ import { byRank } from '../abilities.js';
 export { DMG, dealDamage, byRank, sec };
 
 export const scale = (rank, base, ratio, stat) => byRank(base, rank) + ratio * stat;
+/**
+ * A declared ability number: base by rank + ratio x stat (+ bonus ratio x another stat).
+ * Casts and UI tooltips both read it, so what the tooltip shows is what the ability does.
+ * spec: { label, type: 'magic'|'phys'|'shield'|'heal', base: number|number[], ratio, stat, bonus?: { ratio, stat } }
+ */
+export const amount = (e, v, rank) => byRank(v.base, rank) + v.ratio * e[v.stat] + (v.bonus ? v.bonus.ratio * e[v.bonus.stat] : 0);
 export const clampY = (y) => Math.max(LANE.MIN_Y, Math.min(LANE.MAX_Y, y));
 export const fx = (world, e, name, x = e.x, y = e.y, v = 0, b = 0) => world.events.push(EV.FX, world.tick, e.id, b, x, y, v, name);
 export const isHostileUnit = (u) => !isStructure(u.kind);

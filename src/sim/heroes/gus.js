@@ -3,8 +3,14 @@ import { EV } from '../../core/events.js';
 import { KIND } from '../constants.js';
 import { ORDER } from '../entity.js';
 import { spawnZone } from '../zones.js';
-import { aoe, dash, dealDamage, DMG, scale, sec, fx, clampY } from './kit.js';
+import { aoe, dash, dealDamage, DMG, scale, sec, fx, clampY, amount } from './kit.js';
 import { knockUp, knock, stun, giveGold } from '../damage.js';
+
+// Ability numbers: one declaration used by the cast and by tooltips (kit.amount).
+const Q_VAL1 = { label: 'Slam damage (mounted)', type: 'phys', base: [70, 110, 150, 190, 230], ratio: 0.5, stat: 'ad', bonus: { ratio: 0.04, stat: 'maxHp' } };
+const Q_VAL2 = { label: 'Rock damage (on foot)', type: 'phys', base: [80, 125, 170, 215, 260], ratio: 0.7, stat: 'ad' };
+const E_VAL1 = { label: 'Magic damage', type: 'magic', base: [60, 95, 130, 165, 200], ratio: 0.4, stat: 'ad', bonus: { ratio: 0.03, stat: 'maxHp' } };
+const R_VAL1 = { label: 'Magic damage', type: 'magic', base: [150, 250, 350], ratio: 0.8, stat: 'ad', bonus: { ratio: 0.06, stat: 'maxHp' } };
 
 const pebbleOf = (world, e) => (e.heroState.pebbleId >= 0 ? world.get(e.heroState.pebbleId) : null);
 function spawnPebble(world, e) {
@@ -47,19 +53,19 @@ export default {
     for (const h of world.heroes) if (h.team !== p.team && !h.dead && Math.hypot(h.x - p.x, h.y - p.y) < 1200) giveGold(world, h, 60);
   },
   abilities: {
-    Q: { name: 'Rock Slam / Pebble Shot', cd: [6, 5.5, 5, 4.5, 4], cost: [40, 45, 50, 55, 60], range: 900, freeTarget: false,
+    Q: { values: [Q_VAL1, Q_VAL2], name: 'Rock Slam / Pebble Shot', cd: [6, 5.5, 5, 4.5, 4], cost: [40, 45, 50, 55, 60], range: 900, freeTarget: false,
       desc: 'Mounted: Pebble slams the ground, knocking enemies up. Dismounted: Gus lobs a rock at long range.',
       cast(world, e, c) {
         const rank = c.rank;
         if (e.heroState.mounted) {
           const a = Math.atan2(c.y - e.y, c.x - e.x), cx = e.x + Math.cos(a) * 140, cy = clampY(e.y + Math.sin(a) * 140);
-          aoe(world, e.team, cx, cy, 190, (u) => { knockUp(world, u, 0.75); dealDamage(world, e, u, scale(rank, [70, 110, 150, 190, 230], 0.5, e.ad) + 0.04 * e.maxHp, DMG.PHYS, { ability: true }); });
+          aoe(world, e.team, cx, cy, 190, (u) => { knockUp(world, u, 0.75); dealDamage(world, e, u, amount(e, Q_VAL1, rank), DMG.PHYS, { ability: true }); });
           fx(world, e, 'gus-slam', cx, cy);
         } else {
           const x = c.x, y = c.y;
           fx(world, e, 'gus-lob', x, y, 0.6);
           world.schedule(sec(0.6), (w) => {
-            aoe(w, e.team, x, y, 160, (u) => dealDamage(w, e, u, scale(rank, [80, 125, 170, 215, 260], 0.7, e.ad), DMG.PHYS, { ability: true }));
+            aoe(w, e.team, x, y, 160, (u) => dealDamage(w, e, u, amount(e, Q_VAL2, rank), DMG.PHYS, { ability: true }));
             fx(w, e, 'gus-rock-impact', x, y);
           });
         }
@@ -81,7 +87,7 @@ export default {
         if (Math.hypot(p.x - e.x, p.y - e.y) > 220) { p.order = ORDER.MOVE; p.moveX = e.x; p.moveY = e.y; p.targetId = -1; return false; }
         e.x = p.x; e.y = p.y; mount(world, e); fx(world, e, 'gus-mount');
       } },
-    E: { name: 'Boulder Roll', cd: [14, 13, 12, 11, 10], cost: 60, range: 650, freeTarget: true,
+    E: { values: [E_VAL1], name: 'Boulder Roll', cd: [14, 13, 12, 11, 10], cost: 60, range: 650, freeTarget: true,
       desc: 'Pebble curls up and rolls forward, knocking enemies aside.',
       cast(world, e, c) {
         const roller = e.heroState.mounted ? e : pebbleOf(world, e);
@@ -93,12 +99,12 @@ export default {
             if (hitIds.includes(u.id)) return; hitIds.push(u.id);
             const side = ((u.x - r.x) * -Math.sin(a) + (u.y - r.y) * Math.cos(a)) >= 0 ? 1 : -1;
             knock(w, u, -Math.sin(a) * side, Math.cos(a) * side, 180, 0.3, true);
-            dealDamage(w, e, u, scale(rank, [60, 95, 130, 165, 200], 0.4, e.ad) + 0.03 * e.maxHp, DMG.MAGIC, { ability: true });
+            dealDamage(w, e, u, amount(e, E_VAL1, rank), DMG.MAGIC, { ability: true });
           });
         }, null, 'pebble-roll');
         if (roller !== e) roller.aiControlled = false, world.schedule(sec(0.6), () => { roller.aiControlled = true; });
       } },
-    R: { name: 'Avalanche', cd: [90, 75, 60], cost: 100, range: 800,
+    R: { values: [R_VAL1], name: 'Avalanche', cd: [90, 75, 60], cost: 100, range: 800,
       desc: 'Gus climbs Pebble and they leap to a target area, stunning on landing.',
       cast(world, e, c) {
         const s = e.heroState, t = world.tick;
@@ -107,7 +113,7 @@ export default {
         e.untargetableUntil = t + sec(0.8);
         fx(world, e, 'gus-avalanche-warn', x, y, 0.8);
         dash(world, e, x, y, 0.8, null, (w) => {
-          aoe(w, e.team, x, y, 300, (u) => { stun(w, u, 1.25); dealDamage(w, e, u, scale(rank, [150, 250, 350], 0.8, e.ad) + 0.06 * e.maxHp, DMG.MAGIC, { ability: true }); });
+          aoe(w, e.team, x, y, 300, (u) => { stun(w, u, 1.25); dealDamage(w, e, u, amount(e, R_VAL1, rank), DMG.MAGIC, { ability: true }); });
           fx(w, e, 'gus-avalanche', x, y);
         }, 'gus-leap');
         e.airborneUntil = t + sec(0.8);

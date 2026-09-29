@@ -2,8 +2,13 @@
 import { KIND } from '../constants.js';
 import { spawnZone } from '../zones.js';
 import { spawnProjectile } from '../projectile.js';
-import { aoe, alliesInRadius, dealDamage, DMG, scale, sec, fx, pickTarget } from './kit.js';
+import { aoe, alliesInRadius, dealDamage, DMG, scale, sec, fx, pickTarget, amount } from './kit.js';
 import { addShield, slow, heal } from '../damage.js';
+
+// Ability numbers: one declaration used by the cast and by tooltips (kit.amount).
+const Q_VAL1 = { label: 'Magic damage over 3 s', type: 'magic', base: [90, 130, 170, 210, 250], ratio: 0.6, stat: 'ap' };
+const W_VAL1 = { label: 'Shield', type: 'shield', base: [80, 110, 140, 170, 200], ratio: 0.6, stat: 'ap' };
+const R_VAL1 = { label: 'Heal per second', type: 'heal', base: [40, 60, 80], ratio: 0.2, stat: 'ap' };
 
 const MAX_BEES = 20;
 function addBee(world, e, n = 1) { e.resource = Math.min(MAX_BEES, e.resource + n); e.heroState.lastGain = world.tick; }
@@ -25,7 +30,7 @@ export default {
   },
   onRespawn(world, e) { e.resource = 8; },
   abilities: {
-    Q: { name: 'Sting', cd: [3, 3, 3, 3, 3], cost: 3, costType: 'swarm', range: 650, freeTarget: true,
+    Q: { values: [Q_VAL1], name: 'Sting', cd: [3, 3, 3, 3, 3], cost: 3, costType: 'swarm', range: 650, freeTarget: true,
       desc: 'Fling 3 bees at a target for damage over 3 s.',
       cast(world, e, c) {
         const t = pickTarget(world, e, c.rawX, c.rawY, 700, false, c.targetId);
@@ -33,18 +38,18 @@ export default {
         const rank = c.rank;
         spawnProjectile(world, { kind: 'brindle-sting', owner: e.id, team: e.team, x: e.x, y: e.y, speed: 1100, targetId: t.id,
           onHit: (w, p, u) => {
-            const total = scale(rank, [90, 130, 170, 210, 250], 0.6, e.ap);
+            const total = amount(e, Q_VAL1, rank);
             dealDamage(w, e, u, total * 0.25, DMG.MAGIC, { ability: true });
             for (let k = 1; k <= 6; k++) w.schedule(sec(0.5 * k), (w2) => { if (u.alive && !u.dead) dealDamage(w2, e, u, total * 0.125, DMG.MAGIC, { dot: true }); });
             spawnZone(w, { kind: 'brindle-sting-dot', team: e.team, owner: e.id, x: u.x, y: u.y, duration: 3, data: { target: u.id } });
           } });
       } },
-    W: { name: 'Buzz Shield', cd: [10, 9.5, 9, 8.5, 8], cost: 5, costType: 'swarm', range: 700, freeTarget: true,
+    W: { values: [W_VAL1], name: 'Buzz Shield', cd: [10, 9.5, 9, 8.5, 8], cost: 5, costType: 'swarm', range: 700, freeTarget: true,
       desc: 'Bees form a shield on an ally (or yourself).',
       cast(world, e, c) {
         let best = e, bd = Math.hypot(c.rawX - e.x, c.rawY - e.y) - 120;
         for (const a of alliesInRadius(world, e.team, e.x, e.y, 700)) { if (a.kind !== KIND.HERO) continue; const d = Math.hypot(a.x - c.rawX, a.y - c.rawY); if (d < bd) { bd = d; best = a; } }
-        addShield(world, best, scale(c.rank, [80, 110, 140, 170, 200], 0.6, e.ap), 2.5);
+        addShield(world, best, amount(e, W_VAL1, c.rank), 2.5);
         fx(world, best, 'brindle-shield', best.x, best.y, 2.5);
       } },
     E: { name: 'Honey Pool', cd: [12, 11.5, 11, 10.5, 10], cost: 0, costType: 'none', range: 700,
@@ -53,12 +58,12 @@ export default {
         spawnZone(world, { kind: 'brindle-honey', team: e.team, owner: e.id, x: c.x, y: c.y, r: 220, duration: 3, every: 0.2,
           onTick: (w, z) => aoe(w, z.team, z.x, z.y, z.r, (u) => slow(w, u, 0.3, 0.35)) });
       } },
-    R: { name: 'Hive Dome', cd: [70, 60, 50], cost: 0, costType: 'none',
+    R: { values: [R_VAL1], name: 'Hive Dome', cd: [70, 60, 50], cost: 0, costType: 'none',
       desc: 'Needs 15+ bees. Consumes the swarm for a dome that slows enemies 50% and heals allies for 4 s.',
       cast(world, e, c) {
         if (e.resource < 15) return false;
         const bees = e.resource; e.resource = 0; const rank = c.rank, x = e.x, y = e.y;
-        const healPerSec = (scale(rank, [40, 60, 80], 0.2, e.ap)) * (bees / 15);
+        const healPerSec = amount(e, R_VAL1, rank) * (bees / 15);
         spawnZone(world, { kind: 'brindle-dome', team: e.team, owner: e.id, x, y, r: 340, duration: 4, every: 0.25,
           onTick: (w, z) => {
             aoe(w, z.team, z.x, z.y, z.r, (u) => slow(w, u, 0.5, 0.3));
