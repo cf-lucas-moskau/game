@@ -7,14 +7,17 @@ export const MODEL_URLS = Object.fromEntries(Object.entries(files).map(([p, url]
 // Animation clip names used by the renderer, mapped onto each rig's clip names.
 export const CLIPS = { idle: 'idle', walk: 'walk', run: 'sprint', attack: 'attack-melee-right', shoot: 'holding-right-shoot', cast: 'interact-right', die: 'die', emote: 'emote-yes', hold: 'holding-right' };
 
-// How each hero looks: rig, height in render units, held props (bone-attached) and tint accents.
+// How each hero looks: rig, height in render units, held props and tint accents.
+// A prop with `hold` sits in the fist at the end of its arm bone (grip found on the mesh): `grip` = share of its
+// height below the fist, `tilt` = forward lean (rad), `roll` = sideways turn, `flip` for art authored head-down. `on: 'top'` stands a prop on the highest
+// point of its bone's mesh (`lift` adjusts). Others use explicit bone-local pos/rot. Check props with `node tools/lab.mjs heroes`.
 export const HERO_LOOKS = {
-  morrow:     { model: 'hero-morrow', height: 1.45, attack: 'shoot', props: [{ key: 'prop-wrench', bone: 'arm-right', pos: [0, -0.13, 0.03], rot: [1.35, 0, 0], size: 0.55 }], accent: '#e7b24c' },
-  saffi:      { model: 'hero-saffi', height: 1.35, attack: 'attack', props: [{ key: 'prop-dagger', bone: 'arm-right', pos: [0, -0.13, 0.03], rot: [1.35, 0, 0], size: 0.55 }, { key: 'prop-candle', bone: 'head', pos: [0, 0.27, 0.02], rot: [0, 0, 0], size: 0.3, glow: '#ffb35c' }], accent: '#ff9d4d' },
-  vesper:     { model: 'hero-vesper', height: 1.45, attack: 'shoot', props: [{ key: 'prop-brush', bone: 'arm-right', pos: [0, -0.13, 0.03], rot: [1.35, 0, 0], size: 0.7 }, { key: 'prop-spellbook', bone: 'arm-left', pos: [0, -0.12, 0.06], rot: [0.6, 0, 0], size: 0.3 }], accent: '#8b7bff' },
-  gus:        { model: 'hero-gus', height: 0.95, attack: 'shoot', props: [{ key: 'prop-hammer', bone: 'arm-right', pos: [0, -0.13, 0.03], rot: [1.35, 0, 0], size: 0.45 }], accent: '#c9a26a', pebble: ['rock-a', 'rock-b', 'rock-c'] },
-  brindle:    { model: 'hero-brindle', height: 1.4, attack: 'shoot', props: [{ key: 'prop-lantern', bone: 'arm-right', pos: [0, -0.2, 0.02], rot: [0, 0, 0], size: 0.38, glow: '#ffd866' }], accent: '#ffcf3d', bees: 'bee' },
-  auctioneer: { model: 'hero-auctioneer', height: 1.5, attack: 'shoot', props: [{ key: 'prop-mallet', bone: 'arm-right', pos: [0, -0.13, 0.03], rot: [1.35, 0, 0], size: 0.6 }], accent: '#f2c14e' },
+  morrow:     { model: 'hero-morrow', height: 1.45, attack: 'shoot', props: [{ key: 'prop-wrench', bone: 'arm-right', hold: true, size: 0.55 }], accent: '#e7b24c' },
+  saffi:      { model: 'hero-saffi', height: 1.35, attack: 'attack', props: [{ key: 'prop-dagger', bone: 'arm-right', hold: true, size: 0.5, grip: 0.15 }, { key: 'prop-candle', bone: 'head', on: 'top', lift: -0.02, size: 0.3, glow: '#ffb35c' }], accent: '#ff9d4d' },
+  vesper:     { model: 'hero-vesper', height: 1.45, attack: 'shoot', props: [{ key: 'prop-brush', bone: 'arm-right', hold: true, size: 0.7, grip: 0.35 }, { key: 'prop-spellbook', bone: 'arm-left', hold: true, size: 0.22, grip: 0.5, tilt: 0.3 }], accent: '#8b7bff' },
+  gus:        { model: 'hero-gus', height: 0.95, attack: 'shoot', props: [{ key: 'prop-hammer', bone: 'arm-right', hold: true, size: 0.5 }], accent: '#c9a26a', pebble: ['rock-a', 'rock-b', 'rock-c'] },
+  brindle:    { model: 'hero-brindle', height: 1.4, attack: 'shoot', props: [{ key: 'prop-lantern', bone: 'arm-right', hold: true, size: 0.38, grip: 0.95, tilt: 0, glow: '#ffd866' }], accent: '#ffcf3d', bees: 'bee' },
+  auctioneer: { model: 'hero-auctioneer', height: 1.5, attack: 'shoot', props: [{ key: 'prop-mallet', bone: 'arm-right', hold: true, grip: 0.02, size: 0.6 }], accent: '#f2c14e' },
 };
 // Minions: [team][kind] -> rig + height. Siege uses a static model.
 export const MINION_LOOKS = {

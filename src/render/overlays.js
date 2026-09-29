@@ -1,5 +1,6 @@
 // Instanced overlays: health bars (1 draw), ground shadows + team rings (1 draw), projectiles (1 draw).
 import * as THREE from 'three';
+import { PROJECTILE_STYLES, DEFAULT_PROJECTILE } from './attack-styles.js';
 import { S, TEAM_COLORS, TEAM_RGB, SELF_RGB } from './palette.js';
 import { KIND, isStructure } from '../sim/constants.js';
 import { rx, ry } from './interp.js';
@@ -89,42 +90,95 @@ export class GroundDecals {
 }
 
 // Projectile look per sim projectile kind: [color, size, emissive strength, trail length]
-const PROJ = {
-  'tower-bolt': ['#ffe9a8', 0.28, 3.2], 'minion-bolt': ['#ffffff', 0.12, 1.6], 'siege-shot': ['#ffb070', 0.22, 1.8],
-  'morrow-cog': ['#f2c14e', 0.34, 2.6], 'morrow-auto': ['#ffd88a', 0.14, 2], 'saffi-auto': ['#ff9d4d', 0.12, 2],
-  'vesper-auto': ['#a99bff', 0.14, 2.4], 'gus-auto': ['#d9b98a', 0.18, 1.2], 'brindle-auto': ['#ffd84a', 0.14, 2.2],
-  'brindle-sting': ['#ffd000', 0.2, 3], 'auctioneer-auto': ['#ffe07a', 0.14, 2.2], 'auctioneer-gavel': ['#f2c14e', 0.36, 3.2],
-};
-const PROJ_RGB = {}; for (const [k, v] of Object.entries(PROJ)) PROJ_RGB[k] = new THREE.Color(v[0]).multiplyScalar(v[2]);
-const PROJ_DEFAULT = ['#ffffff', 0.15, 1.5], PROJ_DEFAULT_RGB = new THREE.Color('#ffffff').multiplyScalar(1.5);
+// Projectiles: one instanced draw; the fragment shader draws each attack's own shape (attack-styles.js).
+// Premultiplied blending lets glowing shapes add light and solid ones (ink, stone) stay dark.
+const RGB = (hex, k = 1) => new THREE.Color(hex).multiplyScalar(k);
+const STYLE_CACHE = new Map();
+function lookOf(kind) {
+  let l = STYLE_CACHE.get(kind); if (l) return l;
+  const s = PROJECTILE_STYLES[kind] || DEFAULT_PROJECTILE;
+  l = { s, c: s.team ? s.team.map((h) => RGB(h, s.glow)) : [RGB(s.color, s.glow), RGB(s.color, s.glow)], c2: RGB(s.color2 || '#ffffff'), y: s.y ?? 0.85 };
+  STYLE_CACHE.set(kind, l); return l;
+}
 export class ProjectileViews {
   constructor(parent, cap = 256) {
     const g = new THREE.InstancedBufferGeometry().copy(new THREE.PlaneGeometry(1, 1));
-    this.iA = new THREE.InstancedBufferAttribute(new Float32Array(cap * 4), 4).setUsage(THREE.DynamicDrawUsage); // pos, size
-    this.iB = new THREE.InstancedBufferAttribute(new Float32Array(cap * 4), 4).setUsage(THREE.DynamicDrawUsage); // color*intensity, spin
-    this.iD = new THREE.InstancedBufferAttribute(new Float32Array(cap * 2), 2).setUsage(THREE.DynamicDrawUsage); // screen-space-ish dir (x,z)
-    g.setAttribute('iA', this.iA); g.setAttribute('iB', this.iB); g.setAttribute('iD', this.iD); g.instanceCount = 0;
-    const m = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-      vertexShader: `attribute vec4 iA; attribute vec4 iB; attribute vec2 iD; varying vec2 vUv; varying vec4 vB;
-        void main(){ vUv = uv*2.-1.; vB = iB; vec4 mv = viewMatrix*vec4(iA.xyz,1.);
-          vec3 dir = (viewMatrix*vec4(iD.x,0.,iD.y,0.)).xyz; vec2 d = length(dir.xy) > 0.001 ? normalize(dir.xy) : vec2(1.,0.);
-          vec2 q = position.xy; vec2 stretched = d*q.x*(1. + length(iD)*2.2) + vec2(-d.y,d.x)*q.y;
-          mv.xy += stretched*iA.w; gl_Position = projectionMatrix*mv; }`,
-      fragmentShader: `varying vec2 vUv; varying vec4 vB;
-        void main(){ float r = length(vUv); float core = smoothstep(0.35, 0., r); float glow = smoothstep(1., 0., r);
-          vec3 c = vB.rgb*(glow*0.7) + vec3(1.)*core*0.9; float a = glow; if (a < 0.01) discard; gl_FragColor = vec4(c*a, a); }` });
+    const A = (n) => new THREE.InstancedBufferAttribute(new Float32Array(cap * n), n).setUsage(THREE.DynamicDrawUsage);
+    this.iA = A(4); // pos, size
+    this.iB = A(4); // colour * glow, shape
+    this.iC = A(4); // secondary colour, spin phase
+    this.iD = A(3); // flight direction (x, z), stretch
+    g.setAttribute('iA', this.iA); g.setAttribute('iB', this.iB); g.setAttribute('iC', this.iC); g.setAttribute('iD', this.iD); g.instanceCount = 0;
+    this.uniforms = { uTime: { value: 0 } };
+    const m = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: this.uniforms,
+      blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
+      vertexShader: `attribute vec4 iA, iB, iC; attribute vec3 iD; varying vec2 vUv; varying vec4 vB, vC; varying float vStretch;
+        void main(){ vUv = uv * 2. - 1.; vB = iB; vC = iC; vStretch = iD.z; vec4 mv = viewMatrix * vec4(iA.xyz, 1.);
+          vec3 dir = (viewMatrix * vec4(iD.x, 0., iD.y, 0.)).xyz; vec2 d = length(dir.xy) > 0.001 ? normalize(dir.xy) : vec2(1., 0.);
+          vec2 q = position.xy; vec2 stretched = d * q.x * iD.z + vec2(-d.y, d.x) * q.y;
+          mv.xy += stretched * iA.w; gl_Position = projectionMatrix * mv; }`,
+      fragmentShader: `uniform float uTime; varying vec2 vUv; varying vec4 vB, vC; varying float vStretch;
+        mat2 rot(float a){ float c = cos(a), s = sin(a); return mat2(c, -s, s, c); }
+        void main(){
+          int shape = int(vB.w + .5); vec3 col = vB.rgb, c2 = vC.rgb; float spin = vC.w, r = length(vUv);
+          vec3 c = vec3(0.); float a = 0.;
+          if (shape == 1) { // lance: white-hot core line, hot halo, bright head
+            float y = abs(vUv.y), head = smoothstep(-1., 1., vUv.x);
+            float core = smoothstep(.22, 0., y) * (.35 + .65 * head), halo = smoothstep(1., 0., r) * (.4 + .6 * head);
+            c = c2 * core * 1.4 + col * halo * .9; a = 0.;
+          } else if (shape == 2) { // gear: spinning toothed ring
+            vec2 p = rot(spin) * vUv; float ang = atan(p.y, p.x), teeth = step(.5, fract(ang * 8. / 6.2832));
+            float outer = mix(.62, .9, teeth), body = step(r, outer) * step(.28, r);
+            float glow = smoothstep(1., .3, r) * .35;
+            c = mix(col, c2, smoothstep(.3, .8, r) * .5) * body + col * glow; a = body * .85;
+          } else if (shape == 3) { // ink blot: dark wobbling body, violet rim, droplets
+            float ang = atan(vUv.y, vUv.x), w = .62 + .12 * sin(ang * 5. + uTime * 9. + spin) + .06 * sin(ang * 9. - uTime * 7.);
+            float body = smoothstep(w, w - .08, r), rim = smoothstep(w - .02, w - .2, r) * body;
+            c = col * body + c2 * (body - rim) * 1.6 + c2 * smoothstep(1., w, r) * .25; a = body * .92;
+          } else if (shape == 4) { // bee: striped body, flickering wings
+            vec2 p = vUv * vec2(1., 1.5); float body = smoothstep(.62, .55, length(p * vec2(.9, 1.)));
+            float stripe = step(.5, fract((vUv.x + 1.) * 2.2));
+            float wing = smoothstep(.35, .2, length(vUv - vec2(-.05, .55 + .08 * sin(uTime * 60. + spin)))) + smoothstep(.35, .2, length(vUv - vec2(-.05, -.55 - .08 * sin(uTime * 60. + spin))));
+            c = mix(col, c2, stripe) * body + vec3(.9) * wing * .6 * (1. - body); a = max(body, wing * .5);
+          } else if (shape == 5) { // coin: spinning gold disc with rim and glint
+            float sx = max(.18, abs(cos(spin))); vec2 p = vec2(vUv.x / sx, vUv.y); float rr = length(p);
+            float disc = step(rr, .7), rim = smoothstep(.55, .7, rr) * disc, glint = pow(max(0., 1. - length(p - vec2(-.25, .25)) * 2.2), 3.);
+            c = col * disc * (.75 + .25 * sin(spin * 2.)) + c2 * (rim * .6 + glint * 1.5) + col * smoothstep(1., .4, r) * .3; a = disc * .9;
+          } else if (shape == 6) { // rock: dark chunky stone with a warm lit edge
+            vec2 p = rot(spin) * vUv; float ang = atan(p.y, p.x), w = .66 + .1 * sin(ang * 3. + 1.) + .06 * sin(ang * 7.);
+            float body = smoothstep(w, w - .05, r), lit = smoothstep(.2, .9, dot(normalize(p + 1e-4), vec2(-.6, .8))) * body;
+            c = col * body + c2 * lit * .5; a = body;
+          } else if (shape == 7) { // shard: sharp diamond with a white edge
+            float dmd = abs(vUv.x) * .7 + abs(vUv.y) * 1.6, body = smoothstep(1., .8, dmd), core = smoothstep(.55, .1, dmd);
+            c = col * body * .9 + c2 * core; a = 0.;
+          } else { // orb
+            float core = smoothstep(.35, 0., r), glow = smoothstep(1., 0., r); c = col * glow * .7 + c2 * core * .9; a = 0.;
+          }
+          float lum = max(max(c.r, c.g), c.b); if (a < .01 && lum < .01) discard;
+          gl_FragColor = vec4(c, a); }` });
     this.mesh = new THREE.Mesh(g, m); this.mesh.frustumCulled = false; this.mesh.renderOrder = 50; parent.add(this.mesh); this.cap = cap;
+    this.start = new Map(); // projectile id -> launch distance (for lobbed arcs)
   }
-  update(world, alpha) {
-    let n = 0;
+  update(world, alpha, dt = 0) {
+    let n = 0; this.uniforms.uTime.value += dt; const t = this.uniforms.uTime.value;
     for (const p of world.projectiles) {
       if (!p.alive || n >= this.cap) continue;
-      const look = PROJ[p.kind] || PROJ_DEFAULT, rgb = PROJ_RGB[p.kind] || PROJ_DEFAULT_RGB;
-      const y = p.kind === 'tower-bolt' ? 2.4 : 0.85;
-      this.iA.setXYZW(n, lerp(p.px, p.x, alpha) * S, y, lerp(p.py, p.y, alpha) * S, look[1]);
-      this.iB.setXYZW(n, rgb.r, rgb.g, rgb.b, 0);
-      this.iD.setXY(n, p.dirX * 0.35, p.dirY * 0.35); n++;
+      const l = lookOf(p.kind), s = l.s, rgb = s.team ? l.c[p.team] || l.c[0] : l.c[0];
+      const x = lerp(p.px, p.x, alpha), z = lerp(p.py, p.y, alpha);
+      let y = l.y;
+      if (s.arc) { // lob: height from the share of the way travelled to the target
+        const tg = world.entities[p.targetId]; let d0 = this.start.get(p.id);
+        const d = tg ? Math.hypot(tg.x - x, tg.y - z) : 0; if (d0 === undefined) { d0 = Math.max(1, d); this.start.set(p.id, d0); }
+        const k = 1 - Math.min(1, d / d0); y += Math.sin(k * Math.PI) * s.arc;
+      }
+      let ox = 0, oz = 0;
+      if (s.wobble) { const w = Math.sin(t * 18 + p.id) * s.wobble; ox = -p.dirY * w; oz = p.dirX * w; } // bees zig-zag
+      this.iA.setXYZW(n, x * S + ox, y, z * S + oz, s.size);
+      this.iB.setXYZW(n, rgb.r, rgb.g, rgb.b, s.shape);
+      this.iC.setXYZW(n, l.c2.r, l.c2.g, l.c2.b, (s.spin || 0) * t * 6.2832 + p.id);
+      this.iD.setXYZ(n, p.dirX, p.dirY, s.stretch || 1); n++;
     }
-    this.mesh.geometry.instanceCount = n; this.iA.needsUpdate = this.iB.needsUpdate = this.iD.needsUpdate = true;
+    if (this.start.size > 64) for (const id of this.start.keys()) if (!world.projectiles.some((q) => q.id === id && q.alive)) this.start.delete(id);
+    this.mesh.geometry.instanceCount = n; this.iA.needsUpdate = this.iB.needsUpdate = this.iC.needsUpdate = this.iD.needsUpdate = true;
   }
 }

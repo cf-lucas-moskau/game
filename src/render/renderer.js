@@ -13,6 +13,8 @@ import { Indicators } from './indicators.js';
 import { FX } from './fx.js';
 import { ZoneViews } from './zones.js';
 import { GlowLights } from './glow-lights.js';
+import { CombatFX } from './combat-fx.js';
+import { AbilityFX } from './ability-fx.js';
 
 export class GameRenderer {
   constructor(canvas, lib, world, { quality = 'medium', telemetry = null, fixedBuffer = null } = {}) {
@@ -36,7 +38,8 @@ export class GameRenderer {
     this.bars = new HealthBars(this.env.root); this.decals = new GroundDecals(this.env.root); this.projectiles = new ProjectileViews(this.env.root);
     this.extra = []; // pluggable views (fx, zones) with update(world, alpha, dt, now, renderer)
     this.zones = new ZoneViews(this.env.root); this.fx = new FX(this.env.root, this.q);
-    this.indicators = new Indicators(this.env.root); this.extra.push(this.zones, this.fx, this.indicators);
+    this.indicators = new Indicators(this.env.root); this.combat = new CombatFX(this.env.root); this.abilities = new AbilityFX(this.env.root);
+    this.extra.push(this.zones, this.abilities, this.fx, this.combat, this.indicators);
     this.units.fx = this.fx;
     this.glowLights = new GlowLights(this.env.root, this.q.glowLights || 0);
     this.aim = { active: false }; this.hoverId = -1; this.showRange = false;
@@ -61,6 +64,8 @@ export class GameRenderer {
   shake(amount) { this.cam.shake = Math.min(1, this.cam.shake + amount * this.shakeScale); }
   /** Camera: follows the focus unit, clamped to the lane. Narrow screens pull back to keep the same lane width in view. */
   updateCamera(alpha, dt) {
+    // lab / tooling: an explicit camera ({ pos: [x,y,z], target: [x,y,z] } in render units)
+    if (this.cameraOverride) { const o = this.cameraOverride; this.camera.position.set(o.pos[0], o.pos[1], o.pos[2]); this.camera.lookAt(o.target[0], o.target[1], o.target[2]); this.env.follow(o.target[0], o.target[2]); return; }
     const f = this.world.entities[this.focusId];
     let tx = this.cam.x, tz = 4.5;
     if (f) { tx = rx(f) * S; tz = ry(f) * S; }
@@ -88,7 +93,7 @@ export class GameRenderer {
     const me = w.entities[this.focusId];
     this.gl.getDrawingBufferSize(this._res || (this._res = new THREE.Vector2())); this.bars.update(w, alpha, this.myTeam, me ? me.id : -1, this._res);
     this.decals.update(w, alpha, this.myTeam, me ? me.id : -1, dt);
-    this.projectiles.update(w, alpha);
+    this.projectiles.update(w, alpha, dt);
     for (const x of this.extra) x.update(w, alpha, dt, this.now, this);
     this.updateCamera(alpha, dt);
     this.glowLights.update(this.units.glowAnchors, this.cam, this.now);

@@ -1,7 +1,12 @@
 // Morrow, the Clockwright: leaves echoes, steps back through them, rewinds 4 seconds.
 import { EV } from '../../core/events.js';
-import { skillshot, aoe, enemiesNearPolyline, dealDamage, DMG, scale, sec, fx } from './kit.js';
+import { skillshot, aoe, enemiesNearPolyline, dealDamage, DMG, scale, sec, fx, amount } from './kit.js';
 import { addShield, haste } from '../damage.js';
+
+// Ability numbers: one declaration used by the cast and by tooltips (kit.amount).
+const Q_VAL1 = { label: 'Magic damage', type: 'magic', base: [65, 100, 135, 170, 205], ratio: 0.55, stat: 'ap', bonus: { ratio: 0.2, stat: 'ad' } };
+const W_VAL1 = { label: 'Shield', type: 'shield', base: [80, 115, 150, 185, 220], ratio: 0.5, stat: 'ap' };
+const E_VAL1 = { label: 'Magic damage', type: 'magic', base: [60, 95, 130, 165, 200], ratio: 0.5, stat: 'ap' };
 
 const HISTORY = sec(4);
 const addEcho = (world, e) => addEchoAt(world, e.heroState, e.x, e.y);
@@ -26,25 +31,25 @@ export default {
   },
   onRespawn(world, e) { e.heroState.echoes.length = 0; e.heroState.histFill = 0; },
   abilities: {
-    Q: { name: 'Cog Toss', cd: [6, 5.5, 5, 4.5, 4], cost: [45, 50, 55, 60, 65], range: 700, freeTarget: true,
+    Q: { values: [Q_VAL1], name: 'Cog Toss', cd: [6, 5.5, 5, 4.5, 4], cost: [45, 50, 55, 60, 65], range: 700, freeTarget: true,
       desc: 'Throw a gear that flies out and returns, damaging on both passes.',
       cast(world, e, c) {
         addEcho(world, e);
         const rank = c.rank;
         skillshot(world, e, c.x, c.y, { kind: 'morrow-cog', speed: 1300, range: 700, radius: 55, boomerang: true,
-          onHit: (w, p, u) => dealDamage(w, e, u, scale(rank, [65, 100, 135, 170, 205], 0.55, e.ap) + 0.2 * e.ad, DMG.MAGIC, { ability: true }) });
+          onHit: (w, p, u) => dealDamage(w, e, u, amount(e, Q_VAL1, rank), DMG.MAGIC, { ability: true }) });
       } },
-    W: { name: 'Wind-Up', cd: [12, 11, 10, 9, 8], cost: 60,
+    W: { values: [W_VAL1], name: 'Wind-Up', cd: [12, 11, 10, 9, 8], cost: 60,
       desc: 'Shield for 2 s. If it breaks, gain 40% move speed.',
-      cast(world, e, c) { addEcho(world, e); addShield(world, e, scale(c.rank, [80, 115, 150, 185, 220], 0.5, e.ap), 2); e.heroState.windupShield = 1; } },
-    E: { name: 'Step Through', cd: [14, 13, 12, 11, 10], cost: 70,
+      cast(world, e, c) { addEcho(world, e); addShield(world, e, amount(e, W_VAL1, c.rank), 2); e.heroState.windupShield = 1; } },
+    E: { values: [E_VAL1], name: 'Step Through', cd: [14, 13, 12, 11, 10], cost: 70,
       desc: 'Teleport to your most recent echo, damaging enemies along the path.',
       cast(world, e, c) {
         const s = e.heroState; const echo = s.echoes[s.echoes.length - 1];
         if (!echo || Math.hypot(echo.x - e.x, echo.y - e.y) > 1100) return false;
         const fx0 = e.x, fy0 = e.y;
         const hit = enemiesNearPolyline(world, e.team, [fx0, fy0, echo.x, echo.y], 60);
-        for (const u of hit) dealDamage(world, e, u, scale(c.rank, [60, 95, 130, 165, 200], 0.5, e.ap), DMG.MAGIC, { ability: true });
+        for (const u of hit) dealDamage(world, e, u, amount(e, E_VAL1, c.rank), DMG.MAGIC, { ability: true });
         s.echoes.pop();
         e.x = e.px = echo.x; e.y = e.py = echo.y; e.windup = 0;
         addEchoAt(world, s, fx0, fy0);

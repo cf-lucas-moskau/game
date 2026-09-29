@@ -30,8 +30,12 @@ node tools/simulate.mjs 10             # headless bot-vs-bot matches: length, wi
 node tools/bench.mjs                   # performance benchmark (see docs/PERF.md)
 node tools/soak.mjs 4                  # leak check: retained-heap slope
 node tools/shot.mjs "?quality=medium&skip=150" out.png 15 1280 720   # screenshot helper
+node tools/lab.mjs heroes --cam front                  # Leviathan Lab: every hero up close (contact sheet PNG)
+node tools/lab.mjs strip --hero saffi --clip attack    # animation frames across a clip
+node tools/lab.mjs ability --hero gus --slot R         # timeline of an ability after the cast
+node tools/lab.mjs attack --hero vesper                # auto-attack timeline;  shot / info: see the file header
 ```
-URL parameters: `hero=`, `heroes=a,b,c,d,e,f` (roster), `ping= jitter= loss=` (simulated network),
+URL parameters: `lab=1` (Leviathan Lab: isolated stage, `window.__lab`, panel; `cam= zoom= paused=1 panel=0 dummy= dummies=`), `hero=`, `heroes=a,b,c,d,e,f` (roster), `ping= jitter= loss=` (simulated network),
 `bots=easy|medium|hard`, `quality=low|medium|high`, `spectate=1`, `play=auto` (autopilot through the
 input path), `skip=<seconds>` (fast-forward the sim), `seed=`, `touch=1`, `cpu=1` (CPU measurement mode), `bench=1`.
 
@@ -47,11 +51,11 @@ input path), `skip=<seconds>` (fast-forward the sim), `seed=`, `touch=1`, `cpu=1
   appends results to the PR write-up and merges `--no-ff`.
 - If a gate step fails, investigate the cause with data (profiles, traces, screenshots). Do not loosen a
   budget or tolerance without evidence, and document any measurement change in docs/PERF.md.
-- Visual work: take screenshots with headless Chromium and look at them before merging.
+- Visual work: look at it before merging. Use the Leviathan Lab (`tools/lab.mjs`, `?lab=1`) for heroes, props,
+  animations and effects up close (frame-exact, no match needed); use full-game screenshots for scene-level checks.
 
 ## Current state
-- The repository now lives on GitHub (`cf-lucas-moskau/game`). Branch `claude/goal-test-aotoyo` holds
-  PRs 1-11: PR #10 (VFX) merged after a gate rerun in the new container (see docs/prs/0010-vfx.md), and
+- The repository now lives on GitHub (`cf-lucas-moskau/game`); `main` holds PRs 1-18. Earlier notes: PRs 1-11: PR #10 (VFX) merged after a gate rerun in the new container (see docs/prs/0010-vfx.md), and
   PR #11 (UI) adds the full playable loop: hero select -> match -> end screen -> hero select.
 - Playwright in this container: `PW_PATH=/opt/node22/lib/node_modules/playwright` (Chromium in /opt/pw-browsers).
 - `src/app/app.js` owns the flow (menu with a bot-match backdrop, match, end screen) and tears each match
@@ -71,7 +75,7 @@ input path), `skip=<seconds>` (fast-forward the sim), `seed=`, `touch=1`, `cpu=1
      `@fontsource-variable/bricolage-grotesque` (HUD text, tabular numbers). Palette in `src/render/palette.js`
      (abyss #1c1f4a, dusk #f7b267, slate #3e5c6b, bone #e8dcc4, tide #45c4e6, coral #f0476e, gold #f2c14e).
    - The one bold element: a lane-strip minimap across the top (whole whale lane, towers, heroes, whale-roll warning).
-   - Hero select (random hero + 1 reroll, bots may duplicate heroes, default bot difficulty medium),
+   - Hero select (random hero + unlimited rerolls, bots may duplicate heroes, default bot difficulty medium),
      HUD (portrait + level/XP ring, HP and resource bars, ability slots with cooldowns, D/F, 6 items, gold,
      team kills, match clock, kill feed, sudden-death and whale-roll banners, respawn timer),
      shop (P; buy only at fountain or while dead; `BUILDS` recommendations), scoreboard (Tab),
@@ -86,8 +90,10 @@ input path), `skip=<seconds>` (fast-forward the sim), `seed=`, `touch=1`, `cpu=1
    fewer lit programs/materials (environment materials, glow materials) or a three.js upgrade/patch.
    Open measurement issue: in this container `gcPauseMaxMs` on the emulated phone swings 8-47 ms on identical code
    (SwiftShader contention); consider re-baselining on a machine with a real GPU.
-5. Mobile polish, `docs/ARCHITECTURE.md`, update the spec doc, final deliverables (zip + dist/index.html).
-6. Later (phase 5): `NetTransport` + Node.js WebSocket authoritative server (the owner can host Node).
+5. Done (PRs #14-#18, owner feedback round): props in hands, unlimited rerolls, readable combat (distinct attacks, tower
+   range + lock-on), real numbers in tooltips/shop, unit inspection, per-hero ability styles, Leviathan Lab.
+6. Mobile polish, `docs/ARCHITECTURE.md`, update the spec doc, final deliverables (zip + dist/index.html).
+7. Later (phase 5): `NetTransport` + Node.js WebSocket authoritative server (the owner can host Node).
 
 ## Architecture map
 - `src/core/`: seeded RNG (sfc32), pools, spatial hash, event stream, state hasher, fixed 30 Hz loop.
@@ -113,6 +119,9 @@ input path), `skip=<seconds>` (fast-forward the sim), `seed=`, `touch=1`, `cpu=1
 - Declare every entity field in `createEntity()`. Adding properties later put V8 objects in dictionary mode
   and every double write allocated (541 -> 116 KB per simulated second after fixing).
 - Avoid per-frame allocation in render code (pre-parse colours, no `Object.values`/spreads/string keys per frame).
+- In hot per-vertex loops write typed arrays directly (`attr.array[i] = v`): non-inlined `setXYZ` calls box each double
+  argument (measured 40 KB/s for the swipe ribbons). Pool per-attack records; never add fields to sim entities from render
+  code (keep presentation state in maps). `for..of` over a Map allocates an entry per element: use `forEach` with a stored callback.
 - In the container, SwiftShader makes frame time, FPS and GL submission meaningless: gate CPU-side metrics,
   use `?cpu=1` (160x90 buffer, >= 200 frames), GC pauses as thread CPU time, heap growth via soak slope,
   and verify CPU throttling with a warmed probe. Details in docs/PERF.md.

@@ -1,7 +1,7 @@
 // Touch controls: floating joystick (left), attack + ability buttons (right), drag-to-aim with a
 // cancel zone, drawn abilities traced directly on the battlefield, three-finger tap for the perf overlay.
 import { moveCmd, attackCmd, castCmd, spellCmd, stopCmd } from '../sim/commands.js';
-import { autoTarget, clampToRange, forward, lead } from './intent.js';
+import { autoTarget, clampToRange, forward, lead, hoverTarget } from './intent.js';
 import { aimFor, isDrawn, SPELL_AIM } from './aim.js';
 import { byRank } from '../sim/abilities.js';
 
@@ -24,8 +24,8 @@ const CSS = `
 @media (prefers-reduced-motion: reduce){.tc-stick{transition:none}}`;
 
 export class TouchInput {
-  constructor(session, root, { onToggle = () => {} } = {}) {
-    this.s = session; this.onToggle = onToggle; this.aim = session.renderer.aim = session.renderer.aim || { active: false };
+  constructor(session, root, { onToggle = () => {}, onInspect = () => {} } = {}) {
+    this.s = session; this.onToggle = onToggle; this.onInspect = onInspect; this.aim = session.renderer.aim = session.renderer.aim || { active: false };
     if (!document.getElementById('tc-css')) { const st = document.createElement('style'); st.id = 'tc-css'; st.textContent = CSS; document.head.appendChild(st); }
     const el = this.el = document.createElement('div'); el.className = 'tc'; root.appendChild(el);
     el.innerHTML = `<div class="tc-zone"></div><div class="tc-stick"><div class="tc-knob"></div></div><div class="tc-cancel">✕</div>`;
@@ -42,6 +42,16 @@ export class TouchInput {
     window.addEventListener('pointercancel', this._up);
     // three-finger tap -> perf overlay
     window.addEventListener('touchstart', (this._tt = (e) => { if (e.touches.length === 3) this.onToggle('perf'); }), { passive: true });
+    // a tap on the battlefield (outside the joystick zone and buttons) inspects the unit under the finger
+    const cv = session.renderer.canvas;
+    cv.addEventListener('pointerdown', (this._tap = (e) => {
+      if (e.pointerType !== 'touch') return; this._tapAt = { x: e.clientX, y: e.clientY, t: performance.now() };
+    }));
+    cv.addEventListener('pointerup', (this._tapUp = (e) => {
+      const a = this._tapAt; this._tapAt = null; if (!a || e.pointerType !== 'touch' || performance.now() - a.t > 350 || Math.hypot(e.clientX - a.x, e.clientY - a.y) > 14) return;
+      const w = this.s.renderer.screenToWorld(e.clientX, e.clientY); if (!w) return;
+      const u = hoverTarget(this.s.world, null, w.x, w.y, 80, true); this.onInspect(u ? u.id : -1);
+    }));
     this.layout(); window.addEventListener('resize', (this._rs = () => this.layout()));
     this.active = new Map(); // pointerId -> gesture
   }
@@ -158,5 +168,5 @@ export class TouchInput {
     });
     this.spells.forEach((b, i) => { const f = me.spellCds[i] / (i === 0 ? 900 : 1800); const v = f > 0 ? `conic-gradient(rgba(10,12,30,.72) ${f * 360}deg, transparent 0)` : ''; if (b.firstChild._v !== v) { b.firstChild.style.background = v; b.firstChild._v = v; } });
   }
-  dispose() { this.el.remove(); window.removeEventListener('pointermove', this._mv); window.removeEventListener('pointerup', this._up); window.removeEventListener('pointercancel', this._up); window.removeEventListener('touchstart', this._tt); window.removeEventListener('resize', this._rs); }
+  dispose() { const cv = this.s.renderer.canvas; cv.removeEventListener('pointerdown', this._tap); cv.removeEventListener('pointerup', this._tapUp); this.el.remove(); window.removeEventListener('pointermove', this._mv); window.removeEventListener('pointerup', this._up); window.removeEventListener('pointercancel', this._up); window.removeEventListener('touchstart', this._tt); window.removeEventListener('resize', this._rs); }
 }

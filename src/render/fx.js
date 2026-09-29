@@ -5,7 +5,6 @@ import { Particles } from './particles.js';
 import { S, PALETTE, TEAM_RGB } from './palette.js';
 import { EV } from '../core/events.js';
 import { KIND } from '../sim/constants.js';
-import { HERO_LOOKS } from '../assets/manifest.js';
 import { rx, ry } from './interp.js';
 
 const C = (hex) => new THREE.Color(hex);
@@ -14,7 +13,6 @@ const COL = {
   ink: C('#6f5cff'), fire: C('#ff8a3d'), ember: C('#ffd27a'), honey: C('#ffc233'), stone: C('#bfae93'), dust: C('#d7c9b0'),
   stun: C('#fff3a0'), root: C('#8b7bff'), clock: C('#f2c14e'), coral: C(PALETTE.coral), tide: C(PALETTE.tide), smoke: C('#9aa0b8'),
 };
-const ACCENT = Object.fromEntries(Object.entries(HERO_LOOKS).map(([k, v]) => [k, C(v.accent)]));
 const rnd = (a, b) => a + Math.random() * (b - a);
 
 export class FX {
@@ -60,8 +58,7 @@ export class FX {
         break;
       }
       case EV.CAST: {
-        const col = ACCENT[e.s] || COL.shield;
-        this.ring(rx(ent) * S, ry(ent) * S, 0.2, 12, 0.5, col, 0.4, 0.14, 2.2);
+        // cast signatures live in ability-fx.js (per-hero style); here only the extra spark
         if (e.s === 'morrow' && e.b === 0) this.burst(x, z, 0.8, 4, 1, COL.clock, 0.4, 0.12, 0.02);
         break;
       }
@@ -136,7 +133,7 @@ export class FX {
       else if (z.kind === 'brindle-sting-dot') { const u = world.entities[z.data.target]; if (u && u.alive && !u.dead && Math.random() < rate * 0.5) { const a = now * 9 + Math.random(); this.p.spawn(rx(u) * S + Math.cos(a) * 0.3, 1 + rnd(0, 0.5), ry(u) * S + Math.sin(a) * 0.3, 0, 0, 0, 0.3, COL.honey.r, COL.honey.g, COL.honey.b, 1.6, 0.1, 0.05); } }
     }
     for (const p of world.projectiles) {
-      if (!p.alive || !(p.kind === 'morrow-cog' || p.kind === 'auctioneer-gavel' || p.kind === 'tower-bolt' || p.kind === 'brindle-sting')) continue;
+      if (!p.alive || !(p.kind === 'morrow-cog' || p.kind === 'auctioneer-gavel' || p.kind === 'brindle-sting')) continue; // autos and towers: combat-fx.js
       if (Math.random() < rate * 0.8) { const col = p.kind === 'brindle-sting' ? COL.honey : p.kind === 'tower-bolt' ? COL.ember : COL.gold; this.p.spawn((p.px + (p.x - p.px) * alpha) * S, p.kind === 'tower-bolt' ? 2.4 : 0.85, (p.py + (p.y - p.py) * alpha) * S, 0, 0, 0, 0.3, col.r, col.g, col.b, 1.4, 0.16, 0.02); }
     }
     this.p.update(dt);

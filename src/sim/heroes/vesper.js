@@ -1,9 +1,13 @@
 // Vesper, the Ink Sage: abilities are drawn. Strokes lash, closed loops root, lines become walls.
 import { spawnZone, spawnWall } from '../zones.js';
-import { enemiesNearPolyline, dealDamage, DMG, scale, sec, fx, clipPolyline, polylineLength, anchorStroke, clampY } from './kit.js';
+import { enemiesNearPolyline, dealDamage, DMG, scale, sec, fx, clipPolyline, polylineLength, anchorStroke, clampY, amount } from './kit.js';
 import { root } from '../damage.js';
 import { pointInPoly } from '../../core/math.js';
 import { isStructure } from '../constants.js';
+
+// Ability numbers: one declaration used by the cast and by tooltips (kit.amount).
+const Q_VAL1 = { label: 'Magic damage', type: 'magic', base: [60, 90, 120, 150, 180], ratio: 0.55, stat: 'ap' };
+const W_VAL1 = { label: 'Magic damage', type: 'magic', base: [40, 60, 80, 100, 120], ratio: 0.3, stat: 'ap' };
 
 const INK_MAX = 100, INK_REGEN = 14, CLOSE_DIST = 60;
 const masterpiece = (world, e) => e.heroState.mpUntil > world.tick;
@@ -25,7 +29,7 @@ export default {
   },
   onCast(world, e) { e.heroState.lastDraw = world.tick; },
   abilities: {
-    Q: { name: 'Lash', cd: [3, 2.8, 2.6, 2.4, 2.2], range: 550, freeTarget: true, drawn: 'stroke', maxLen: 400,
+    Q: { values: [Q_VAL1], name: 'Lash', cd: [3, 2.8, 2.6, 2.4, 2.2], range: 550, freeTarget: true, drawn: 'stroke', maxLen: 400,
       cost: 0, desc: 'Drag to draw a stroke up to 400 long. It becomes a whip. Costs ink per length.',
       cast(world, e, c) {
         let pts = c.pts && c.pts.length >= 4 ? anchorStroke(e, c.pts, 550) : straightStroke(e, c.rawX, c.rawY, 380);
@@ -36,10 +40,10 @@ export default {
         const amp = masterpiece(world, e) ? 1.5 : 1;
         const rank = c.rank;
         fx(world, e, 'vesper-lash', pts[0], pts[1], 0); world.lastStroke = { owner: e.id, pts, kind: 'lash', tick: world.tick };
-        world.schedule(sec(0.15), (w) => { for (const u of enemiesNearPolyline(w, e.team, pts, 45)) dealDamage(w, e, u, scale(rank, [60, 90, 120, 150, 180], 0.55, e.ap) * amp, DMG.MAGIC, { ability: true }); });
+        world.schedule(sec(0.15), (w) => { for (const u of enemiesNearPolyline(w, e.team, pts, 45)) dealDamage(w, e, u, amount(e, Q_VAL1, rank) * amp, DMG.MAGIC, { ability: true }); });
         spawnZone(world, { kind: 'vesper-stroke', team: e.team, owner: e.id, x: pts[0], y: pts[1], duration: 0.6, data: { pts } });
       } },
-    W: { name: 'Loop', cd: [10, 9.5, 9, 8.5, 8], cost: 30, range: 650, freeTarget: true, drawn: 'loop',
+    W: { values: [W_VAL1], name: 'Loop', cd: [10, 9.5, 9, 8.5, 8], cost: 30, range: 650, freeTarget: true, drawn: 'loop',
       desc: 'Draw a closed shape. Enemies inside are rooted for 1.2 s.',
       cast(world, e, c) {
         let pts = c.pts && c.pts.length >= 2 ? anchorStroke(e, c.pts, 650) : circleStroke(c.x, c.y, 160);
@@ -51,7 +55,7 @@ export default {
         const rank = c.rank;
         world.forEachInRadius(cx, cy, r, e.team, 'enemy', (u) => {
           if (isStructure(u.kind) || !pointInPoly(u.x, u.y, poly, n)) return;
-          root(world, u, 1.2); dealDamage(world, e, u, scale(rank, [40, 60, 80, 100, 120], 0.3, e.ap) * amp, DMG.MAGIC, { ability: true });
+          root(world, u, 1.2); dealDamage(world, e, u, amount(e, W_VAL1, rank) * amp, DMG.MAGIC, { ability: true });
         });
         spawnZone(world, { kind: 'vesper-loop', team: e.team, owner: e.id, x: cx, y: cy, r, duration: 1.2, data: { pts: poly } });
       } },

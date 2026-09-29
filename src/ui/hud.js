@@ -10,6 +10,7 @@ import { KIND, RULES, TICK_HZ, xpToNext } from '../sim/constants.js';
 import { byRank } from '../sim/abilities.js';
 import { canShop } from '../sim/match.js';
 import { itemActiveCmd } from '../sim/commands.js';
+import { abilityNumbers } from './numbers.js';
 
 const KEYS = ['Q', 'W', 'E', 'R'];
 const RES_COLOR = { mana: 'linear-gradient(180deg,#7aa2ff,#4a6fe0)', ink: 'linear-gradient(180deg,#a99cff,#7564e8)', flame: 'linear-gradient(180deg,#ffc27a,#f07a3a)', swarm: 'linear-gradient(180deg,#ffe07a,#e0a82e)' };
@@ -38,6 +39,7 @@ export class Hud {
     this.strip = new LaneStrip(canvas);
     this.feed = h('div', { class: 'feed', 'aria-live': 'polite' });
     this.banner = h('div', { class: 'banner hidden' }, h('div', { class: 'b' }), h('div', { class: 's' }));
+    this.lock = h('div', { class: 'tower-lock hidden', role: 'status' }, h('div', { class: 'edge' }), h('div', { class: 'label' }, 'Tower is targeting you'));
     this.respawn = h('div', { class: 'respawn hidden' }, h('div', { class: 'n' }), h('div', { class: 's' }, 'Respawning. Open the shop while you wait.'));
     // ---- dock
     this.ring = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); this.ring.setAttribute('class', 'ring'); this.ring.setAttribute('viewBox', '0 0 76 76');
@@ -69,7 +71,7 @@ export class Hud {
       h('button', { onclick: onMenu, 'aria-label': 'Menu', 'data-act': 'menu' }, touch ? 'Menu' : 'Esc'));
     this.el = h('div', { class: 'hud' },
       h('div', { class: 'topbar' }, this.blue, h('div', { class: 'strip-wrap' }, canvas, this.clock), this.red),
-      this.feed, this.banner, this.respawn, this.dock, quick);
+      this.lock, this.feed, this.banner, this.respawn, this.dock, quick);
     root.append(this.el);
     this.cdTotal = [1, 1, 1, 1]; this.prevCd = [0, 0, 0, 0]; this.prevRanks = { Q: -1, W: -1, E: -1, R: -1 }; this.prevLevel = me.level;
     this.lag = 1; this.feedItems = []; this.bannerUntil = 0; this.bannerQueue = [];
@@ -89,8 +91,9 @@ export class Hud {
     const k = KEYS[i], a = this.def.abilities[k], rank = me.ranks[k];
     const cost = typeof a.cost === 'function' ? null : byRank(a.cost || 0, Math.max(1, rank));
     const cd = typeof a.cd === 'function' ? null : byRank(a.cd, Math.max(1, rank));
-    const meta = [rank > 0 ? `Rank ${rank}` : `Unlocks at level ${k === 'R' ? 6 : 'up'}`, cd != null ? `${cd} s cooldown` : '', cost ? `${cost} ${a.costType || this.def.resource}` : ''].filter(Boolean).join(' · ');
-    this.tip.show(el, `${k} · ${a.name}`, a.desc || '', meta);
+    const meta = [rank > 0 ? `Rank ${rank}` : `Unlocks at level ${k === 'R' ? 6 : 'up'}`, cd != null ? `${Math.round(cd * (1 - me.cdr) * 10) / 10} s cooldown` : '', cost ? `${cost} ${a.costType || this.def.resource}` : ''].filter(Boolean).join(' · ');
+    const rows = abilityNumbers(this.s.world, me)[i].rows.map((r) => [r.label, String(Math.round(r.value)), r.type, r.formula]);
+    this.tip.show(el, `${k} · ${a.name}`, a.desc || '', meta, rows);
   }
   itemTip(i, el) {
     const key = this.s.me.items[i]; if (!key) return;
@@ -140,6 +143,9 @@ export class Hud {
     // banners + feed expiry
     if (this.bannerUntil && now > this.bannerUntil) { if (this.bannerQueue.length) { this.bannerUntil = 0; this.showBanner(...this.bannerQueue.shift()); } else { this.bannerUntil = 0; this.banner.classList.add('hidden'); } }
     while (this.feedItems.length && this.feedItems[0].until < now) this.feedItems.shift().row.remove();
+    // an enemy tower is shooting at you: red edges and a label while the lock holds
+    let locked = false; if (!me.dead) for (const st of w.structures) if (st.alive && st.kind === KIND.TOWER && st.team !== me.team && st.targetId === me.id) { locked = true; break; }
+    toggle(this.lock, 'hidden', !locked);
     // respawn
     toggle(this.respawn, 'hidden', !me.dead);
     if (me.dead) setNum(this.respawn.firstChild, cdKey(Math.max(0, me.respawnAt - t)), cdLabel);

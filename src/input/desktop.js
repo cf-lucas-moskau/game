@@ -9,8 +9,8 @@ import { aimFor, isDrawn, SPELL_AIM } from './aim.js';
 
 const SLOT_KEYS = { KeyQ: 0, KeyW: 1, KeyE: 2, KeyR: 3 };
 export class DesktopInput {
-  constructor(session, canvas, { onToggle = () => {} } = {}) {
-    this.s = session; this.canvas = canvas; this.onToggle = onToggle;
+  constructor(session, canvas, { onToggle = () => {}, onInspect = () => {} } = {}) {
+    this.s = session; this.canvas = canvas; this.onToggle = onToggle; this.onInspect = onInspect;
     this.mouse = { sx: 0, sy: 0, x: 0, y: 0, right: false };
     this.aim = session.renderer.aim = { active: false }; this.attackArmed = false; this.lastSteer = 0;
     this.stroke = null;
@@ -45,7 +45,10 @@ export class DesktopInput {
       this.lastSteer = performance.now();
     } else if (e.button === 0) {
       if (this.aim.active && !this.stroke) { this.release(this.aim.slot); return; }
-      if (this.attackArmed) { this.attackArmed = false; this.s.send(attackMoveCmd(p, m.x, m.y)); this.s.renderer.marker(m.x, m.y, 'attack'); }
+      if (this.attackArmed) { this.attackArmed = false; this.s.send(attackMoveCmd(p, m.x, m.y)); this.s.renderer.marker(m.x, m.y, 'attack'); return; }
+      // left click on a unit (ally, enemy, yourself, minion or tower) opens its details; on the ground closes them
+      const u = hoverTarget(this.world(), null, m.x, m.y, 60, true);
+      this.onInspect(u ? u.id : -1);
     }
   }
   /** Called every frame: holding right mouse keeps steering (throttled to 8/s). */

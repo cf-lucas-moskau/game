@@ -88,8 +88,9 @@ const until = async (page, fn, arg, ms = 20000) => { try { await page.waitForFun
   const menu = await until(page, () => !!document.querySelector('[data-act=play]'), null, 90000);
   check('hero select appears', menu);
   const k0 = await page.evaluate(() => document.querySelector('.hero-card h2').textContent);
-  await page.click('[data-act=reroll]');
-  check('reroll is spent after one use', await page.evaluate(() => document.querySelector('[data-act=reroll]').disabled));
+  const seen = new Set([k0]);
+  for (let i = 0; i < 4; i++) { await page.click('[data-act=reroll]'); seen.add(await page.evaluate(() => document.querySelector('.hero-card h2').textContent)); }
+  check('reroll is unlimited and always changes the hero', seen.size >= 3 && !(await page.evaluate(() => document.querySelector('[data-act=reroll]').disabled)), `${seen.size} heroes after 4 rerolls`);
   const chosen = await page.evaluate(() => document.querySelector('.hero-card h2').textContent);
   await page.click('[data-act=play]');
   check('Fight starts a match with the chosen hero', await until(page, (n) => window.__game && window.__game.world.tick > 30 && window.__game.world.registry.heroes[window.__game.me.heroKey].name === n, chosen, 60000), `${k0} -> ${chosen}`);
@@ -98,13 +99,22 @@ const until = async (page, fn, arg, ms = 20000) => { try { await page.waitForFun
     await page.evaluate(() => { const a = window.__app.audio; return `${a.ctx && a.ctx.state}, ${a.played} voices played, ${a.dropped} dropped`; }));
   await page.keyboard.press('p');
   const gold0 = await page.evaluate(() => window.__game.me.gold);
-  await page.click('.card:not([disabled])');
+  await page.click('.card[aria-disabled=false]');
   check('shop buys an item at the fountain', await until(page, () => window.__game.me.items.length === 1), `gold ${gold0 | 0} -> ${(await page.evaluate(() => window.__game.me.gold)) | 0}`);
+  check('shop cards show what an item does for your hero', await page.evaluate(() => [...document.querySelectorAll('.card .impact')].some((x) => /For you: \+\d+/.test(x.textContent))),
+    await page.evaluate(() => (document.querySelector('.card .impact') || {}).textContent || 'none'));
   await page.keyboard.press('Escape');
   check('Escape closes the shop', await page.evaluate(() => document.querySelector('[aria-label=Shop]').classList.contains('hidden')));
   await page.keyboard.press('Tab');
   check('Tab opens the scoreboard with six heroes', await until(page, () => document.querySelectorAll('[aria-label=Scoreboard] tbody tr').length === 6));
-  await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
+  await page.click('[aria-label=Scoreboard] tbody tr[data-id]:not(.me)');
+  check('clicking a scoreboard row shows that hero\'s details and items', await until(page, () => { const p = document.querySelector('.inspect'); return p && !p.classList.contains('hidden') && p.querySelectorAll('.ins-item').length === 6; }));
+  await page.keyboard.press('Escape');
+  const ally = await page.evaluate(() => { const g = window.__game, a = g.world.heroes.find((h) => h !== g.me && h.team === g.me.team); return g.renderer.worldToScreen(a.x, a.y, 0.6); });
+  await page.mouse.click(ally.x, ally.y);
+  check('left-clicking a unit on the battlefield inspects it', await until(page, () => !document.querySelector('.inspect').classList.contains('hidden')), await page.evaluate(() => document.querySelector('.ins-name') ? document.querySelector('.ins-name').textContent : 'no panel'));
+  await page.evaluate(() => window.__app.match.inspect.hide());
+  await page.click('[data-act=menu]');
   await page.click('[data-act=surrender]'); await page.click('[data-act=confirm-surrender]');
   check('surrender ends the match in defeat', await until(page, () => document.querySelector('.end h1') && document.querySelector('.end h1').textContent === 'Defeat', null, 20000));
   await page.click('[data-act=again]');
@@ -115,6 +125,27 @@ const until = async (page, fn, arg, ms = 20000) => { try { await page.waitForFun
   check('audio voices are released (no leak across matches)', await page.evaluate(() => { const v = window.__app.audio.voices; return v.sfx <= 28 && v.music <= 22; }),
     await page.evaluate(() => JSON.stringify(window.__app.audio.voices)));
   check('no page errors (loop)', errors.length === 0, errors[0] || '');
+  await page.close();
+}
+// ---------------- Leviathan Lab: every hero loads, casts every ability and plays every clip
+{
+  const page = await browser.newPage({ viewport: { width: 640, height: 400 } });
+  const errors = []; page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto(`file://${root}/dist/index.html?lab=1&panel=0&paused=1&quality=low`);
+  await page.waitForFunction(() => window.__lab, null, { timeout: 90000 });
+  const r = await page.evaluate(() => {
+    const lab = window.__lab, done = [];
+    for (const h of lab.info().heroes) {
+      lab.setHero(h);
+      for (const c of lab.info().clips) { lab.anim(c, 0.2); lab.step(1 / 30); }
+      lab.anim(null);
+      for (const k of ['Q', 'W', 'E', 'R']) { lab.cast(k); lab.step(0.6); }
+      lab.attack(); lab.step(1);
+      done.push(h);
+    }
+    return done.length;
+  });
+  check('lab: every hero plays every clip and casts every ability', r === 6 && errors.length === 0, errors[0] || `${r} heroes`);
   await page.close();
 }
 await browser.close();
