@@ -14,8 +14,8 @@ const DRAIN = 0.015, RELIGHT = 0.04;
 function relight(world, e, mult) { e.hp = Math.min(e.maxHp, e.hp + e.maxHp * RELIGHT * mult); }
 export default {
   key: 'saffi', name: 'Saffi Blinkwick', title: 'the Candle', role: 'Assassin', resource: 'flame', difficulty: 'Hard',
-  rankOrder: ['Q', 'E', 'W'],
-  build: ['iron-fin', 'harpoon-chain', 'quickcurrent-boots', 'cursed-coin', 'borrowed-seconds', 'whalehide-vest'], // recommended items: shop highlights and bot purchase order noRegen: true, selfHealOnly: true,
+  rankOrder: ['Q', 'E', 'W'], noRegen: true, selfHealOnly: true,
+  build: ['iron-fin', 'harpoon-chain', 'quickcurrent-boots', 'cursed-coin', 'borrowed-seconds', 'whalehide-vest'], // recommended items: shop highlights and bot purchase order
   base: { hp: 640, hpL: 100, ad: 66, adL: 3.8, armor: 30, armorL: 4.4, mr: 32, mrL: 1.6, as: 0.7, asL: 0.03, range: 150, speed: 350, radius: 32 },
   init(world, e) { e.heroState = { blazeUntil: 0 }; },
   onTick(world, e) {

@@ -30,3 +30,9 @@ and their GPU upload, which is where packs draw lasting states. `attack-styles.j
   identity, a valid decal style, four aim shapes and sounds; every hero has an attack look; every ability
   projectile kind a hero's sim module spawns has a style.
 - Bot matches (`tools/simulate.mjs`) and the determinism/replay tests are unchanged; e2e passes.
+
+## Bug found after the commit
+
+Moving the build lists onto the hero definitions inserted Saffi's line in the middle of hers, and its trailing
+comment swallowed `noRegen: true, selfHealOnly: true` (she would regenerate and accept ally heals). The Saffi test
+caught it; I had missed the failure because I read only the last lines of the test output. Fixed in the next commit.

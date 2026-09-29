@@ -9,20 +9,17 @@ import { cdKey, cdLabel } from './format.js';
 import { EV } from '../core/events.js';
 import { KIND, RULES, TICK_HZ, xpToNext } from '../sim/constants.js';
 import { byRank } from '../sim/abilities.js';
+import { poolAmount } from '../sim/resources.js';
 import { canShop } from '../sim/match.js';
 import { itemActiveCmd } from '../sim/commands.js';
 import { abilityNumbers } from './numbers.js';
 
 const KEYS = ['Q', 'W', 'E', 'R'];
-const RES_COLOR = { mana: 'linear-gradient(180deg,#7aa2ff,#4a6fe0)', ink: 'linear-gradient(180deg,#a99cff,#7564e8)', flame: 'linear-gradient(180deg,#ffc27a,#f07a3a)', swarm: 'linear-gradient(180deg,#ffe07a,#e0a82e)' };
+const RES_COLOR = { mana: 'linear-gradient(180deg,#7aa2ff,#4a6fe0)', ink: 'linear-gradient(180deg,#a99cff,#7564e8)', flame: 'linear-gradient(180deg,#ffc27a,#f07a3a)', swarm: 'linear-gradient(180deg,#ffe07a,#e0a82e)', energy: 'linear-gradient(180deg,#b7f5c4,#4fc98a)' };
 const RING = 2 * Math.PI * 34;
 const fmtClock = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 const fmtPair = (k) => `${Math.floor(k / 1e5)} / ${k % 1e5}`;
 const RANK_UP = [{ transform: 'translateY(-6px)' }, { transform: 'none' }];
-/** Current amount of the pool an ability spends, or -1 when it costs nothing trackable. */
-function resourcePool(me, type) {
-  switch (type) { case 'mana': return me.mana; case 'ink': case 'swarm': return me.resource; case 'gold': return me.gold; default: return -1; }
-}
 const READY_FLASH = [{ boxShadow: '0 0 0 3px rgba(247,178,103,.9), 0 0 18px rgba(247,178,103,.8)' }, { boxShadow: '0 0 0 0 rgba(247,178,103,0)' }];
 const BANNER_IN = [{ transform: 'scale(1.3)', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }];
 
@@ -172,7 +169,7 @@ export class Hud {
       setSweep(sl.cd, cd > 0 ? cd / this.cdTotal[i] : 0);
       setNum(sl.cdn, cd > 0 ? cdKey(cd) : 0, cdLabel);
       const cost = rank > 0 ? (typeof a.cost === 'function' ? 0 : byRank(a.cost || 0, rank)) : 0;
-      const pool = resourcePool(me, a.costType || def.resource);
+      const pool = poolAmount(me, a.costType || def.resource);
       toggle(sl.el, 'locked', rank <= 0 || me.dead); toggle(sl.el, 'poor', rank > 0 && pool >= 0 && pool < cost);
       toggle(sl.el, 'ready', rank > 0 && cd === 0 && !me.dead);
       if (rank !== this.prevRanks[k]) { const first = this.prevRanks[k] < 0; this.prevRanks[k] = rank; sl.pips.forEach((p, r) => p.classList.toggle('on', r < rank)); if (!first) sl.el.animate(RANK_UP, 300); }

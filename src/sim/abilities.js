@@ -2,6 +2,7 @@ import { EV } from '../core/events.js';
 import { sec, KIND, LANE } from './constants.js';
 import { canCast } from './stats.js';
 import { heal, haste } from './damage.js';
+import { canPay, spend } from './resources.js';
 
 export const SLOTS = ['Q', 'W', 'E', 'R'];
 
@@ -57,21 +58,8 @@ export function tryCast(world, e, slot, cmd) {
   for (const k of e.items) { const it = world.registry.items[k]; if (it && it.onAbilityCast) it.onAbilityCast(world, e, slot); }
   return true;
 }
-function payable(world, e, def, ab, cost) {
-  switch (ab.costType || def.resource) {
-    case 'mana': return e.mana >= cost;
-    case 'ink': case 'swarm': return e.resource >= cost;
-    case 'gold': return e.gold >= cost;
-    default: return true;
-  }
-}
-function pay(world, e, def, ab, cost) {
-  switch (ab.costType || def.resource) {
-    case 'mana': e.mana -= cost; break;
-    case 'ink': case 'swarm': e.resource -= cost; break;
-    case 'gold': e.gold -= cost; break;
-  }
-}
+function payable(world, e, def, ab, cost) { return canPay(e, ab.costType || def.resource, cost); }
+function pay(world, e, def, ab, cost) { spend(e, ab.costType || def.resource, cost); }
 
 // ---- summoner spells ------------------------------------------------------------
 export const SPELLS = {

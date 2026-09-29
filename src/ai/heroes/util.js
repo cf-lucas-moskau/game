@@ -1,6 +1,7 @@
 // Shared helpers for per-hero bot scripts (src/ai/heroes/<hero>.js).
 import { castCmd } from '../../sim/commands.js';
 import { byRank } from '../../sim/abilities.js';
+import { canPay } from '../../sim/resources.js';
 import { d, hpr } from '../perception.js';
 export const SL = ['Q', 'W', 'E', 'R'];
 export function ready(world, me, s) {
@@ -8,10 +9,8 @@ export function ready(world, me, s) {
   const def = world.registry.heroes[me.heroKey], ab = def.abilities[SL[s]];
   const cost = typeof ab.cost === 'function' ? 0 : byRank(ab.cost || 0, me.ranks[SL[s]]);
   const type = ab.costType || def.resource;
-  if (type === 'mana') return me.mana >= cost;
   if (type === 'gold') return me.gold >= cost + 40; // keep a small float
-  if (type === 'ink' || type === 'swarm') return me.resource >= cost;
-  return true;
+  return canPay(me, type, cost);
 }
 export const closest = (me, list, max = Infinity) => { let b = null, bd = max; for (const e of list) { const dd = d(e, me); if (dd < bd) { bd = dd; b = e; } } return b; };
 export const lowest = (list) => list.reduce((a, b) => (!a || hpr(b) < hpr(a) ? b : a), null);
