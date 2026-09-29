@@ -189,6 +189,16 @@
 table.sb tr[data-id] { cursor: pointer; } table.sb tr[data-id]:hover td { background: rgba(69, 196, 230, 0.08); }
 .touch .inspect { top: calc(112px + var(--safe-t)); right: auto; left: calc(8px + var(--safe-l)); width: 230px; padding: 10px; }
 
+/* ---------- Leviathan Lab panel */
+.lab-panel { position: fixed; left: 10px; top: 10px; max-width: min(560px, calc(100vw - 20px)); padding: 10px 12px; border-radius: 12px; background: rgba(12, 14, 36, 0.88);
+  border: 1px solid var(--panel-edge); pointer-events: auto; display: grid; gap: 6px; font-size: 12px; }
+.lab-panel > b { font: 400 18px var(--title); }
+.lab-row { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.lab-row > span { width: 52px; color: var(--muted); font-weight: 650; }
+.lab-row button { border: 1px solid var(--panel-edge); background: rgba(38, 42, 94, 0.8); border-radius: 7px; padding: 4px 8px; font-size: 12px; font-weight: 600; }
+.lab-row button.on { background: rgba(69, 196, 230, 0.3); border-color: var(--tide); }
+.lab-row input[type=range] { flex: 1; min-width: 160px; }
+
 /* ---------- floating numbers */
 .floaters { position: fixed; inset: 0; overflow: hidden; pointer-events: none; }
 .fl { position: absolute; left: 0; top: 0; font-weight: 800; font-size: 17px; text-shadow: 0 1px 0 #000, 0 0 6px rgba(0, 0, 0, 0.6); will-change: transform; white-space: nowrap; }

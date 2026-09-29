@@ -3,6 +3,7 @@ import { AssetLibrary } from './render/assets.js';
 import { telemetry } from './perf/telemetry.js';
 import { startSpectate } from './app/spectate.js';
 import { App } from './app/app.js';
+import { Lab, labPanel } from './app/lab.js';
 import { loadFonts } from './ui/fonts.js';
 import { defaultQuality } from './render/quality.js';
 import { HERO_KEYS } from './sim/heroes/index.js';
@@ -20,7 +21,13 @@ async function boot() {
   await Promise.all([lib.loadAll((p) => { bootText.textContent = `Waking the whale… ${Math.round(p * 100)}%`; }), loadFonts()]);
   telemetry.gauges.loadMs = Math.round(performance.now() - t0);
   const veil = root.querySelector('#boot'); veil.classList.add('out'); setTimeout(() => veil.remove(), 400);
-  if (params.has('spectate')) {
+  if (params.has('lab')) {
+    // Leviathan Lab: heroes, animations and effects up close (see src/app/lab.js, tools/lab.mjs)
+    const lab = window.__lab = new Lab({ root, lib, quality: params.get('quality') || 'high', hero: params.get('hero') || 'vesper', dummy: params.get('dummy') || 'morrow', dummies: num('dummies', 2) });
+    lab.camera(params.get('cam') || 'three', num('zoom', 1));
+    if (params.get('panel') !== '0') { const ui = document.createElement('div'); ui.className = 'ui'; root.append(ui); labPanel(ui, lab); }
+    if (params.get('paused') !== '1') lab.play();
+  } else if (params.has('spectate')) {
     // bot-only match without UI: benchmark scenario and attract mode
     const canvas = document.createElement('canvas');
     Object.assign(canvas.style, { position: 'fixed', inset: 0, width: '100vw', height: '100vh', display: 'block' });

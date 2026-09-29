@@ -12,6 +12,11 @@ npm run bench    # performance benchmark only
 
 `npm run build` produces a single self-contained `dist/index.html` (open it directly in a browser).
 
+## Leviathan Lab
+Open `index.html?lab=1` for an isolated stage with one hero and training dummies: switch heroes, cameras
+(front, side, close, top...), force and scrub animation clips, cast abilities, pause and step frame by frame.
+`node tools/lab.mjs` renders the same views to PNG from the command line (see the header of `tools/lab.mjs`).
+
 ## How to play
 The whale picks a hero for you (one reroll). Choose the bot difficulty and press **Fight**.
 Push with your minion waves, destroy the two enemy towers in order, then shatter the enemy Heartstone.

@@ -42,6 +42,7 @@ class HeroView {
     this.current = null; this.play('idle');
     this.oneShotUntil = 0; this.lastYaw = 0;
     // held props on bones, fitted in the idle pose (the pose players see most; arms hang out ~45 deg from rest)
+    if (this.current) { this.current.stopFading(); this.current.setEffectiveWeight(1); } // play() fades in from 0: apply idle fully now
     this.mixer.update(0); this.body.updateMatrixWorld(true);
     this.glows = [];
     for (const p of this.look.props || []) {
@@ -52,17 +53,34 @@ class HeroView {
       const ws = new THREE.Vector3(); bone.getWorldScale(ws); prop.scale.divide(ws).multiplyScalar(this.body.scale.x || 1);
       bone.add(prop);
       if (p.hold) holdInHand(this.body, bone, prop, p);
+      else if (p.on === 'top') sitOnTop(this.body, bone, prop, p);
       else { prop.position.fromArray(p.pos); prop.rotation.set(...p.rot); }
       // glow anchor: the renderer's fixed light pool lights the nearest ones (glow-lights.js)
       if (p.glow) { const a = new THREE.Object3D(); prop.add(a); a.position.y = 0.6; this.glows.push({ anchor: a, color: new THREE.Color(p.glow), phase: this.id, active: false, x: 0, y: 0, z: 0, d: 0 }); }
       bakeProp(this.body, bone, prop);
     }
     if (this.look.pebble) { this.mount = buildPebble(lib, this.look.pebble, 1.0); this.root.add(this.mount); this.mount.visible = false; }
-    this.flash = 0;
+    this.flash = 0; this.forced = null; this.forcedTime = null;
   }
   play(k, fade = 0.15) {
     const a = this.actions[k] || this.actions.idle; if (!a || this.current === a) return;
     a.reset().fadeIn(fade).play(); if (this.current) this.current.fadeOut(fade); this.current = a; this.currentKey = k;
+  }
+  /** Lab control: force clip `k` (null releases it); `time` freezes it at that many seconds, otherwise it loops. */
+  force(k, time = null) {
+    if (this.forced && this.forced !== k && this.actions[this.forced]) this.loopModes(this.forced);
+    this.forced = k; this.forcedTime = time; if (!k) { this.current = null; this.currentKey = null; this.play('idle'); }
+  }
+  applyForced() {
+    const a = this.actions[this.forced]; if (!a) return;
+    if (this.current !== a) { if (this.current) this.current.stop(); a.reset(); a.setLoop(THREE.LoopRepeat, Infinity); a.clampWhenFinished = false; a.play(); this.current = a; this.currentKey = this.forced; }
+    if (this.forcedTime !== null) { a.paused = false; a.time = this.forcedTime % a.getClip().duration; a.paused = true; } else a.paused = false;
+  }
+  loopModes(k) {
+    const a = this.actions[k]; if (!a) return;
+    if (k === 'die') { a.setLoop(THREE.LoopOnce); a.clampWhenFinished = true; }
+    else if (['attack', 'shoot', 'cast', 'emote'].includes(k)) { a.setLoop(THREE.LoopOnce); a.clampWhenFinished = false; }
+    a.paused = false;
   }
   oneShot(k, now, speed = 1) {
     const a = this.actions[k]; if (!a) return;
@@ -79,7 +97,8 @@ class HeroView {
     if (this.mount) { this.mount.visible = mounted && !e.dead; this.body.position.y = mounted ? 0.78 : 0; if (mounted) animatePebble(this.mount, e, now); }
     const air = e.airborneUntil > world.tick ? Math.sin(Math.min(1, (e.airborneUntil - world.tick) / 20) * Math.PI) * 0.8 : 0;
     this.root.position.y = air + (e.dashFx === 'gus-leap' && e.dashUntil > world.tick ? 2 : 0);
-    if (e.dead) { if (this.currentKey !== 'die') this.play('die', 0.1); }
+    if (this.forced) this.applyForced(); // lab: a chosen clip, looping or frozen at a time
+    else if (e.dead) { if (this.currentKey !== 'die') this.play('die', 0.1); }
     else if (now >= this.oneShotUntil || this.currentKey === 'die') {
       if (e.moving || e.dashUntil > world.tick) this.play(mounted ? 'idle' : (e.hasteUntil > world.tick ? 'run' : 'walk'));
       else this.play('idle');
@@ -157,13 +176,31 @@ function holdInHand(body, bone, prop, p) {
   if (n) grip.divideScalar(n);
   // orientation: hero frame (body root) * tilt/roll, expressed in the bone's frame
   (body.parent || body).getWorldQuaternion(_q); bone.getWorldQuaternion(_q2); // the hero root: upright, facing +z
-  const tilt = new THREE.Quaternion().setFromEuler(new THREE.Euler(p.tilt ?? 0.3, 0, p.roll ?? 0));
+  const tilt = new THREE.Quaternion().setFromEuler(new THREE.Euler((p.tilt ?? 0.3) + (p.flip ? Math.PI : 0), 0, p.roll ?? 0)); // flip: art authored head-down
   prop.quaternion.copy(_q2.invert()).multiply(_q).multiply(tilt);
   // slide down the prop's own up axis so the handle, not its foot, sits in the fist
   prop.updateMatrix(); const box = new THREE.Box3().setFromObject(prop.children[0] || prop, true);
   const hgt = (box.max.y - box.min.y) || p.size;
   _w.set(0, -hgt * (p.grip ?? 0.2), 0).applyQuaternion(prop.quaternion);
   prop.position.copy(grip).add(_w);
+}
+/** Stand a prop upright on the highest point of the mesh a bone carries (a candle on a head). */
+function sitOnTop(body, bone, prop, p) {
+  let base = null; body.traverse((o) => { if (!base && o.isSkinnedMesh) base = o; });
+  body.updateMatrixWorld(true);
+  const k = base.skeleton.bones.indexOf(bone), g = base.geometry, SI = g.attributes.skinIndex, SW = g.attributes.skinWeight;
+  let top = -Infinity; const tip = new THREE.Vector3(), sum = new THREE.Vector3(); let n = 0;
+  const pts = [];
+  for (let i = 0; i < g.attributes.position.count; i++) {
+    let bi = 0, bw = -1; for (let c = 0; c < 4; c++) { const w = SW.getComponent(i, c); if (w > bw) { bw = w; bi = SI.getComponent(i, c); } }
+    if (bi !== k) continue;
+    base.getVertexPosition(i, _v); _v.applyMatrix4(base.matrixWorld); pts.push(_v.clone()); if (_v.y > top) top = _v.y;
+  }
+  for (const q of pts) if (q.y > top - 0.03) { sum.add(q); n++; }
+  if (n) tip.copy(sum.divideScalar(n)); tip.y = top + (p.lift || 0);
+  tip.applyMatrix4(new THREE.Matrix4().copy(bone.matrixWorld).invert());
+  (body.parent || body).getWorldQuaternion(_q); bone.getWorldQuaternion(_q2);
+  prop.quaternion.copy(_q2.invert()).multiply(_q); prop.position.copy(tip);
 }
 /** Flat, non-indexed skinned geometry (Float32 attributes, Uint16 skin indices) so parts can be merged. */
 function flatSkinned(src) {

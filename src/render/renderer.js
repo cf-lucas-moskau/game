@@ -64,6 +64,8 @@ export class GameRenderer {
   shake(amount) { this.cam.shake = Math.min(1, this.cam.shake + amount * this.shakeScale); }
   /** Camera: follows the focus unit, clamped to the lane. Narrow screens pull back to keep the same lane width in view. */
   updateCamera(alpha, dt) {
+    // lab / tooling: an explicit camera ({ pos: [x,y,z], target: [x,y,z] } in render units)
+    if (this.cameraOverride) { const o = this.cameraOverride; this.camera.position.set(o.pos[0], o.pos[1], o.pos[2]); this.camera.lookAt(o.target[0], o.target[1], o.target[2]); this.env.follow(o.target[0], o.target[2]); return; }
     const f = this.world.entities[this.focusId];
     let tx = this.cam.x, tz = 4.5;
     if (f) { tx = rx(f) * S; tz = ry(f) * S; }

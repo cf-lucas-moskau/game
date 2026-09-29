@@ -30,8 +30,12 @@ node tools/simulate.mjs 10             # headless bot-vs-bot matches: length, wi
 node tools/bench.mjs                   # performance benchmark (see docs/PERF.md)
 node tools/soak.mjs 4                  # leak check: retained-heap slope
 node tools/shot.mjs "?quality=medium&skip=150" out.png 15 1280 720   # screenshot helper
+node tools/lab.mjs heroes --cam front                  # Leviathan Lab: every hero up close (contact sheet PNG)
+node tools/lab.mjs strip --hero saffi --clip attack    # animation frames across a clip
+node tools/lab.mjs ability --hero gus --slot R         # timeline of an ability after the cast
+node tools/lab.mjs attack --hero vesper                # auto-attack timeline;  shot / info: see the file header
 ```
-URL parameters: `hero=`, `heroes=a,b,c,d,e,f` (roster), `ping= jitter= loss=` (simulated network),
+URL parameters: `lab=1` (Leviathan Lab: isolated stage, `window.__lab`, panel; `cam= zoom= paused=1 panel=0 dummy= dummies=`), `hero=`, `heroes=a,b,c,d,e,f` (roster), `ping= jitter= loss=` (simulated network),
 `bots=easy|medium|hard`, `quality=low|medium|high`, `spectate=1`, `play=auto` (autopilot through the
 input path), `skip=<seconds>` (fast-forward the sim), `seed=`, `touch=1`, `cpu=1` (CPU measurement mode), `bench=1`.
 
@@ -47,7 +51,8 @@ input path), `skip=<seconds>` (fast-forward the sim), `seed=`, `touch=1`, `cpu=1
   appends results to the PR write-up and merges `--no-ff`.
 - If a gate step fails, investigate the cause with data (profiles, traces, screenshots). Do not loosen a
   budget or tolerance without evidence, and document any measurement change in docs/PERF.md.
-- Visual work: take screenshots with headless Chromium and look at them before merging.
+- Visual work: look at it before merging. Use the Leviathan Lab (`tools/lab.mjs`, `?lab=1`) for heroes, props,
+  animations and effects up close (frame-exact, no match needed); use full-game screenshots for scene-level checks.
 
 ## Current state
 - The repository now lives on GitHub (`cf-lucas-moskau/game`). Branch `claude/goal-test-aotoyo` holds

@@ -127,6 +127,27 @@ const until = async (page, fn, arg, ms = 20000) => { try { await page.waitForFun
   check('no page errors (loop)', errors.length === 0, errors[0] || '');
   await page.close();
 }
+// ---------------- Leviathan Lab: every hero loads, casts every ability and plays every clip
+{
+  const page = await browser.newPage({ viewport: { width: 640, height: 400 } });
+  const errors = []; page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto(`file://${root}/dist/index.html?lab=1&panel=0&paused=1&quality=low`);
+  await page.waitForFunction(() => window.__lab, null, { timeout: 90000 });
+  const r = await page.evaluate(() => {
+    const lab = window.__lab, done = [];
+    for (const h of lab.info().heroes) {
+      lab.setHero(h);
+      for (const c of lab.info().clips) { lab.anim(c, 0.2); lab.step(1 / 30); }
+      lab.anim(null);
+      for (const k of ['Q', 'W', 'E', 'R']) { lab.cast(k); lab.step(0.6); }
+      lab.attack(); lab.step(1);
+      done.push(h);
+    }
+    return done.length;
+  });
+  check('lab: every hero plays every clip and casts every ability', r === 6 && errors.length === 0, errors[0] || `${r} heroes`);
+  await page.close();
+}
 await browser.close();
 console.log(results.map((r) => '   ' + r).join('\n'));
 if (failed) { console.log(`   E2E: ${failed} failure(s)`); process.exit(1); } else console.log('   E2E: all input and game-loop checks passed');
