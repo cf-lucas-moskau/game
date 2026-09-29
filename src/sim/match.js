@@ -73,7 +73,7 @@ function commandSystem(w, commands) {
     const c = commands[i];
     const e = w.get(w.players[c.p]);
     if (!e || w.state.over) continue;
-    if (e.dead && c.t !== CMD.BUY && c.t !== CMD.SELL) continue;
+    if (e.dead && c.t !== CMD.BUY && c.t !== CMD.SELL && c.t !== CMD.SURRENDER) continue;
     const def = w.registry.heroes[e.heroKey];
     switch (c.t) {
       case CMD.MOVE: e.order = ORDER.MOVE; e.moveX = c.x; e.moveY = c.y; e.targetId = -1; if (def.onMoveOrder) def.onMoveOrder(w, e, c); break;
@@ -85,6 +85,7 @@ function commandSystem(w, commands) {
       case CMD.SWAP: if (def.onSwap) def.onSwap(w, e); break;
       case CMD.BUY: buy(w, e, c.item); break;
       case CMD.SELL: sell(w, e, c.i); break;
+      case CMD.SURRENDER: { const heart = w.structures.find((x) => x.kind === KIND.HEART && x.team === e.team); if (!w.state.over) w.state.surrendered = true; endMatch(w, 1 - e.team, heart ? heart.x : e.x, heart ? heart.y : e.y); break; }
       case CMD.ITEM_ACTIVE: { const key = e.items[c.i]; const it = key && w.registry.items[key]; if (it && it.active && (e.itemState[key + ':cd'] || 0) <= w.tick) { if (it.active(w, e, c) !== false) e.itemState[key + ':cd'] = w.tick + sec(it.activeCd); } break; }
     }
   }
@@ -231,10 +232,12 @@ function onStructureDown(w, s) {
     const next = mine.find((x) => x.tier === s.tier - 1);
     if (next) next.vulnerable = true;
   }
-  if (s.kind === KIND.HEART) {
-    w.state.over = true; w.state.winner = 1 - s.team;
-    w.events.push(EV.MATCH_END, w.tick, w.state.winner, 0, s.x, s.y);
-  }
+  if (s.kind === KIND.HEART) endMatch(w, 1 - s.team, s.x, s.y);
+}
+function endMatch(w, winner, x, y) {
+  if (w.state.over) return;
+  w.state.over = true; w.state.winner = winner;
+  w.events.push(EV.MATCH_END, w.tick, winner, 0, x, y);
 }
 function winSystem() {}
 

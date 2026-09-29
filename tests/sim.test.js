@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createMatch, stateHash } from '../src/sim/match.js';
-import { moveCmd, attackMoveCmd } from '../src/sim/commands.js';
+import { moveCmd, attackMoveCmd, surrenderCmd, validCommand } from '../src/sim/commands.js';
+import { EV } from '../src/core/events.js';
 import { KIND, sec } from '../src/sim/constants.js';
 import { testContent, roster3v3 } from './helpers.js';
 import { kill as killFn } from '../src/sim/damage.js';
@@ -16,6 +17,19 @@ function run(seed, seconds, scripted = true) {
 }
 
 describe('simulation', () => {
+  it('surrender ends the match for the other team, once, even while dead', () => {
+    const w = createMatch({ seed: 4, roster: roster3v3(), content: testContent });
+    expect(validCommand(surrenderCmd(4))).toBe(true);
+    for (let i = 0; i < 30; i++) w.step([]);
+    killFn(w, w.heroes[4], null);
+    const ends = []; w.events.drain(() => {});
+    w.step([surrenderCmd(4), surrenderCmd(1)]);
+    w.events.drain((e) => { if (e.type === EV.MATCH_END) ends.push(e.a); });
+    expect(w.state.over).toBe(true);
+    expect(w.state.winner).toBe(0);
+    expect(ends).toEqual([0]);
+    expect(w.state.surrendered).toBe(true);
+  });
   it('is deterministic for the same seed and commands', () => {
     const a = run(99, 120), b = run(99, 120);
     expect(stateHash(a)).toBe(stateHash(b));

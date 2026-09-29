@@ -23,7 +23,7 @@ pooled entity records, minion growth 5%/min, Auctioneer interest passive, the me
 ```
 npm install
 npx playwright install chromium        # needed by e2e, bench, soak (or set PW_PATH to a playwright install)
-npm run dev                            # play: http://localhost:5173/?hero=vesper&ping=100
+npm run dev                            # play: http://localhost:5173/ (hero select), or ?hero=vesper&ping=100 to skip it
 npm test                               # vitest: sim, heroes, items, bots, transport, predictor
 npm run build                          # single self-contained dist/index.html (assets inlined), must stay < 16 MB
 node tools/simulate.mjs 10             # headless bot-vs-bot matches: length, win rates, sim cost
@@ -50,17 +50,23 @@ input path), `skip=<seconds>` (fast-forward the sim), `seed=`, `touch=1`, `cpu=1
 - Visual work: take screenshots with headless Chromium and look at them before merging.
 
 ## Current state
-- `main`: PRs 1-9 merged (core, sim, heroes, items, bots, perf+transport, renderer, bench, input).
-- `vfx` (PR #10, visual effects): complete and committed, **not merged**. The gate must be rerun in the new
-  environment for its key (results are not in the repo), then `scripts/pr.sh merge 10`.
+- The repository now lives on GitHub (`cf-lucas-moskau/game`). Branch `claude/goal-test-aotoyo` holds
+  PRs 1-11: PR #10 (VFX) merged after a gate rerun in the new container (see docs/prs/0010-vfx.md), and
+  PR #11 (UI) adds the full playable loop: hero select -> match -> end screen -> hero select.
+- Playwright in this container: `PW_PATH=/opt/node22/lib/node_modules/playwright` (Chromium in /opt/pw-browsers).
+- `src/app/app.js` owns the flow (menu with a bot-match backdrop, match, end screen) and tears each match
+  down completely (renderer GL context, inputs, UI). URL shortcuts `hero= heroes= play=` skip hero select.
+- Surrender is a sim command (`CMD.SURRENDER`), so it will work unchanged with the server.
 - Numbers from the last full runs (headless Chromium, SwiftShader software GPU, 1 CPU):
   sim tick p95 0.1-0.2 ms, render update p95 0.3 ms desktop / 2.6 ms emulated phone,
   GC max 0.3-0.5 ms desktop / 3.4 ms phone, scene draw calls 40-43 (budget 50),
   corrections 0.3-0.7 per 10 s at 100 ms ping, retained heap slope about 1.5 MB per 10 min.
 
 ## Next work, in order
-1. **Merge PR #10** (rerun gate).
-2. **PR #11, UI** (`src/ui/`), design already decided:
+1. Done: PR #10 merged, PR #11 UI (`src/ui/`) built as designed below. Remaining UI polish: painted hero
+   portraits and item icons (swap `src/ui/identity.js` emblems and the item abbreviations), volume setting
+   once audio exists.
+2. (Design record for PR #11, UI:)
    - Fonts bundled offline via npm: `@fontsource/gloock` (titles, hero names) and
      `@fontsource-variable/bricolage-grotesque` (HUD text, tabular numbers). Palette in `src/render/palette.js`
      (abyss #1c1f4a, dusk #f7b267, slate #3e5c6b, bone #e8dcc4, tide #45c4e6, coral #f0476e, gold #f2c14e).

@@ -1,6 +1,6 @@
 // Command schema shared by input devices, bots and the network transport.
 // Every command is a plain, JSON-serializable object stamped with a tick and player id.
-export const CMD = Object.freeze({ MOVE: 1, ATTACK: 2, CAST: 3, STOP: 4, BUY: 5, SELL: 6, SPELL: 7, ATTACK_MOVE: 8, SWAP: 9, ITEM_ACTIVE: 10, PICK_HERO: 11 });
+export const CMD = Object.freeze({ MOVE: 1, ATTACK: 2, CAST: 3, STOP: 4, BUY: 5, SELL: 6, SPELL: 7, ATTACK_MOVE: 8, SWAP: 9, ITEM_ACTIVE: 10, PICK_HERO: 11, SURRENDER: 12 });
 
 export const moveCmd = (player, x, y) => ({ t: CMD.MOVE, p: player, x: Math.round(x), y: Math.round(y) });
 export const attackCmd = (player, id) => ({ t: CMD.ATTACK, p: player, id });
@@ -12,6 +12,8 @@ export const buyCmd = (player, item) => ({ t: CMD.BUY, p: player, item });
 export const sellCmd = (player, index) => ({ t: CMD.SELL, p: player, i: index });
 export const stopCmd = (player) => ({ t: CMD.STOP, p: player });
 export const swapCmd = (player) => ({ t: CMD.SWAP, p: player });
+/** Concede the match for the player's team. */
+export const surrenderCmd = (player) => ({ t: CMD.SURRENDER, p: player });
 export const itemActiveCmd = (player, index, x, y) => ({ t: CMD.ITEM_ACTIVE, p: player, i: index, x: Math.round(x), y: Math.round(y) });
 
 export const MAX_STROKE_POINTS = 40;
@@ -34,7 +36,7 @@ export function validCommand(c) {
     case CMD.SPELL: return (c.s === 0 || c.s === 1) && num(c.x) && num(c.y);
     case CMD.BUY: return typeof c.item === 'string' && c.item.length < 40;
     case CMD.SELL: case CMD.ITEM_ACTIVE: return Number.isInteger(c.i) && c.i >= 0 && c.i < 6;
-    case CMD.STOP: case CMD.SWAP: return true;
+    case CMD.STOP: case CMD.SWAP: case CMD.SURRENDER: return true;
     default: return false;
   }
 }

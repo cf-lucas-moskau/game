@@ -10,6 +10,8 @@ import { PostFX } from './post.js';
 import { QUALITY, ResolutionGuard } from './quality.js';
 import { view, rx, ry } from './interp.js';
 import { Indicators } from './indicators.js';
+import { FX } from './fx.js';
+import { ZoneViews } from './zones.js';
 
 export class GameRenderer {
   constructor(canvas, lib, world, { quality = 'medium', telemetry = null, fixedBuffer = null } = {}) {
@@ -32,15 +34,20 @@ export class GameRenderer {
     this.units = new UnitRenderer(lib, world, this.env.root);
     this.bars = new HealthBars(this.env.root); this.decals = new GroundDecals(this.env.root); this.projectiles = new ProjectileViews(this.env.root);
     this.extra = []; // pluggable views (fx, zones) with update(world, alpha, dt, now, renderer)
-    this.indicators = new Indicators(this.env.root); this.extra.push(this.indicators);
+    this.zones = new ZoneViews(this.env.root); this.fx = new FX(this.env.root, this.q);
+    this.indicators = new Indicators(this.env.root); this.extra.push(this.zones, this.fx, this.indicators);
+    this.units.fx = this.fx;
     this.aim = { active: false }; this.hoverId = -1; this.showRange = false;
     this.post = this.q.post ? new PostFX(gl, { levels: this.q.bloomLevels, msaa: this.q.msaa }) : null;
     this.guard = new ResolutionGuard(0.55, 1);
     this.cam = { x: 8, z: 4.5, shake: 0, zoom: 1 }; this.focusId = -1; this.myTeam = 0;
-    this.now = 0; this.resize(); addEventListener('resize', () => this.resize());
+    this.shakeScale = 1; // user setting (0 disables camera shake)
+    this._pv = new THREE.Vector3();
+    this.now = 0; this.resize(); addEventListener('resize', (this._onResize = () => this.resize()));
   }
   resize() {
     const w = this.canvas.clientWidth || innerWidth, h = this.canvas.clientHeight || innerHeight;
+    this.cssW = w; this.cssH = h; // cached: reading clientWidth per frame would force a layout
     let dpr = Math.min(devicePixelRatio || 1, 2) * this.q.pixelRatio * this.guard.scale;
     if (this.fixedBuffer) { dpr = this.fixedBuffer[0] / w; this.guard.enabled = false; }
     this.gl.setPixelRatio(dpr); this.gl.setSize(w, h, false);
@@ -49,7 +56,7 @@ export class GameRenderer {
     if (this.telemetry) this.telemetry.gauges.renderScale = +(this.guard.scale).toFixed(2);
   }
   marker(x, y, type) { this.indicators.marker(x, y, type); }
-  shake(amount) { this.cam.shake = Math.min(1, this.cam.shake + amount); }
+  shake(amount) { this.cam.shake = Math.min(1, this.cam.shake + amount * this.shakeScale); }
   /** Camera: follows the focus unit, clamped to the lane. Narrow screens pull back to keep the same lane width in view. */
   updateCamera(alpha, dt) {
     const f = this.world.entities[this.focusId];
@@ -105,6 +112,18 @@ export class GameRenderer {
     const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0); const hit = new THREE.Vector3();
     if (!ray.ray.intersectPlane(plane, hit)) return null;
     return { x: hit.x / S, y: hit.z / S };
+  }
+  /** Allocation-free projection for per-frame UI (canvas-relative CSS px); out.visible = in front of the camera. */
+  project(x, y, h, out) {
+    const v = this._pv.set(x * S, h, y * S).project(this.camera);
+    out.x = (v.x + 1) / 2 * this.cssW; out.y = (1 - v.y) / 2 * this.cssH; out.visible = v.z < 1;
+    return out;
+  }
+  /** Release the GL context and listeners; the shared AssetLibrary stays loaded for the next match. */
+  dispose() {
+    removeEventListener('resize', this._onResize);
+    if (this.post && this.post.dispose) this.post.dispose();
+    this.gl.dispose(); this.gl.forceContextLoss();
   }
   worldToScreen(x, y, h = 0) {
     const v = new THREE.Vector3(x * S, h, y * S).project(this.camera); const r = this.canvas.getBoundingClientRect();

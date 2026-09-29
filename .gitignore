@@ -4,3 +4,5 @@ perf-results/*.json
 !perf-results/baseline.json
 !perf-results/.gitkeep
 .DS_Store
+.gate/
+.shots/

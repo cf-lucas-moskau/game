@@ -25,7 +25,7 @@ export class World {
     this.scratch = new Int32Array(1024);
     this.scratch2 = new Int32Array(1024);
     this.nextFxId = 1;
-    this.state = { whale: { phase: 'idle', dir: 0, until: 0, next: 0 }, suddenDeath: false, winner: -1, over: false, waveCount: 0 };
+    this.state = { whale: { phase: 'idle', dir: 0, until: 0, next: 0 }, suddenDeath: false, winner: -1, over: false, surrendered: false, waveCount: 0 };
     this.systems = [];
     this.registry = { heroes: {}, items: {} };
     this.stats = { tickMs: 0 };

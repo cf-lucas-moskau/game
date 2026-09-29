@@ -136,7 +136,11 @@ export class Environment {
         .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
           vec2 cell = floor(vec2(vObj.x*1.6, vObj.y*2.4)); float spot = step(0.9, hash(cell)) * smoothstep(-0.6,-2.,vObj.y) * smoothstep(-7.,-3.,vObj.y);
           vec2 f = fract(vec2(vObj.x*1.6, vObj.y*2.4)) - 0.5; spot *= smoothstep(0.32, 0.05, length(f));
-          totalEmissiveRadiance += vec3(.3,.95,1.)*spot*(0.9+0.4*sin(uTime*1.7 + cell.x));`);
+          totalEmissiveRadiance += vec3(.3,.95,1.)*spot*(0.9+0.4*sin(uTime*1.7 + cell.x));
+          // eyes, painted into the body (no extra draw): dark iris with a soft cyan catchlight
+          vec2 ed = vec2(vObj.x - 46.5, vObj.y + 4.2); float eye = smoothstep(0.62, 0.5, length(ed)) * step(4.8, abs(vObj.z - ${(LANE.H * S / 2).toFixed(2)}));
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.03,.04,.08), eye);
+          totalEmissiveRadiance += vec3(.35,.7,1.) * eye * smoothstep(0.22, 0.05, length(ed - vec2(0.15, 0.18)));`);
     };
     const whale = new THREE.Mesh(g, mat); whale.receiveShadow = true; this.root.add(whale);
     // tail flukes + pectoral fins, flapping in the vertex shader
@@ -160,10 +164,6 @@ export class Environment {
     const { mergeGeometries } = THREE_UTILS;
     const finMesh = new THREE.Mesh(mergeGeometries([...flukes, ...fins].map((x) => x.index ? x.toNonIndexed() : x)), finMat);
     this.root.add(finMesh);
-    // eye
-    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.55, 16, 12), new THREE.MeshStandardMaterial({ color: '#0d1020', roughness: 0.2, emissive: '#1a2a55', emissiveIntensity: 0.6 }));
-    const eg = [CZ + 5.7, CZ - 5.7].map((z) => new THREE.SphereGeometry(0.55, 16, 12).translate(46.5, -4.2, z));
-    eye.geometry = THREE_UTILS.mergeGeometries(eg); this.root.add(eye);
   }
   buildLane() {
     const W = LANE.W * S, H = (LANE.MAX_Y - LANE.MIN_Y + 140) * S, z0 = (LANE.MIN_Y - 70) * S;
@@ -195,19 +195,18 @@ export class Environment {
           float pulse = 0.5 + 0.5*sin(uTime*10.);
           totalEmissiveRadiance += vec3(1., .45, .3) * danger * warnSide * uWarn * (0.4 + 0.6*pulse) * 1.6;
           totalEmissiveRadiance += vec3(.5,.9,1.) * danger * 0.06;
-          totalEmissiveRadiance += vec3(1.,.2,.25) * uSudden * 0.12 * (0.5+0.5*sin(uTime*2.));`);
+          totalEmissiveRadiance += vec3(1.,.2,.25) * uSudden * 0.12 * (0.5+0.5*sin(uTime*2.));
+          // fountains: team-coloured pools with a bright rim (drawn here instead of separate meshes)
+          for (int t = 0; t < 2; t++) {
+            vec2 fc = vec2(t == 0 ? ${(MAP.FOUNTAIN_X * S).toFixed(2)} : ${((LANE.W - MAP.FOUNTAIN_X) * S).toFixed(2)}, ${(LANE.H * S / 2).toFixed(2)});
+            float fr = length(vW.xz - fc) / ${(MAP.FOUNTAIN_R * S).toFixed(2)};
+            vec3 fcCol = t == 0 ? cBlue : cRed;
+            totalEmissiveRadiance += fcCol * (smoothstep(0.86, 0.9, fr) * smoothstep(1.0, 0.96, fr) * 0.9 + step(fr, 0.86) * 0.12);
+          }`);
     };
     const lane = new THREE.Mesh(g, m); lane.receiveShadow = true; this.root.add(lane);
     // fountains: glowing pools on each base
-    const parts = [];
-    for (const team of [TEAM.BLUE, TEAM.RED]) {
-      const c = new THREE.Color(team === 0 ? PALETTE.tide : PALETTE.coral);
-      const add = (g, a) => { g.rotateX(-Math.PI / 2); g.translate(sideX(team, MAP.FOUNTAIN_X) * S, 0.03, cz); const n = g.attributes.position.count; const col = new Float32Array(n * 4); for (let i = 0; i < n; i++) col.set([c.r, c.g, c.b, a], i * 4); g.setAttribute('color', new THREE.BufferAttribute(col, 4)); g.deleteAttribute('uv'); g.deleteAttribute('normal'); parts.push(g.index ? g.toNonIndexed() : g); };
-      add(new THREE.RingGeometry(MAP.FOUNTAIN_R * S * 0.86, MAP.FOUNTAIN_R * S, 64), 0.55);
-      add(new THREE.CircleGeometry(MAP.FOUNTAIN_R * S * 0.86, 48), 0.16);
-    }
-    const pools = new THREE.Mesh(THREE_UTILS.mergeGeometries(parts), new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false }));
-    pools.renderOrder = 1; this.root.add(pools);
+
   }
   buildScenery() {
     // instanced barnacle rocks along both flanks, moss trees on the far side, lamps by the bases
@@ -230,12 +229,7 @@ export class Environment {
     const crys = new THREE.InstancedMesh(cr.geometry, crMat, 26); const dc = new THREE.Object3D();
     for (let i = 0; i < 26; i++) { const x = 1 + rnd() * 38, z = 0.1 - rnd() * 1.2; dc.position.set(x, whaleTopY(x, z) - 0.05, z); dc.rotation.set(rnd() * 0.3, rnd() * 6.28, rnd() * 0.3); dc.scale.setScalar(0.5 + rnd() * 0.9); dc.updateMatrix(); crys.setMatrixAt(i, dc.matrix); }
     this.root.add(crys);
-    const lamp = this.assets.merged(SCENERY.lamp, 1.3);
-    const lamps = new THREE.InstancedMesh(lamp.geometry, lamp.material, 8); const d = new THREE.Object3D(); let li = 0;
-    for (const team of [0, 1]) for (const x of [MAP.SHOP_X + 120, MAP.TOWER_INNER_X + 260]) for (const z of [0.85, 8.2]) {
-      d.position.set(sideX(team, x) * S, 0, z); d.rotation.y = 0; d.scale.setScalar(1); d.updateMatrix(); lamps.setMatrixAt(li++, d.matrix);
-    }
-    this.root.add(lamps);
+
   }
   update(dt, world) {
     this.uniforms.uTime.value += dt;

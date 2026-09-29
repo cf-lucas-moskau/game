@@ -9,7 +9,7 @@
 | Render CPU p95 (update + submission) | 6 ms | report only | yes |
 | Frame time p95 / p99 | 16.7 / 20 ms | report only | yes |
 | GC pause max (thread CPU time) | 5 ms | yes | yes |
-| Heap growth (after forced GC) | 5 MB / 10 min | yes | yes |
+| Heap growth (retained-heap slope, `tools/soak.mjs`, 2.5 min) | 5 MB / 10 min | yes (soak step) | yes |
 | Scene draw calls | 50 | yes | yes |
 | Load to first frame | 4 s | yes | yes |
 | Input latency (input to displayed response) | 1 frame + 20 ms (desktop), + 30 ms (mobile) | once input lands | yes |
@@ -64,3 +64,31 @@ The third (rim) light was removed already.
 retained heap after a forced GC every 30 s, then fits a slope. PR #9: 8.47 -> 9.03 MB over 4 minutes,
 slope 1.24 MB per 10 min and flattening (match progression: levels, items, bigger waves). The 30 s
 bench window is too short to judge leaks, so its heap regression noise floor is 50% of the budget.
+
+PR #10: the 30 s bench value read 5.84 MB/10 min while a 3-minute soak of the same scenario gave a
+1.47 MB/10 min slope with the heap oscillating (9.45 -> 9.26 -> 9.47 MB). A single pair of samples
+30 s apart cannot gate leaks, so heap growth moved to the soak step of the gate; the bench reports it as info.
+
+PR #10 also showed that the emulated phone's effective throttle factor varies between runs (2.8x to
+4.1x measured by the probe), and timer resolution is 0.1 ms. Regression checks in throttled scenarios
+therefore compare time metrics divided by the measured throttle factor, with the noise floor scaled
+by it. Absolute budgets are unchanged. (The flagged case: sim tick p95 0.2 -> 0.6 ms with no sim change.)
+
+## UI layer (PR #11)
+The HUD is DOM over the canvas. `telemetry.ui` times the whole UI update per frame (HUD, floating
+numbers, shop, scoreboard, perf overlay) and `uiUpdateP95Ms` is gated at 1.5 ms. Two findings:
+- Restarting a CSS animation by reading `offsetWidth` forced a synchronous reflow. Floating numbers
+  spawned from the sim event stream, which the renderer drains, so the reflow landed inside
+  `renderUpdate` (emulated phone p95 0.8 -> 2.8 ms). Spawns are now queued and animated with the Web
+  Animations API in the UI update.
+- `getBoundingClientRect()` (lane strip) and `clientWidth` (world-to-screen projection) per frame
+  flushed layout after the HUD's style writes. Sizes now come from a ResizeObserver and the renderer's
+  resize handler. UI update p95: desktop 0.9 -> 0.3 ms, emulated phone 3.3 -> 1.0 ms.
+Per-frame HUD setters compare numbers first and build strings only when a shown value changes.
+
+## GC pause max in the second container
+From PR #10 on, the gate runs in a new container (4 vCPU Xeon, SwiftShader). There, `gcPauseMaxMs`
+(a single worst MinorGC per run) does not reproduce the old baseline: the pre-VFX `main` measured
+4.41 / 1.62 / 13.17 ms (desktop / play / phone), and one build of `play-ping100` gave 11.9, 4.3 and
+3.4 ms on three runs. The budget is unchanged. Merges where only this metric fails are justified in
+the PR write-up with same-container comparisons against `main`.

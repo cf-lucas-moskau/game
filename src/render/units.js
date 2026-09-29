@@ -32,6 +32,8 @@ class HeroView {
     this.root = new THREE.Group(); parent.add(this.root);
     this.body = lib.instance(this.look.model, this.look.height); this.root.add(this.body);
     mergeSkinned(this.body);
+    // per-hero material copy: the same hero can appear twice, and hit flashes must stay per unit
+    this.skin = []; this.body.traverse((o) => { if (o.isSkinnedMesh) { o.material = o.material.clone(); this.skin.push(o.material); } });
     this.mixer = new THREE.AnimationMixer(this.body);
     this.actions = {};
     for (const [k, name] of Object.entries(CLIPS)) { const c = lib.clip(this.look.model, name); if (c) this.actions[k] = this.mixer.clipAction(c); }
@@ -81,6 +83,8 @@ class HeroView {
     this.root.visible = !(e.dead && world.tick > e.respawnAt - 1);
     this.mixer.update(dt);
     for (const l of this.glows) l.intensity = 1 + Math.sin(now * 13 + this.id) * 0.25;
+    const fl = this.fx ? (this.fx.flash.get(this.id) || 0) : 0;
+    if (fl !== this.lastFlash) { for (const m of this.skin) m.emissive.setRGB(fl * 0.9, fl * 0.8, fl * 0.75); this.lastFlash = fl; }
   }
   dispose() { this.root.removeFromParent(); }
 }
@@ -193,18 +197,17 @@ class StructureViews {
     this.towers = world.structures.filter((s) => s.kind === KIND.TOWER);
     this.hearts = world.structures.filter((s) => s.kind === KIND.HEART);
     const tl = STRUCTURE_LOOKS.tower;
-    this.parts = [];
-    let y = 0;
+    // stonework (base + mids) is merged into one geometry: one draw for all towers; roofs carry team colour
     const stackH = [1.9, 0.75, 0.75, 1.25];
-    tl.parts.forEach((k, i) => {
-      const { geometry, material } = lib.merged(k, stackH[i]);
-      const roof = i === tl.parts.length - 1;
-      // roofs carry the team colour; stonework keeps its texture
-      const mat = roof ? new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.55, flatShading: true }) : material;
-      const m = new THREE.InstancedMesh(geometry, mat, this.towers.length); m.castShadow = true; m.receiveShadow = true;
-      if (roof) { m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(this.towers.length * 3), 3); this.roof = m; }
-      this.parts.push({ mesh: m, y }); y += stackH[i] * (i === 0 ? 0.97 : 0.93); parent.add(m);
-    });
+    const stone = [], y0 = []; let y = 0; let stoneMat = null;
+    tl.parts.forEach((k, i) => { y0.push(y); y += stackH[i] * (i === 0 ? 0.97 : 0.93); });
+    for (let i = 0; i < tl.parts.length - 1; i++) { const { geometry, material } = lib.merged(tl.parts[i], stackH[i]); stone.push(geometry.clone().translate(0, y0[i], 0)); stoneMat = stoneMat || material; }
+    const roofG = lib.merged(tl.parts[tl.parts.length - 1], stackH[stackH.length - 1]).geometry.clone().translate(0, y0[y0.length - 1], 0);
+    const stoneMesh = new THREE.InstancedMesh(BGU.mergeGeometries(stone), stoneMat, this.towers.length); stoneMesh.castShadow = stoneMesh.receiveShadow = true;
+    const roof = new THREE.InstancedMesh(roofG, new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.55, flatShading: true }), this.towers.length); roof.castShadow = true;
+    roof.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(this.towers.length * 3), 3); this.roof = roof;
+    parent.add(stoneMesh); parent.add(roof);
+    this.parts = [{ mesh: stoneMesh, y: 0 }, { mesh: roof, y: 0 }];
     this.towerTop = y;
     const cr = lib.merged(tl.crystal, 0.9);
     this.crystals = new THREE.InstancedMesh(cr.geometry, glowMaterial(null, 0.75, { flatShading: true }), this.towers.length);
@@ -225,7 +228,7 @@ class StructureViews {
       const dead = !t.alive; const k = this.collapse[i] = dead ? Math.min(1, this.collapse[i] + dt * 0.8) : 0;
       const col = TEAM_RGB[t.team];
       for (const p of this.parts) {
-        tmpObj.position.set(t.x * S, p.y * (1 - k * 0.85) - k * 1.2, t.y * S); tmpObj.rotation.set(k * 0.3, t.team ? Math.PI : 0, k * 0.2); tmpObj.scale.set(1, 1 - k * 0.6, 1); tmpObj.updateMatrix();
+        tmpObj.position.set(t.x * S, -k * 1.2, t.y * S); tmpObj.rotation.set(k * 0.3, t.team ? Math.PI : 0, k * 0.2); tmpObj.scale.set(1, 1 - k * 0.6, 1); tmpObj.updateMatrix();
         p.mesh.setMatrixAt(i, tmpObj.matrix);
       }
       this.roof.setColorAt(i, tmpColor.copy(col).multiplyScalar(0.85));
@@ -307,6 +310,7 @@ export class UnitRenderer {
       const e = es[i];
       if (e.kind === KIND.HERO) {
         let v = this.heroViews.get(e.id); if (!v) { v = new HeroView(this.lib, e, this.parent); this.heroViews.set(e.id, v); }
+        v.fx = this.fx;
         v.update(e, alpha, dt, now, world); continue;
       }
       if (e.kind === KIND.PEBBLE) {
