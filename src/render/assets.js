@@ -4,6 +4,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as skeletonClone } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { MODEL_URLS } from '../assets/manifest.js';
+import { buildAtlas } from './atlas.js';
 
 export class AssetLibrary {
   constructor() { this.gltf = {}; this.loader = new GLTFLoader(); this.mergedCache = {}; }
@@ -26,6 +27,8 @@ export class AssetLibrary {
       });
       this.gltf[k] = g; done++; onProgress && onProgress(done / keys.length);
     }));
+    // one atlas + one shared material for every textured model (fewer programs, uploads and draws)
+    this.atlas = buildAtlas(this.gltf);
   }
   has(k) { return !!this.gltf[k]; }
   clips(k) { return this.gltf[k].animations; }
@@ -55,7 +58,8 @@ export class AssetLibrary {
     const bb = geometry.boundingBox, h = bb.max.y - bb.min.y, s = height / (h || 1);
     geometry.translate(-(bb.min.x + bb.max.x) / 2, -bb.min.y, -(bb.min.z + bb.max.z) / 2); geometry.scale(s, s, s);
     geometry.computeBoundingSphere();
-    const res = { geometry, material: material.clone() };
+    // the shared atlas material stays shared; anything else is copied so callers may tint it
+    const res = { geometry, material: this.atlas && material === this.atlas.material ? material : material.clone() };
     this.mergedCache[ck] = res; return res;
   }
 }

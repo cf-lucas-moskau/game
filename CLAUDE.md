@@ -81,8 +81,11 @@ input path), `skip=<seconds>` (fast-forward the sim), `seed=`, `touch=1`, `cpu=1
      hidden on touch (touch buttons live in `src/input/touch.js`).
 3. Done (PR #12): audio in `src/audio/` (engine, synth voices, sound palette, sfx director, generative music).
    Sound design is tuned by measurement only (levels, voice counts); a listening pass by the owner is still due.
-4. **Texture atlas** for characters and props: 43 materials / 20 programs cause about 12 ms WebGL submission
-   on the emulated phone (report-only in CI but a real risk). Goal: shared materials, fewer program switches.
+4. Done (PR #13): runtime texture atlas + shared material, one-draw Pebble, props baked into heroes, fixed glow-light
+   pool. Remaining allocation is three.js uniform uploads (V8 boxes doubles passed to gl.uniform3f); next lever is
+   fewer lit programs/materials (environment materials, glow materials) or a three.js upgrade/patch.
+   Open measurement issue: in this container `gcPauseMaxMs` on the emulated phone swings 8-47 ms on identical code
+   (SwiftShader contention); consider re-baselining on a machine with a real GPU.
 5. Mobile polish, `docs/ARCHITECTURE.md`, update the spec doc, final deliverables (zip + dist/index.html).
 6. Later (phase 5): `NetTransport` + Node.js WebSocket authoritative server (the owner can host Node).
 

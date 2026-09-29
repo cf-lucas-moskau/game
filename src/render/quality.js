@@ -1,8 +1,8 @@
 // Quality presets and the dynamic resolution guard.
 export const QUALITY = {
-  low:    { name: 'low', pixelRatio: 0.75, post: false, bloomLevels: 0, shadows: false, msaa: 0, antialias: false, particles: 0.4 },
-  medium: { name: 'medium', pixelRatio: 1, post: true, bloomLevels: 4, shadows: false, msaa: 0, antialias: false, particles: 0.7 },
-  high:   { name: 'high', pixelRatio: 1.5, post: true, bloomLevels: 5, shadows: true, msaa: 4, antialias: false, particles: 1 },
+  low:    { name: 'low', pixelRatio: 0.75, post: false, bloomLevels: 0, shadows: false, msaa: 0, antialias: false, particles: 0.4, glowLights: 0 },
+  medium: { name: 'medium', pixelRatio: 1, post: true, bloomLevels: 4, shadows: false, msaa: 0, antialias: false, particles: 0.7, glowLights: 2 },
+  high:   { name: 'high', pixelRatio: 1.5, post: true, bloomLevels: 5, shadows: true, msaa: 4, antialias: false, particles: 1, glowLights: 3 },
 };
 export function defaultQuality() {
   const coarse = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;

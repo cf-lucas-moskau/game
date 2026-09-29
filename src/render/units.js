@@ -51,7 +51,9 @@ class HeroView {
       // bones are scaled with the rig; compensate so props keep their authored size
       const ws = new THREE.Vector3(); bone.getWorldScale(ws); prop.scale.divide(ws).multiplyScalar(this.body.scale.x || 1);
       bone.add(prop);
-      if (p.glow) { const l = new THREE.PointLight(p.glow, 1.2, 2.5, 2); prop.add(l); l.position.y = 0.6; this.glows.push(l); }
+      // glow anchor: the renderer's fixed light pool lights the nearest ones (glow-lights.js)
+      if (p.glow) { const a = new THREE.Object3D(); prop.add(a); a.position.y = 0.6; this.glows.push({ anchor: a, color: new THREE.Color(p.glow), phase: this.id, active: false, x: 0, y: 0, z: 0, d: 0 }); }
+      bakeProp(this.body, bone, prop);
     }
     if (this.look.pebble) { this.mount = buildPebble(lib, this.look.pebble, 1.0); this.root.add(this.mount); this.mount.visible = false; }
     this.flash = 0;
@@ -81,8 +83,8 @@ class HeroView {
       else this.play('idle');
     }
     this.root.visible = !(e.dead && world.tick > e.respawnAt - 1);
+    for (let i = 0; i < this.glows.length; i++) this.glows[i].active = this.root.visible && !e.dead;
     this.mixer.update(dt);
-    for (const l of this.glows) l.intensity = 1 + Math.sin(now * 13 + this.id) * 0.25;
     const fl = this.fx ? (this.fx.flash.get(this.id) || 0) : 0;
     if (fl !== this.lastFlash) { for (const m of this.skin) m.emissive.setRGB(fl * 0.9, fl * 0.8, fl * 0.75); this.lastFlash = fl; }
   }
@@ -130,24 +132,108 @@ function mergeSkinned(root) {
   base.geometry = merged;
   for (let i = 1; i < skinned.length; i++) skinned[i].removeFromParent();
 }
+/** Flat, non-indexed skinned geometry (Float32 attributes, Uint16 skin indices) so parts can be merged. */
+function flatSkinned(src) {
+  const g = new THREE.BufferGeometry(), s2 = src.index ? src.toNonIndexed() : src;
+  for (const n of ['position', 'normal', 'uv', 'skinWeight']) {
+    const a = s2.attributes[n]; const f = new Float32Array(a.count * a.itemSize);
+    for (let i = 0; i < a.count; i++) for (let c = 0; c < a.itemSize; c++) f[i * a.itemSize + c] = a.getComponent(i, c);
+    g.setAttribute(n, new THREE.BufferAttribute(f, a.itemSize));
+  }
+  const si = s2.attributes.skinIndex, u = new Uint16Array(si.count * 4);
+  for (let i = 0; i < si.count * 4; i++) u[i] = si.getComponent(i >> 2, i & 3);
+  g.setAttribute('skinIndex', new THREE.BufferAttribute(u, 4));
+  return g;
+}
+/**
+ * Bake a held prop into the hero's skinned mesh, rigidly bound to its hand bone (one draw per hero
+ * instead of two). Only when both share the atlas texture. With attached binding the shader computes
+ * world = boneWorld * boneInverse * bindMatrix * v, so v = bindMatrix^-1 * boneInverse^-1 * L * p,
+ * where L is the prop mesh relative to the bone, gives exactly the old parented placement.
+ */
+function bakeProp(body, bone, prop) {
+  let base = null; body.traverse((o) => { if (!base && o.isSkinnedMesh) base = o; });
+  if (!base || !base.material.map) return;
+  const k = base.skeleton.bones.indexOf(bone); if (k < 0) return;
+  const meshes = []; prop.traverse((o) => { if (o.isMesh && !o.isSkinnedMesh && o.material.map === base.material.map) meshes.push(o); });
+  if (!meshes.length) return;
+  body.updateMatrixWorld(true);
+  const toBind = new THREE.Matrix4().copy(base.bindMatrix).invert().multiply(new THREE.Matrix4().copy(base.skeleton.boneInverses[k]).invert());
+  const boneInv = new THREE.Matrix4().copy(bone.matrixWorld).invert();
+  const geos = [base.geometry.userData.flat ? base.geometry : flatSkinned(base.geometry)];
+  const t = new THREE.Vector3();
+  for (const m of meshes) {
+    const M = new THREE.Matrix4().copy(toBind).multiply(boneInv).multiply(m.matrixWorld), nm = new THREE.Matrix3().getNormalMatrix(M);
+    const src = m.geometry.index ? m.geometry.toNonIndexed() : m.geometry, n = src.attributes.position.count;
+    const P = new Float32Array(n * 3), N = new Float32Array(n * 3), UV = new Float32Array(n * 2), SI = new Uint16Array(n * 4), SW = new Float32Array(n * 4);
+    for (let i = 0; i < n; i++) {
+      t.fromBufferAttribute(src.attributes.position, i).applyMatrix4(M); P.set([t.x, t.y, t.z], i * 3);
+      t.fromBufferAttribute(src.attributes.normal, i).applyMatrix3(nm).normalize(); N.set([t.x, t.y, t.z], i * 3);
+      UV[i * 2] = src.attributes.uv.getX(i); UV[i * 2 + 1] = src.attributes.uv.getY(i);
+      SI[i * 4] = k; SW[i * 4] = 1;
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.BufferAttribute(N, 3)); g.setAttribute('uv', new THREE.BufferAttribute(UV, 2));
+    g.setAttribute('skinIndex', new THREE.BufferAttribute(SI, 4)); g.setAttribute('skinWeight', new THREE.BufferAttribute(SW, 4));
+    geos.push(g); m.visible = false; // the prop's own mesh stays as an anchor (glow lights) but is not drawn
+  }
+  const merged = BGU.mergeGeometries(geos, false); if (!merged) { for (const m of meshes) m.visible = true; return; }
+  merged.userData.flat = true; merged.computeBoundingSphere(); base.geometry = merged;
+}
 const STONE = new THREE.MeshStandardMaterial({ color: '#a39580', roughness: 0.95, flatShading: true });
 const PEBBLE_EYES = new THREE.MeshBasicMaterial({ color: '#8ff4ff' });
-/** Pebble the rock golem: boulder torso, rock head with glowing eyes, two boulder fists. */
+/**
+ * Pebble the rock golem: boulder torso, rock head with glowing eyes, two boulder fists.
+ * The rigid parts are merged into one skinned mesh with a bone each (one draw instead of five);
+ * the eyes ride the head bone. Bones animate exactly like the separate parts used to.
+ */
 function buildPebble(lib, keys, height) {
   const g = new THREE.Group();
-  const part = (k, h) => { const m = lib.instance(k, h); m.traverse((o) => { if (o.isMesh) { o.material = STONE; o.castShadow = true; } }); return m; };
-  const body = part(keys[0], height * 0.72); body.scale.set(1.2, 1, 1.05); g.add(body);
-  const head = part(keys[2], height * 0.36); head.position.set(0, height * 0.66, 0.12); g.add(head);
-  const eyes = new THREE.Mesh(BGU.mergeGeometries([-1, 1].map((sx) => new THREE.SphereGeometry(0.055, 8, 6).translate(sx * 0.11, height * 0.82, 0.36))), PEBBLE_EYES); g.add(eyes);
-  const armL = part(keys[1], height * 0.4); armL.position.set(0.62, height * 0.12, 0.1); g.add(armL);
-  const armR = armL.clone(); armR.position.x = -0.62; g.add(armR);
-  g.userData = { head, armL, armR, eyes };
+  const layout = [
+    { key: keys[0], h: height * 0.72, pos: [0, 0, 0], scale: [1.2, 1, 1.05] },
+    { key: keys[2], h: height * 0.36, pos: [0, 0.82, 0.12] }, // head height as players know it (the old bob animation held it at 0.82)
+    { key: keys[1], h: height * 0.4, pos: [0.62, height * 0.12, 0.1] },
+    { key: keys[1], h: height * 0.4, pos: [-0.62, height * 0.12, 0.1] },
+  ];
+  const bones = layout.map((p) => { const b = new THREE.Bone(); b.position.fromArray(p.pos); return b; });
+  const root = new THREE.Bone(); for (const b of bones) root.add(b);
+  const geos = [], v = new THREE.Matrix4();
+  layout.forEach((p, bi) => {
+    const part = lib.instance(p.key, p.h); if (p.scale) part.scale.multiply(new THREE.Vector3().fromArray(p.scale));
+    part.updateMatrixWorld(true);
+    part.traverse((o) => {
+      if (!o.isMesh) return;
+      const src = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry;
+      // part space (bone-local: the bone sits at the part's origin), then the bone's rest offset into mesh space
+      v.copy(o.matrixWorld).premultiply(new THREE.Matrix4().makeTranslation(...p.pos));
+      const nm = new THREE.Matrix3().getNormalMatrix(v), sp = src.attributes.position, sn = src.attributes.normal, t = new THREE.Vector3();
+      const P = new THREE.BufferAttribute(new Float32Array(sp.count * 3), 3), N = new THREE.BufferAttribute(new Float32Array(sp.count * 3), 3);
+      for (let i = 0; i < sp.count; i++) {
+        t.fromBufferAttribute(sp, i).applyMatrix4(v); P.setXYZ(i, t.x, t.y, t.z); // fromBufferAttribute dequantizes
+        t.fromBufferAttribute(sn, i).applyMatrix3(nm).normalize(); N.setXYZ(i, t.x, t.y, t.z);
+      }
+      const geo = new THREE.BufferGeometry(); geo.setAttribute('position', P); geo.setAttribute('normal', N);
+      const si = new Uint16Array(P.count * 4), sw = new Float32Array(P.count * 4);
+      for (let i = 0; i < P.count; i++) { si[i * 4] = bi + 1; sw[i * 4] = 1; } // bone 0 is the root
+      geo.setAttribute('skinIndex', new THREE.BufferAttribute(si, 4)); geo.setAttribute('skinWeight', new THREE.BufferAttribute(sw, 4));
+      geos.push(geo);
+    });
+  });
+  const mesh = new THREE.SkinnedMesh(BGU.mergeGeometries(geos, false), STONE);
+  mesh.castShadow = true; mesh.frustumCulled = false;
+  mesh.add(root); mesh.bind(new THREE.Skeleton([root, ...bones]));
+  g.add(mesh);
+  const [, head, armL, armR] = bones;
+  // eyes sit on the head bone (their own glowing material: one extra draw)
+  const eyes = new THREE.Mesh(BGU.mergeGeometries([-1, 1].map((sx) => new THREE.SphereGeometry(0.055, 8, 6).translate(sx * 0.11, height * 0.82 - 0.82, 0.24))), PEBBLE_EYES);
+  head.add(eyes);
+  g.userData = { head, armL, armR, eyes, headY: head.position.y };
   return g;
 }
 function animatePebble(g, e, now) {
   const u = g.userData, k = e.moving ? 1 : 0.2;
   u.armL.rotation.x = Math.sin(now * 7) * 0.5 * k; u.armR.rotation.x = -Math.sin(now * 7) * 0.5 * k;
-  const bob = Math.abs(Math.sin(now * 7)) * 0.05 * k; u.head.position.y = 0.82 + bob; u.eyes.position.y = bob;
+  const bob = Math.abs(Math.sin(now * 7)) * 0.05 * k; u.head.position.y = u.headY + bob;
   g.rotation.x = e.dashFx === 'pebble-roll' ? now * 12 : 0;
 }
 
@@ -280,7 +366,7 @@ class BeeSwarm {
 const BATCH_KEYS = [0, 1].map((t) => ({ [KIND.MELEE]: `${t}:melee`, [KIND.RANGED]: `${t}:ranged`, [KIND.SIEGE]: `${t}:siege` }));
 export class UnitRenderer {
   constructor(lib, world, parent) {
-    this.lib = lib; this.parent = parent; this.heroViews = new Map(); this.pebbleViews = new Map();
+    this.lib = lib; this.parent = parent; this.heroViews = new Map(); this.pebbleViews = new Map(); this.glowAnchors = [];
     this.batches = {};
     for (const team of [0, 1]) for (const kind of ['melee', 'ranged', 'siege']) this.batches[`${team}:${kind}`] = new MinionBatch(lib, MINION_LOOKS[team][kind], team, 48, parent);
     this.structures = new StructureViews(lib, world, parent);
@@ -309,7 +395,7 @@ export class UnitRenderer {
     for (let i = 0; i < es.length; i++) {
       const e = es[i];
       if (e.kind === KIND.HERO) {
-        let v = this.heroViews.get(e.id); if (!v) { v = new HeroView(this.lib, e, this.parent); this.heroViews.set(e.id, v); }
+        let v = this.heroViews.get(e.id); if (!v) { v = new HeroView(this.lib, e, this.parent); this.heroViews.set(e.id, v); this.glowAnchors.push(...v.glows); }
         v.fx = this.fx;
         v.update(e, alpha, dt, now, world); continue;
       }
