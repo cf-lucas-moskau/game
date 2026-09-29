@@ -32,6 +32,7 @@ export default {
   key: 'gus', name: 'Gus & Pebble', title: 'the Odd Couple', role: 'Tank / Artillery', resource: 'mana', difficulty: 'Medium',
   rankOrder: ['Q', 'E', 'W'],
   build: ['tidal-heart', 'barnacle-plate', 'magnet-boots', 'molted-shell', 'iron-fin', 'whalehide-vest'], // recommended items: shop highlights and bot purchase order
+  passive: { name: 'Pebble', desc: 'Gus rides Pebble, a rock golem that fights beside him and absorbs hits. His spells change when he dismounts; if Pebble crumbles it rebuilds after a while.' },
   base: { hp: 690, hpL: 108, ad: 62, adL: 3.6, armor: 38, armorL: 4.8, mr: 32, mrL: 2, as: 0.62, asL: 0.02, range: 170, speed: 330, mana: 360, manaL: 40, radius: 46, projectile: 0 },
   init(world, e) { e.heroState = { mounted: true, pebbleId: -1, pebbleHp: 1, rebuildAt: 0 }; },
   modifyStats(world, e) {

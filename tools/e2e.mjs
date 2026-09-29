@@ -112,9 +112,14 @@ for (const [w, hgt] of [[844, 390], [390, 844]]) {
   const seen = new Set([k0]);
   for (let i = 0; i < 4; i++) { await page.click('[data-act=reroll]'); seen.add(await page.evaluate(() => document.querySelector('.hero-card h2').textContent)); }
   check('reroll is unlimited and always changes the hero', seen.size >= 3 && !(await page.evaluate(() => document.querySelector('[data-act=reroll]').disabled)), `${seen.size} heroes after 4 rerolls`);
+  // pick a hero from the roster and a skin; both must reach the match
+  await page.click('[data-hero=saffi]');
+  check('clicking a roster tile selects that hero', await page.evaluate(() => document.querySelector('.hero-card h2').textContent === 'Saffi Blinkwick' && document.querySelector('[data-hero=saffi]').classList.contains('on')));
+  await page.click('[data-skin=bluewick]');
   const chosen = await page.evaluate(() => document.querySelector('.hero-card h2').textContent);
   await page.click('[data-act=play]');
   check('Fight starts a match with the chosen hero', await until(page, (n) => window.__game && window.__game.world.tick > 30 && window.__game.world.registry.heroes[window.__game.me.heroKey].name === n, chosen, 60000), `${k0} -> ${chosen}`);
+  check('the chosen hero and skin reach the match', await page.evaluate(() => window.__game.me.heroKey === 'saffi' && window.__game.roster[0].skin === 'bluewick'));
   check('HUD shows the hero', await page.evaluate(() => !!document.querySelector('.hud .dock') && !document.querySelector('.menu')));
   check('audio unlocks on the first click and plays music and effects', await until(page, () => { const a = window.__app.audio; return a.ready && a.played > 20; }, null, 20000),
     await page.evaluate(() => { const a = window.__app.audio; return `${a.ctx && a.ctx.state}, ${a.played} voices played, ${a.dropped} dropped`; }));
