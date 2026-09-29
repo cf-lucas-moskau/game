@@ -15,7 +15,7 @@ Performance and smoothness are critical: always measure (frame time, sim, render
 The owner writes in German or English; answer in the language of their message.
 
 Spec document (Claude Docs): https://claude.ai/code/artifact/9992dd94-0c29-42d7-aca8-44a8a11e3378
-Updated after PR #21 (3D rendering, rules numbers, Brindle and Auctioneer passives, auto ranks, pooled records,
+Updated after PR #27 (16 heroes with passives and kits, hero select, skins); earlier after PR #21 (3D rendering, rules numbers, auto ranks, pooled records,
 measurement method). Keep it in sync when rules or tech change.
 
 ## Commands
