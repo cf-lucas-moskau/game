@@ -3,6 +3,7 @@
 // for. Refreshed 4 times a second while open; it follows the unit until closed or it disappears.
 import { h, clear } from './dom.js';
 import { emblem } from './menu.js';
+import { itemIcon } from './identity.js';
 import { statLines } from './format.js';
 import { KIND, STRUCT, TICK_HZ, RULES } from '../sim/constants.js';
 import { autoNumbers } from './numbers.js';
@@ -30,14 +31,14 @@ export class InspectPanel {
       const slots = [];
       for (let i = 0; i < RULES.MAX_ITEMS; i++) {
         const key = e.items[i], it = key && w.registry.items[key];
-        const el = h('div', { class: `ins-item${it ? ' full' : ''}` }, it ? it.name : '');
+        const el = h('div', { class: `ins-item${it ? ' full' : ''}`, title: it ? it.name : '' }, it ? itemIcon(key, it) : null, it ? h('small', {}, it.name) : null);
         if (it) { el.addEventListener('pointerenter', () => this.tip.show(el, it.name, statLines(it.stats).join(' · '), it.desc || '')); el.addEventListener('pointerleave', () => this.tip.hide()); }
         slots.push(el);
       }
       const stats = [['Attack damage', Math.round(e.ad)], ['Ability power', Math.round(e.ap)], ['Armor', Math.round(e.armor)], ['Magic resist', Math.round(e.mr)],
         ['Attack speed', e.as.toFixed(2)], ['Auto DPS', Math.round(a.dps)], ['Move speed', Math.round(e.speed)], ['Range', Math.round(e.range)]];
       clear(this.body).append(
-        h('div', { class: 'ins-head' }, emblem(e.heroKey), h('div', {}, h('div', { class: `ins-name ${tcls}` }, def.name), h('div', { class: 'ins-sub' }, `${e === me ? 'You' : mine ? 'Ally' : 'Enemy'} · Level ${e.level} · ${e.kills} / ${e.deaths} / ${e.assists}`))),
+        h('div', { class: 'ins-head' }, emblem(e.heroKey), h('div', {}, h('div', { class: `ins-name ${tcls}` }, def.name), h('div', { class: 'ins-sub' }, `${e === me ? 'You' : mine ? 'Ally' : 'Enemy'} · Level ${e.level} `, h('span', { class: 'kda' }, `· ${e.kills} / ${e.deaths} / ${e.assists}`)))),
         hp, h('div', { class: 'ins-label' }, 'Items'), h('div', { class: 'ins-items' }, slots),
         h('div', { class: 'ins-stats' }, stats.map(([k, v]) => [h('span', {}, k), h('b', {}, String(v))])));
     } else {

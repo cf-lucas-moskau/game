@@ -55,7 +55,7 @@ input path), `skip=<seconds>` (fast-forward the sim), `seed=`, `touch=1`, `cpu=1
   animations and effects up close (frame-exact, no match needed); use full-game screenshots for scene-level checks.
 
 ## Current state
-- The repository now lives on GitHub (`cf-lucas-moskau/game`); `main` holds PRs 1-18. Earlier notes: PRs 1-11: PR #10 (VFX) merged after a gate rerun in the new container (see docs/prs/0010-vfx.md), and
+- The repository now lives on GitHub (`cf-lucas-moskau/game`); `main` holds PRs 1-21. Earlier notes: PRs 1-11: PR #10 (VFX) merged after a gate rerun in the new container (see docs/prs/0010-vfx.md), and
   PR #11 (UI) adds the full playable loop: hero select -> match -> end screen -> hero select.
 - Playwright in this container: `PW_PATH=/opt/node22/lib/node_modules/playwright` (Chromium in /opt/pw-browsers).
 - `src/app/app.js` owns the flow (menu with a bot-match backdrop, match, end screen) and tears each match
@@ -92,7 +92,8 @@ input path), `skip=<seconds>` (fast-forward the sim), `seed=`, `touch=1`, `cpu=1
    (SwiftShader contention); consider re-baselining on a machine with a real GPU.
 5. Done (PRs #14-#18, owner feedback round): props in hands, unlimited rerolls, readable combat (distinct attacks, tower
    range + lock-on), real numbers in tooltips/shop, unit inspection, per-hero ability styles, Leviathan Lab.
-6. Mobile polish, `docs/ARCHITECTURE.md`, update the spec doc, final deliverables (zip + dist/index.html).
+6. Done (PRs #19-#21): item icons (`src/ui/identity.js`), mobile polish (portrait + landscape, e2e overlap check),
+   `docs/ARCHITECTURE.md`. Remaining: update the spec doc, final deliverables (zip + dist/index.html), painted hero portraits.
 7. Later (phase 5): `NetTransport` + Node.js WebSocket authoritative server (the owner can host Node).
 
 ## Architecture map

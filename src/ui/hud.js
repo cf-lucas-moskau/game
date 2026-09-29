@@ -4,6 +4,7 @@
 import { h, toggle, setNum, setScaleX, setSweep } from './dom.js';
 import { LaneStrip } from './minimap.js';
 import { emblem } from './menu.js';
+import { itemIcon } from './identity.js';
 import { cdKey, cdLabel } from './format.js';
 import { EV } from '../core/events.js';
 import { KIND, RULES, TICK_HZ, xpToNext } from '../sim/constants.js';
@@ -24,7 +25,6 @@ function resourcePool(me, type) {
 }
 const READY_FLASH = [{ boxShadow: '0 0 0 3px rgba(247,178,103,.9), 0 0 18px rgba(247,178,103,.8)' }, { boxShadow: '0 0 0 0 rgba(247,178,103,0)' }];
 const BANNER_IN = [{ transform: 'scale(1.3)', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }];
-const short = (name) => name.split(' ').map((w) => w[0]).join('').slice(0, 3);
 
 export class Hud {
   constructor(root, session, { touch, onShop, onScoreboard, onMenu, tooltip }) {
@@ -181,7 +181,7 @@ export class Hud {
     // items + gold
     for (let i = 0; i < this.items.length; i++) {
       const el = this.items[i], key = me.items[i], it = key ? w.registry.items[key] : null;
-      if (el._key !== key) { el._key = key; toggle(el, 'full', !!it); el.children[1].textContent = it ? short(it.name) : ''; }
+      if (el._key !== key) { el._key = key; toggle(el, 'full', !!it); el.children[1].replaceChildren(...(it ? [itemIcon(key, it)] : [])); }
       const until = it && it.active ? (me.itemState[key + ':cd'] || 0) : 0;
       setSweep(el.children[2], until > t ? (until - t) / (it.activeCd * TICK_HZ) : 0);
     }

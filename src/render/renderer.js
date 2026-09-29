@@ -83,6 +83,7 @@ export class GameRenderer {
   }
   /** Draw one frame. alpha = interpolation between previous and current sim tick. */
   render(alpha, dt) {
+    if (this.pendingResize) { this.pendingResize = false; this.resize(); }
     const t0 = performance.now(); this.now += dt; const w = this.world;
     view.alpha = alpha; const pr = this.predictor;
     if (pr) { view.predId = pr.id; view.ox = pr.ox; view.oy = pr.oy; } else view.predId = -1;
@@ -109,7 +110,8 @@ export class GameRenderer {
       this.telemetry.gauges.postPasses = this.post ? this.gl.info.render.calls - sceneCalls : 0;
       this.telemetry.gauges.quality = this.q.name;
       const ft = this.telemetry.frame.count ? this.telemetry.frame.last() : 16;
-      if (this.guard.sample(ft)) this.resize();
+      // resizing clears the canvas: apply it before the next frame draws, never after this one
+      if (this.guard.sample(ft)) this.pendingResize = true;
     }
   }
   /** Screen pixel -> sim ground coordinate (for input). */

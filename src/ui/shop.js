@@ -7,6 +7,7 @@ import { canShop } from '../sim/match.js';
 import { BUILDS } from '../sim/items/index.js';
 import { RULES } from '../sim/constants.js';
 import { itemImpact } from './numbers.js';
+import { itemIcon } from './identity.js';
 
 const CATS = [['attack', 'Attack'], ['magic', 'Magic'], ['defense', 'Defense'], ['movement', 'Movement']];
 export class Shop {
@@ -46,7 +47,7 @@ export class Shop {
       const short = impact.filter((d) => !d.label.startsWith('Effective')).slice(0, 3).map((d) => `${fmt(d)} ${d.label.replace(/^([QWER]) .*/, '$1').replace('Auto-attack hit', 'auto').replace('Auto-attack DPS', 'DPS').replace('Move speed', 'speed').replace('Cooldowns', 'CD')}`);
       const el = h('button', { class: `card${rec ? ' rec' : ''}${owned ? ' owned' : ''}${me.gold < it.cost ? ' cant' : ''}${why ? ' off' : ''}`, 'aria-disabled': why ? 'true' : 'false', 'data-item': key,
         onclick: () => { if (!why) this.s.send(buyCmd(this.s.player, key)); } },
-        h('div', { class: 'top' }, h('span', {}, it.name), h('span', { class: 'cost' }, String(it.cost))),
+        h('div', { class: 'top' }, h('span', { class: 'nm' }, itemIcon(key, it), it.name), h('span', { class: 'cost' }, String(it.cost))),
         h('div', { class: 'st' }, statLines(it.stats).join(' · ')),
         short.length ? h('div', { class: 'impact' }, `For you: ${short.join(' · ')}`) : null,
         it.desc ? h('div', { class: 'ds' }, it.desc) : null);
@@ -63,7 +64,7 @@ export class Shop {
     for (let i = 0; i < RULES.MAX_ITEMS; i++) {
       const key = me.items[i], it = key && items[key];
       slots.push(it
-        ? h('button', { class: 's full', disabled: !here, title: here ? `Sell for ${Math.floor(it.cost * RULES.SELL_RATIO)}` : 'Sell at your fountain', onclick: () => this.s.send(sellCmd(this.s.player, i)) }, it.name, h('small', {}, `sell ${Math.floor(it.cost * RULES.SELL_RATIO)}`))
+        ? h('button', { class: 's full', disabled: !here, title: here ? `Sell for ${Math.floor(it.cost * RULES.SELL_RATIO)}` : 'Sell at your fountain', onclick: () => this.s.send(sellCmd(this.s.player, i)) }, itemIcon(key, it), it.name, h('small', {}, `sell ${Math.floor(it.cost * RULES.SELL_RATIO)}`))
         : h('div', { class: 's' }, ''));
     }
     clear(this.body).append(
@@ -71,7 +72,7 @@ export class Shop {
       h('aside', { class: 'inv' },
         h('div', { class: `notice${here ? ' ok' : ''}` }, here ? (me.dead ? 'You can shop while you respawn.' : 'At the fountain: buying is open.') : 'Browse anywhere. Buy at your fountain or while dead.'),
         h('div', { class: 'slots' }, slots),
-        h('div', { class: 'build' }, h('b', {}, 'Recommended for this hero'), build.map((k) => h('span', { class: me.items.includes(k) ? 'own' : '' }, `${me.items.includes(k) ? '✓' : '·'} ${items[k].name}`)))));
+        h('div', { class: 'build' }, h('b', {}, 'Recommended for this hero'), build.map((k) => h('span', { class: me.items.includes(k) ? 'own' : '' }, itemIcon(k, items[k]), `${items[k].name}${me.items.includes(k) ? ' ✓' : ''}`)))));
   }
   dispose() { this.el.remove(); }
 }
