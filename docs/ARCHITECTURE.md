@@ -69,9 +69,12 @@ One frame (`GameSession.frame`):
   win/surrender) and `stateHash`.
 - `systems/movement.js`, `systems/combat.js`: pathing on the lane plane, auto-attacks, tower targeting.
 - `damage.js`: the one damage pipeline (armor/MR, shields, item hooks, kill credit, events).
-- `abilities.js`: casting, costs, cooldowns and auto-leveled ranks (`ranksForLevel`).
+- `abilities.js`: casting, costs, cooldowns (static or state-dependent: `abilityCost`, `abilityCooldown`) and
+  auto-leveled ranks (`ranksForLevel`). `resources.js`: which pool each resource type pays from (mana, gold, a
+  hero's own bar such as ink, swarm or energy, or nothing).
 - `heroes/kit.js`: helpers for hero modules (skillshots, AoE, polylines, `amount()` for value specs).
-- `heroes/*.js`: one module per hero: base stats, `init/onTick/onRespawn` hooks, and four abilities. Ability
+- `heroes/*.js`: one module per hero (16): base stats, a passive, hooks (`init`, `onTick`, `onRespawn`,
+  `onBasicAttack`, `onDealtDamage`, `onTookDamage`, `modifyDamageIn`, `modifyStats`, `onCast`, `onTakedown`...) and four abilities. Ability
   numbers are **value specs** (`{ base, ratio, stat }`) used both by the cast and by tooltips, so the UI never
   duplicates a number.
 - `items/index.js`: stats summed by `stats.js`, unique effects as hooks (`onBasicHit`, `onDealtDamage`, `onLethal`, `onTick`, ...), and

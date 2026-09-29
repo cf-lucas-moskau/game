@@ -26,6 +26,7 @@ export class HeroFx {
     this.active = null; // packs of the heroes in this match (their world hooks run each frame)
     this.k = { age: 0, left: 0, fade: 0 }; // zone timing scratch, reused
     this.c = { slot: 0, ent: null, cx: 0, cz: 0, tx: 0, tz: 0, e: null, x: 0, z: 0 }; // event context, reused
+    this.props = new Map(); // model key -> { mesh (InstancedMesh), n } for pack props drawn this frame
     this.api = this.makeApi();
     r.zones.hook = (world, now) => this.zonePhase(world, now);
     r.abilities.hook = (world, now) => this.decalPhase(world, now);
@@ -34,7 +35,7 @@ export class HeroFx {
   makeApi() {
     const r = this.r, fx = r.fx, ab = r.abilities, zn = r.zones, self = this;
     return {
-      S, tickHz: TICK_HZ, tick: 0, now: 0, world: null,
+      S, tickHz: TICK_HZ, tick: 0, now: 0, world: null, focusId: -1, // focusId: the unit the camera follows (the player's hero)
       hx: (u) => rx(u) * S, hz: (u) => ry(u) * S,
       color(hex) { let c = self.colors.get(hex); if (!c) { c = new THREE.Color(hex); self.colors.set(hex, c); } return c; },
       n: (count) => fx.n(count),
@@ -42,6 +43,8 @@ export class HeroFx {
       state(key) { let m = self.states.get(key); if (!m) { m = new Map(); self.states.set(key, m); } return m; },
       // particles (render units; col = api.color(...))
       spawn: (x, y, z, vx, vy, vz, life, col, intensity, s0, s1, gravity = 0, drag = 0) => fx.p.spawn(x, y, z, vx, vy, vz, life, col.r, col.g, col.b, intensity, s0, s1, gravity, drag),
+      /** A particle that lives for one frame: markers that follow something (redrawn each frame). */
+      spawnOnce: (x, y, z, col, size) => fx.p.spawn(x, y, z, 0, 0, 0, 0.034, col.r, col.g, col.b, 2.4, size, size, 0, 0),
       burst: (x, z, y, count, speed, col, life, s0, s1, o) => fx.burst(x, z, y, count, speed, col, life, s0, s1, o),
       ring: (x, z, y, count, radius, col, life, size, outward) => fx.ring(x, z, y, count, radius, col, life, size, outward),
       line: (x0, z0, x1, z1, y, count, col, life, size) => fx.line(x0, z0, x1, z1, y, count, col, life, size),
@@ -49,6 +52,8 @@ export class HeroFx {
       // ground decals: timed (decal) and drawn-this-frame (mark); style = pack style name
       decal(o) { ab.add({ ...o, style: STYLE_ID[o.style] }, self.api.now); },
       mark: (x, z, rad, style, shape, alpha, seed, spin, inner) => ab.put(x, z, rad, rad, 0, STYLE_ID[style], shape, 0, alpha, 1, seed, spin, inner),
+      /** A line decal drawn this frame: centre (x, z), half length, half width, angle (render units). */
+      markLine: (x, z, halfLen, halfWidth, angle, style, alpha, seed) => ab.put(x, z, halfLen, halfWidth, angle, STYLE_ID[style], DECAL.LINE, 0, alpha, 1, seed, 0, 0),
       /** A dash/blink leaves a line decal in the given style from (c.x, c.z) to (c.tx, c.tz). */
       trail(c, style) { const len = Math.hypot(c.tx - c.x, c.tz - c.z) / 2; if (len > 0.05) ab.add({ x: (c.x + c.tx) / 2, z: (c.z + c.tz) / 2, len, width: 0.28, angle: Math.atan2(c.tz - c.z, c.tx - c.x), style: STYLE_ID[style], shape: DECAL.LINE, dur: 0.7 }, self.api.now); },
       // zone layer (sim units): ribbons, discs, domes, telegraphs
@@ -56,14 +61,28 @@ export class HeroFx {
       disc: (x, y, rad, kind, prog, alpha, team, seed) => zn.disc(x, y, rad, kind, prog, alpha, team, seed),
       dome: (x, y, rad, age, fade) => zn.dome(x, y, rad, age, fade, self.api.now),
       telegraph: (x, y, rad, dur, team) => zn.telegraphs.push({ x, y, r: rad, start: self.api.now, dur, team }),
+      /** A model from the manifest drawn this frame at (x, z) render units, `size` tall, turned by `rot` (zone layer). */
+      prop: (key, x, z, size, rot = 0) => self.drawProp(key, x, z, size, rot),
     };
   }
   pack(key) { return HERO_VIEWS[key] || null; }
+  drawProp(key, x, z, size, rot) {
+    let p = this.props.get(key);
+    if (!p) {
+      const { geometry, material } = this.r.lib.merged(key, 1);
+      const mesh = new THREE.InstancedMesh(geometry, material, 24); mesh.frustumCulled = false; mesh.count = 0; mesh.castShadow = true;
+      this.r.env.root.add(mesh); p = { mesh, n: 0 }; this.props.set(key, p);
+    }
+    if (p.n >= 24) return;
+    const m = this._m || (this._m = new THREE.Matrix4()), q = this._q || (this._q = new THREE.Quaternion()), v = this._v || (this._v = new THREE.Vector3()), sc = this._s || (this._s = new THREE.Vector3());
+    q.setFromAxisAngle(this._up || (this._up = new THREE.Vector3(0, 1, 0)), rot); v.set(x, 0, z); sc.set(size, size, size);
+    p.mesh.setMatrixAt(p.n++, m.compose(v, q, sc));
+  }
   activePacks(world) {
     if (!this.active) { const s = new Set(); for (const h of world.heroes) if (HERO_VIEWS[h.heroKey]) s.add(HERO_VIEWS[h.heroKey]); this.active = [...s]; }
     return this.active;
   }
-  sync(world, now) { const a = this.api; a.world = world; a.tick = world.tick; a.now = now; }
+  sync(world, now) { const a = this.api; a.world = world; a.tick = world.tick; a.now = now; a.focusId = this.r.focusId; }
   // ------------------------------------------------------------------ events
   onEvent(e, world, now) {
     this.sync(world, now);
@@ -92,12 +111,14 @@ export class HeroFx {
   zonePhase(world, now) {
     this.sync(world, now);
     const api = this.api, t = world.tick, k = this.k;
+    this.props.forEach(this._resetProp || (this._resetProp = (p) => { p.n = 0; }));
     for (const h of world.heroes) { if (h.dead) continue; const p = HERO_VIEWS[h.heroKey]; if (p && p.fx && p.fx.ground) p.fx.ground(api, h); }
     for (const z of world.zones) {
       const d = this.zoneDrawers.get(z.kind); if (!d || !d.draw) continue;
       k.age = (t - z.born) / TICK_HZ; k.left = (z.until - t) / TICK_HZ; k.fade = Math.min(1, k.age * 8) * Math.min(1, k.left * 4);
       d.draw(api, z, k);
     }
+    this.props.forEach(this._flushProp || (this._flushProp = (p) => { p.mesh.count = p.n; if (p.n) p.mesh.instanceMatrix.needsUpdate = true; }));
   }
   decalPhase(world, now) {
     this.sync(world, now);

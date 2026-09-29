@@ -123,6 +123,16 @@ export class CombatFX {
       case 'coin': for (let i = 0; i < fx.n(8); i++) fx.p.spawn(x, y, z, rnd(-2, 2), rnd(2, 4), rnd(-2, 2), 0.6, col.r, col.g, col.b, 2, 0.1, 0.06, 10, 0.3); fx.burst(x, z, y, 6, 1.5, col2, 0.25, 0.14, 0.02, { drag: 5 }); break;
       case 'ember': fx.burst(x, z, y, 12, 3, col, 0.4, 0.16, 0.02, { drag: 4, up: 0.8, intensity: 2.2 }); break;
       case 'dust': fx.burst(x, z, 0.3, 16, 2.6, col, 0.55, 0.26, 0.05, { up: 1.2, gravity: 6, intensity: 0.9 }); fx.ring(x, z, 0.08, 14, 0.3, col2, 0.4, 0.2, 2.4); break;
+      case 'spark': fx.burst(x, z, y, 10, 4, col2, 0.16, 0.12, 0.01, { drag: 7, intensity: 2.8 }); fx.ring(x, z, y, 8, 0.1, col, 0.18, 0.08, 3); break;
+      case 'splash': for (let i = 0; i < fx.n(12); i++) fx.p.spawn(x, y, z, rnd(-1.8, 1.8), rnd(1.5, 3.5), rnd(-1.8, 1.8), 0.5, col2.r, col2.g, col2.b, 1.8, 0.1, 0.04, 9, 0.5); fx.ring(x, z, 0.06, 12, 0.2, col, 0.4, 0.14, 1.6); break;
+      case 'pierce': fx.burst(x, z, y, 8, 3.2, col, 0.22, 0.1, 0.02, { drag: 6, spread: 0.4, intensity: 2.2 }); fx.ring(x, z, y, 6, 0.1, col2, 0.15, 0.08, 2.4); break;
+      case 'gust': fx.ring(x, z, y, 14, 0.2, col, 0.35, 0.16, 3); fx.burst(x, z, y, 6, 1.5, col2, 0.3, 0.14, 0.04, { drag: 3, up: 0.6 }); break;
+      case 'frost': for (let i = 0; i < fx.n(10); i++) fx.p.spawn(x, y, z, rnd(-2.2, 2.2), rnd(0.5, 2.5), rnd(-2.2, 2.2), 0.45, col2.r, col2.g, col2.b, 2, 0.1, 0.02, 8, 1); fx.ring(x, z, 0.08, 12, 0.25, col, 0.5, 0.14, 1.2); break;
+      case 'leaf': for (let i = 0; i < fx.n(8); i++) fx.p.spawn(x, y, z, rnd(-1.2, 1.2), rnd(0.8, 1.8), rnd(-1.2, 1.2), 0.9, col.r, col.g, col.b, 1.3, 0.12, 0.08, 2, 2); break;
+      case 'note': fx.ring(x, z, y, 10, 0.25, col, 0.35, 0.12, 1.6); fx.burst(x, z, y + 0.2, 4, 0.6, col2, 0.6, 0.14, 0.08, { up: 1.8, drag: 1 }); break;
+      case 'star': fx.burst(x, z, y, 10, 2.8, col2, 0.3, 0.14, 0.02, { drag: 5, intensity: 2.6 }); fx.burst(x, z, y, 3, 0.4, col, 0.5, 0.26, 0.04, { drag: 2, intensity: 2 }); break;
+      case 'clang': fx.burst(x, z, y, 10, 3.5, col2, 0.25, 0.08, 0.01, { drag: 4, gravity: 5, intensity: 2.4 }); fx.burst(x, z, 0.3, 8, 1.5, col, 0.4, 0.22, 0.06, { up: 0.8, intensity: 0.8 }); break;
+      case 'smoke': fx.burst(x, z, y, 8, 0.9, col, 0.7, 0.2, 0.45, { drag: 2, up: 0.4, intensity: 0.8 }); fx.burst(x, z, y, 5, 2, col2, 0.25, 0.1, 0.02, { drag: 5, intensity: 2.2 }); break;
       default: fx.burst(x, z, y, 6, 2.4, col, 0.25, 0.12, 0.02, { drag: 5 });
     }
   }

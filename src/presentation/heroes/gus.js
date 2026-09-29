@@ -4,7 +4,7 @@ import { SHAPE, DECAL } from '../kit.js';
 const STONE = '#cdb894', ROCK = '#bfae93', DUST = '#d7c9b0';
 
 export default {
-  key: 'gus', accent: '#9fb8a0', style: 'stone', color: STONE,
+  key: 'gus', accent: '#9fb8a0', style: 'stone', color: STONE, leaps: ['gus-leap'],
   emblem: '<path d="M6 36l8-14 7 6 8-14 13 22z"/><circle cx="33" cy="12" r="4"/>',
   aim: [{ kind: 'gusq', range: 900, radius: 160 }, { kind: 'self', radius: 220 }, { kind: 'line', range: 620, width: 160 }, { kind: 'point', range: 800, radius: 300 }],
   /** Q depends on the mount: a slam in front of Pebble, or a lobbed rock on foot. */

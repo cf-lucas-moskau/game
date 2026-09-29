@@ -4,6 +4,10 @@ import { S, TEAM_COLORS, TEAM_RGB, WHITE_RGB } from './palette.js';
 import { KIND, isMinion } from '../sim/constants.js';
 import { HERO_LOOKS, MINION_LOOKS, STRUCTURE_LOOKS, CLIPS } from '../assets/manifest.js';
 import { resolveLook } from '../assets/skins.js';
+import { HERO_VIEWS } from '../presentation/heroes/index.js';
+
+// dashes drawn as a leap through the air (packs list them: `leaps`)
+const LEAPS = new Set(Object.values(HERO_VIEWS).flatMap((v) => v.leaps || []));
 import { bakeVAT, vatMaterial } from './vat.js';
 import { rx, ry } from './interp.js';
 import * as BGU from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -62,8 +66,10 @@ class HeroView {
       bakeProp(this.body, bone, prop);
     }
     if (this.look.pebble) { this.mount = buildPebble(lib, this.look.pebble, 1.0, this.look); this.root.add(this.mount); this.mount.visible = false; }
-    this.flash = 0; this.forced = null; this.forcedTime = null;
+    this.flash = 0; this.forced = null; this.forcedTime = null; this.leapUntil = 0; this.leapLen = 1;
   }
+  /** Length of the current leap in ticks (remembered at its start) for a smooth arc. */
+  leapTicks(e, world) { if (this.leapUntil !== e.dashUntil) { this.leapUntil = e.dashUntil; this.leapLen = e.dashUntil - world.tick; } return this.leapLen; }
   play(k, fade = 0.15) {
     const a = this.actions[k] || this.actions.idle; if (!a || this.current === a) return;
     a.reset().fadeIn(fade).play(); if (this.current) this.current.fadeOut(fade); this.current = a; this.currentKey = k;
@@ -98,7 +104,7 @@ class HeroView {
     const mounted = e.heroKey === 'gus' && e.heroState.mounted;
     if (this.mount) { this.mount.visible = mounted && !e.dead; this.body.position.y = mounted ? 0.78 : 0; if (mounted) animatePebble(this.mount, e, now); }
     const air = e.airborneUntil > world.tick ? Math.sin(Math.min(1, (e.airborneUntil - world.tick) / 20) * Math.PI) * 0.8 : 0;
-    this.root.position.y = air + (e.dashFx === 'gus-leap' && e.dashUntil > world.tick ? 2 : 0);
+    this.root.position.y = air + (e.dashUntil > world.tick && LEAPS.has(e.dashFx) ? Math.sin(Math.min(1, (e.dashUntil - world.tick) / Math.max(1, this.leapTicks(e, world))) * Math.PI) * 1.6 : 0);
     if (this.forced) this.applyForced(); // lab: a chosen clip, looping or frozen at a time
     else if (e.dead) { if (this.currentKey !== 'die') this.play('die', 0.1); }
     else if (now >= this.oneShotUntil || this.currentKey === 'die') {

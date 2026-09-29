@@ -28,6 +28,10 @@ export function ranksForLevel(level, order = ['Q', 'E', 'W']) {
 const at = (v, rank) => (Array.isArray(v) ? v[Math.max(0, Math.min(v.length - 1, rank - 1))] : v);
 export const byRank = at;
 
+/** An ability's cost right now (costs may depend on state, e.g. a free spell). */
+export const abilityCost = (world, e, ab, rank) => (typeof ab.cost === 'function' ? ab.cost(world, e, rank) : at(ab.cost || 0, rank));
+/** An ability's base cooldown in seconds right now, before cooldown reduction. */
+export const abilityCooldown = (world, e, ab, rank) => (typeof ab.cd === 'function' ? ab.cd(world, e, rank) : at(ab.cd, rank));
 /** Try to cast ability slot (0..3). Returns true when cast. */
 export function tryCast(world, e, slot, cmd) {
   const def = world.registry.heroes[e.heroKey];
@@ -35,7 +39,7 @@ export function tryCast(world, e, slot, cmd) {
   if (!ab || e.dead) return false;
   const rank = e.ranks[key];
   if (rank <= 0 || e.cds[slot] > 0 || !canCast(world, e)) return false;
-  const cost = typeof ab.cost === 'function' ? ab.cost(world, e, rank) : at(ab.cost || 0, rank);
+  const cost = abilityCost(world, e, ab, rank);
   if (!payable(world, e, def, ab, cost)) return false;
   // clamp target to range
   let tx = cmd.x, ty = cmd.y;
@@ -48,7 +52,7 @@ export function tryCast(world, e, slot, cmd) {
   const ok = ab.cast(world, e, ctx);
   if (ok === false) return false;
   pay(world, e, def, ab, cost);
-  const baseCd = typeof ab.cd === 'function' ? ab.cd(world, e, rank) : at(ab.cd, rank);
+  const baseCd = abilityCooldown(world, e, ab, rank);
   e.cds[slot] = sec(baseCd * (1 - e.cdr));
   if (ab.castTime) e.castLockUntil = world.tick + sec(ab.castTime);
   e.facing = Math.atan2(ty - e.y, tx - e.x);

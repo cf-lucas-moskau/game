@@ -1,13 +1,13 @@
 // Shared helpers for per-hero bot scripts (src/ai/heroes/<hero>.js).
 import { castCmd } from '../../sim/commands.js';
-import { byRank } from '../../sim/abilities.js';
+import { abilityCost } from '../../sim/abilities.js';
 import { canPay } from '../../sim/resources.js';
 import { d, hpr } from '../perception.js';
 export const SL = ['Q', 'W', 'E', 'R'];
 export function ready(world, me, s) {
   if (me.ranks[SL[s]] <= 0 || me.cds[s] > 0) return false;
   const def = world.registry.heroes[me.heroKey], ab = def.abilities[SL[s]];
-  const cost = typeof ab.cost === 'function' ? 0 : byRank(ab.cost || 0, me.ranks[SL[s]]);
+  const cost = abilityCost(world, me, ab, me.ranks[SL[s]]);
   const type = ab.costType || def.resource;
   if (type === 'gold') return me.gold >= cost + 40; // keep a small float
   return canPay(me, type, cost);

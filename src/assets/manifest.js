@@ -19,6 +19,16 @@ export const HERO_LOOKS = {
   gus:        { model: 'hero-gus', palette: 'dungeon', height: 0.95, attack: 'shoot', props: [{ key: 'prop-hammer', bone: 'arm-right', hold: true, size: 0.5 }], accent: '#c9a26a', pebble: ['rock-a', 'rock-b', 'rock-c'] },
   brindle:    { model: 'hero-brindle', height: 1.4, attack: 'shoot', props: [{ key: 'prop-lantern', bone: 'arm-right', hold: true, size: 0.38, grip: 0.95, tilt: 0, glow: '#ffd866' }], accent: '#ffcf3d', bees: 'bee' },
   auctioneer: { model: 'hero-auctioneer', height: 1.5, attack: 'shoot', props: [{ key: 'prop-mallet', bone: 'arm-right', hold: true, grip: 0.02, size: 0.6 }], accent: '#f2c14e' },
+  nimbus:     { model: 'hero-nimbus', height: 1.45, attack: 'shoot', props: [{ key: 'prop-rod', bone: 'arm-right', hold: true, size: 0.8, grip: 0.3, glow: '#a8f0ff' }], accent: '#a8f0ff' },
+  coralie:    { model: 'hero-coralie', height: 1.5, attack: 'attack', props: [{ key: 'prop-spear', bone: 'arm-right', hold: true, size: 0.85, grip: 0.4 }, { key: 'prop-spiked-shield', bone: 'arm-left', hold: true, size: 0.45, grip: 0.5, tilt: 0 }], accent: '#ff9e8a' },
+  kestrel:    { model: 'hero-kestrel', height: 1.4, attack: 'shoot', props: [{ key: 'prop-crossbow', bone: 'arm-right', hold: true, size: 0.42, grip: 0.3, tilt: 1.2 }], accent: '#d4ff5a' },
+  mistral:    { model: 'hero-mistral', height: 1.4, attack: 'shoot', props: [{ key: 'prop-wand', bone: 'arm-right', hold: true, size: 0.45, grip: 0.25, glow: '#bff5e6' }], accent: '#bff5e6' },
+  rime:       { model: 'hero-rime', height: 1.45, attack: 'shoot', props: [{ key: 'prop-staff', bone: 'arm-right', hold: true, size: 0.85, grip: 0.3, glow: '#9ec9ff' }], accent: '#9ec9ff' },
+  thorne:     { model: 'hero-thorne', height: 1.45, attack: 'shoot', props: [{ key: 'prop-trowel', bone: 'arm-right', hold: true, size: 0.55, grip: 0.3 }], accent: '#6fd66a' },
+  cantor:     { model: 'hero-cantor', height: 1.4, attack: 'shoot', props: [{ key: 'prop-bell', bone: 'arm-right', hold: true, size: 0.3, grip: 0.15, tilt: 0.2 }], accent: '#ff9ee6' },
+  lumen:      { model: 'hero-lumen', height: 1.4, attack: 'shoot', props: [{ key: 'prop-compass', bone: 'arm-right', hold: true, size: 0.5, grip: 0.35 }, { key: 'prop-star', bone: 'head', on: 'top', lift: 0.02, size: 0.22, glow: '#ffe9b0' }], accent: '#ffe9b0' },
+  dredge:     { model: 'hero-dredge', height: 1.55, attack: 'attack', props: [{ key: 'prop-axe', bone: 'arm-right', hold: true, size: 0.78, grip: 0.12 }], accent: '#b7c3cf' },
+  wisp:       { model: 'hero-wisp', height: 1.4, attack: 'attack', props: [{ key: 'prop-dagger-b', bone: 'arm-right', hold: true, size: 0.45, grip: 0.15 }, { key: 'prop-lantern-mini', bone: 'arm-left', hold: true, size: 0.26, grip: 0.95, tilt: 0, glow: '#d65cff' }], accent: '#d65cff' },
 };
 // Minions: [team][kind] -> rig + height. Siege uses a static model.
 export const MINION_LOOKS = {

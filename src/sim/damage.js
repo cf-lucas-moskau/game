@@ -140,6 +140,9 @@ export function kill(world, victim, killer) {
     const k = killer && killer.kind === KIND.HERO && killer.team !== victim.team ? killer : null;
     if (k) { k.kills++; giveGold(world, k, RULES.KILL_GOLD + 20 * Math.max(0, victim.level - k.level)); giveXp(world, k, RULES.KILL_XP); }
     for (const a of assisters) { a.assists++; giveGold(world, a, RULES.ASSIST_GOLD); giveXp(world, a, RULES.KILL_XP * 0.5); itemsOnAssist(world, a); }
+    // takedown hook (kill or assist): resets and stacks that pay off on hero kills
+    if (k) takedown(world, k, victim);
+    for (const a of assisters) takedown(world, a, victim);
     if (!k && !assisters.length) {
       // executed by minion/tower: shared to nearby enemy heroes
       for (const h of world.heroes) if (h.team !== victim.team && !h.dead) giveGold(world, h, RULES.ASSIST_GOLD);
@@ -164,6 +167,7 @@ export function kill(world, victim, killer) {
   world.events.push(EV.DEATH, t, victim.id, killer ? killer.id : -1, victim.x, victim.y, 0, String(victim.kind));
   world.despawn(victim);
 }
+function takedown(world, h, victim) { const d = world.registry.heroes[h.heroKey]; if (d.onTakedown) d.onTakedown(world, h, victim); }
 function itemsOnAssist(world, h) { for (const k of h.items) { const it = world.registry.items[k]; if (it && it.onAssist) it.onAssist(world, h); } const d = world.registry.heroes[h.heroKey]; if (d.onAssist) d.onAssist(world, h); }
 function itemsOnMinionKill(world, h) { for (const k of h.items) { const it = world.registry.items[k]; if (it && it.onMinionKill) it.onMinionKill(world, h); } }
 
