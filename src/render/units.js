@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { S, TEAM_COLORS, TEAM_RGB, WHITE_RGB } from './palette.js';
 import { KIND, isMinion } from '../sim/constants.js';
 import { HERO_LOOKS, MINION_LOOKS, STRUCTURE_LOOKS, CLIPS } from '../assets/manifest.js';
+import { resolveLook } from '../assets/skins.js';
 import { bakeVAT, vatMaterial } from './vat.js';
 import { rx, ry } from './interp.js';
 import * as BGU from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -27,11 +28,12 @@ const tmpColor = new THREE.Color();
 
 // ---------------------------------------------------------------- heroes
 class HeroView {
-  constructor(lib, e, parent) {
-    this.look = HERO_LOOKS[e.heroKey]; this.id = e.id; this.team = e.team;
+  constructor(lib, e, parent, skin) {
+    this.look = resolveLook(e.heroKey, skin); this.id = e.id; this.team = e.team;
     this.root = new THREE.Group(); parent.add(this.root);
     this.body = lib.instance(this.look.model, this.look.height); this.root.add(this.body);
     mergeSkinned(this.body);
+    if (this.look.variant) applyPaletteVariant(this.body, lib.atlas.variants[this.look.variant]);
     // per-hero material copy: the same hero can appear twice, and hit flashes must stay per unit
     this.skin = []; this.body.traverse((o) => { if (o.isSkinnedMesh) { o.material = o.material.clone(); this.skin.push(o.material); } });
     this.mixer = new THREE.AnimationMixer(this.body);
@@ -59,7 +61,7 @@ class HeroView {
       if (p.glow) { const a = new THREE.Object3D(); prop.add(a); a.position.y = 0.6; this.glows.push({ anchor: a, color: new THREE.Color(p.glow), phase: this.id, active: false, x: 0, y: 0, z: 0, d: 0 }); }
       bakeProp(this.body, bone, prop);
     }
-    if (this.look.pebble) { this.mount = buildPebble(lib, this.look.pebble, 1.0); this.root.add(this.mount); this.mount.visible = false; }
+    if (this.look.pebble) { this.mount = buildPebble(lib, this.look.pebble, 1.0, this.look); this.root.add(this.mount); this.mount.visible = false; }
     this.flash = 0; this.forced = null; this.forcedTime = null;
   }
   play(k, fade = 0.15) {
@@ -152,6 +154,21 @@ function mergeSkinned(root) {
   merged.computeBoundingSphere();
   base.geometry = merged;
   for (let i = 1; i < skinned.length; i++) skinned[i].removeFromParent();
+}
+/**
+ * Point the body's UVs at a skin's recoloured palette cell (atlas.js). Runs before props are baked in,
+ * so only the character's own vertices move; each hero view owns its geometry (merged or copied here).
+ */
+function applyPaletteVariant(body, v) {
+  if (!v) return;
+  body.traverse((o) => {
+    if (!o.isSkinnedMesh) return;
+    if (!o.geometry.userData.flat) { o.geometry = flatSkinned(o.geometry); o.geometry.userData.flat = true; }
+    const uv = o.geometry.attributes.uv, a = uv.array, e = 1e-4;
+    const u0 = v.u0 - e, v0 = v.v0 - e, u1 = v.u0 + v.size + e, v1 = v.v0 + v.size + e;
+    for (let i = 0; i < a.length; i += 2) if (a[i] >= u0 && a[i] <= u1 && a[i + 1] >= v0 && a[i + 1] <= v1) { a[i] += v.du; a[i + 1] += v.dv; }
+    uv.needsUpdate = true;
+  });
 }
 /**
  * Put a prop in the fist at the end of an arm bone: the grip is the centre of the arm's farthest
@@ -252,12 +269,20 @@ function bakeProp(body, bone, prop) {
 }
 const STONE = new THREE.MeshStandardMaterial({ color: '#a39580', roughness: 0.95, flatShading: true });
 const PEBBLE_EYES = new THREE.MeshBasicMaterial({ color: '#8ff4ff' });
+const pebbleMats = new Map(); // skin tint -> [stone, eyes], shared by every Pebble wearing it
+function pebbleMaterials(tint, eyes) {
+  if (!tint && !eyes) return [STONE, PEBBLE_EYES];
+  const k = `${tint}|${eyes}`; let m = pebbleMats.get(k);
+  if (!m) { const st = STONE.clone(); if (tint) st.color.set(tint); const ey = PEBBLE_EYES.clone(); if (eyes) ey.color.set(eyes); m = [st, ey]; pebbleMats.set(k, m); }
+  return m;
+}
 /**
  * Pebble the rock golem: boulder torso, rock head with glowing eyes, two boulder fists.
  * The rigid parts are merged into one skinned mesh with a bone each (one draw instead of five);
  * the eyes ride the head bone. Bones animate exactly like the separate parts used to.
  */
-function buildPebble(lib, keys, height) {
+function buildPebble(lib, keys, height, look = null) {
+  const [stone, eyeMat] = pebbleMaterials(look && look.pebbleTint, look && look.pebbleEyes);
   const g = new THREE.Group();
   const layout = [
     { key: keys[0], h: height * 0.72, pos: [0, 0, 0], scale: [1.2, 1, 1.05] },
@@ -289,13 +314,13 @@ function buildPebble(lib, keys, height) {
       geos.push(geo);
     });
   });
-  const mesh = new THREE.SkinnedMesh(BGU.mergeGeometries(geos, false), STONE);
+  const mesh = new THREE.SkinnedMesh(BGU.mergeGeometries(geos, false), stone);
   mesh.castShadow = true; mesh.frustumCulled = false;
   mesh.add(root); mesh.bind(new THREE.Skeleton([root, ...bones]));
   g.add(mesh);
   const [, head, armL, armR] = bones;
   // eyes sit on the head bone (their own glowing material: one extra draw)
-  const eyes = new THREE.Mesh(BGU.mergeGeometries([-1, 1].map((sx) => new THREE.SphereGeometry(0.055, 8, 6).translate(sx * 0.11, height * 0.82 - 0.82, 0.24))), PEBBLE_EYES);
+  const eyes = new THREE.Mesh(BGU.mergeGeometries([-1, 1].map((sx) => new THREE.SphereGeometry(0.055, 8, 6).translate(sx * 0.11, height * 0.82 - 0.82, 0.24))), eyeMat);
   head.add(eyes);
   g.userData = { head, armL, armR, eyes, headY: head.position.y };
   return g;
@@ -437,6 +462,7 @@ const BATCH_KEYS = [0, 1].map((t) => ({ [KIND.MELEE]: `${t}:melee`, [KIND.RANGED
 export class UnitRenderer {
   constructor(lib, world, parent) {
     this.lib = lib; this.parent = parent; this.heroViews = new Map(); this.pebbleViews = new Map(); this.glowAnchors = [];
+    this.skins = new Map(); // playerId -> skin key (presentation only; the roster carries it, the sim never does)
     this.batches = {};
     for (const team of [0, 1]) for (const kind of ['melee', 'ranged', 'siege']) this.batches[`${team}:${kind}`] = new MinionBatch(lib, MINION_LOOKS[team][kind], team, 48, parent);
     this.structures = new StructureViews(lib, world, parent);
@@ -457,6 +483,7 @@ export class UnitRenderer {
       if (v && isMinion(v.kind)) this.corpses.push({ x: v.x * S, z: v.y * S, yaw: faceToRotY(v.facing), team: v.team, key: `${v.team}:${this.kindName(v.kind)}`, start: now });
     }
   }
+  skinOf(e) { return this.skins.get(e.playerId); }
   update(world, alpha, dt, now) {
     this.world = world;
     if (!this.batchList) this.batchList = Object.values(this.batches);
@@ -465,13 +492,13 @@ export class UnitRenderer {
     for (let i = 0; i < es.length; i++) {
       const e = es[i];
       if (e.kind === KIND.HERO) {
-        let v = this.heroViews.get(e.id); if (!v) { v = new HeroView(this.lib, e, this.parent); this.heroViews.set(e.id, v); this.glowAnchors.push(...v.glows); }
+        let v = this.heroViews.get(e.id); if (!v) { v = new HeroView(this.lib, e, this.parent, this.skinOf(e)); this.heroViews.set(e.id, v); this.glowAnchors.push(...v.glows); }
         v.fx = this.fx;
         v.update(e, alpha, dt, now, world); continue;
       }
       if (e.kind === KIND.PEBBLE) {
         let v = this.pebbleViews.get(e.id);
-        if (e.alive && !v) { v = buildPebble(this.lib, HERO_LOOKS.gus.pebble, 1.15); this.parent.add(v); this.pebbleViews.set(e.id, v); }
+        if (e.alive && !v) { const o = world.entities[e.ownerId], look = resolveLook('gus', o ? this.skinOf(o) : undefined); v = buildPebble(this.lib, look.pebble, 1.15, look); this.parent.add(v); this.pebbleViews.set(e.id, v); }
         if (v) { v.visible = e.alive; if (e.alive) { v.position.set(rx(e) * S, 0, ry(e) * S); v.rotation.y = faceToRotY(e.facing); animatePebble(v, e, now); } }
         continue;
       }

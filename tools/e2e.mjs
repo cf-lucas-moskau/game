@@ -164,9 +164,26 @@ for (const [w, hgt] of [[844, 390], [390, 844]]) {
       lab.attack(); lab.step(1);
       done.push(h);
     }
-    return done.length;
+    return { done: done.length, total: lab.info().heroes.length };
   });
-  check('lab: every hero plays every clip and casts every ability', r === 6 && errors.length === 0, errors[0] || `${r} heroes`);
+  check('lab: every hero plays every clip and casts every ability', r.done === r.total && r.total >= 6 && errors.length === 0, errors[0] || `${r.done} heroes`);
+  // every skin loads, and a palette skin's body samples its own recoloured atlas cell
+  const sk = await page.evaluate(() => {
+    const lab = window.__lab, bad = []; let n = 0;
+    for (const h of lab.info().heroes) for (const k of lab.info().skins.length ? (lab.setHero(h), lab.info().skins) : []) {
+      lab.setHero(h, { skin: k }); lab.step(1 / 30); n++;
+      const v = lab.heroView(), variant = lab.lib.atlas.variants[`${h}:${k}`];
+      if (!variant) continue;
+      // held props bake into the same mesh with their own cells: count only the palette cells
+      const inCell = (u, w, du, dv) => u >= variant.u0 + du - 1e-4 && u <= variant.u0 + du + variant.size + 1e-4 && w >= variant.v0 + dv - 1e-4 && w <= variant.v0 + dv + variant.size + 1e-4;
+      let moved = 0, left = 0;
+      v.body.traverse((o) => { if (!o.isSkinnedMesh) return; const a = o.geometry.attributes.uv.array;
+        for (let i = 0; i < a.length; i += 2) { if (inCell(a[i], a[i + 1], variant.du, variant.dv)) moved++; else if (inCell(a[i], a[i + 1], 0, 0)) left++; } });
+      if (!moved || left) bad.push(`${h}:${k} moved ${moved}, left in the base cell ${left}`);
+    }
+    return { n, bad };
+  });
+  check('lab: every skin loads and palette skins use their own atlas cell', sk.n > r.total && !sk.bad.length && errors.length === 0, errors[0] || sk.bad[0] || `${sk.n} hero/skin looks`);
   await page.close();
 }
 await browser.close();

@@ -5,6 +5,7 @@ import { clone as skeletonClone } from 'three/examples/jsm/utils/SkeletonUtils.j
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { MODEL_URLS } from '../assets/manifest.js';
 import { buildAtlas } from './atlas.js';
+import { paletteVariants } from '../assets/skins.js';
 
 export class AssetLibrary {
   constructor() { this.gltf = {}; this.loader = new GLTFLoader(); this.mergedCache = {}; }
@@ -28,7 +29,7 @@ export class AssetLibrary {
       this.gltf[k] = g; done++; onProgress && onProgress(done / keys.length);
     }));
     // one atlas + one shared material for every textured model (fewer programs, uploads and draws)
-    this.atlas = buildAtlas(this.gltf);
+    this.atlas = buildAtlas(this.gltf, paletteVariants());
   }
   has(k) { return !!this.gltf[k]; }
   clips(k) { return this.gltf[k].animations; }

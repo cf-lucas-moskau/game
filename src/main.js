@@ -23,7 +23,7 @@ async function boot() {
   const veil = root.querySelector('#boot'); veil.classList.add('out'); setTimeout(() => veil.remove(), 400);
   if (params.has('lab')) {
     // Leviathan Lab: heroes, animations and effects up close (see src/app/lab.js, tools/lab.mjs)
-    const lab = window.__lab = new Lab({ root, lib, quality: params.get('quality') || 'high', hero: params.get('hero') || 'vesper', dummy: params.get('dummy') || 'morrow', dummies: num('dummies', 2) });
+    const lab = window.__lab = new Lab({ root, lib, quality: params.get('quality') || 'high', hero: params.get('hero') || 'vesper', skin: params.get('skin') || undefined, dummy: params.get('dummy') || 'morrow', dummies: num('dummies', 2) });
     lab.camera(params.get('cam') || 'three', num('zoom', 1));
     if (params.get('panel') !== '0') { const ui = document.createElement('div'); ui.className = 'ui'; root.append(ui); labPanel(ui, lab); }
     if (params.get('paused') !== '1') lab.play();

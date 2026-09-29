@@ -29,6 +29,10 @@ The rules that keep it replaceable:
   keep their own state in maps keyed by entity id; they never add fields to sim entities.
 - **Assets are named in one file.** `assets/manifest.js` maps keys to GLB files, animation clips and hero looks.
   Swapping art means replacing a GLB (or re-pointing `tools/assets.config.js`) and adjusting the look entry.
+- **Skins are patches over looks.** `assets/skins.js` lists each hero's skins: palette swaps (a recoloured copy of
+  the rig's palette texture in its own atlas cell; only that skin's body UVs point at it), prop, rig, accent and
+  golem-tint overrides. `resolveLook(hero, skin)` is the only way presentation code gets a look. Skins ride in
+  the roster (`session.roster[i].skin`, bots pick one from a presentation RNG); the sim never sees them.
 - **Content is data + hooks.** A hero is one module in `sim/heroes/`, an item is one entry in `sim/items/index.js`.
   Adding either touches no system code.
 
