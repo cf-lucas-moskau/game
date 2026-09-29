@@ -136,12 +136,19 @@ for (const [w, hgt] of [[844, 390], [390, 844]]) {
   await page.click('[aria-label=Scoreboard] tbody tr[data-id]:not(.me)');
   check('clicking a scoreboard row shows that hero\'s details and items', await until(page, () => { const p = document.querySelector('.inspect'); return p && !p.classList.contains('hidden') && p.querySelectorAll('.ins-item').length === 6; }));
   await page.keyboard.press('Escape');
-  // click the ally's head (screen-space picking: what you see is what you click). Time is frozen for the click:
+  // click a hero's head (screen-space picking: what you see is what you click): an ally if one is on the canvas and
+  // not under the HUD, else an enemy (bots walk off-screen as the match goes on). Time is frozen for the click:
   // a bot moves ~15 px between reading its position and the click landing, which is not what this checks.
-  const ally = await page.evaluate(() => { const g = window.__game; g.stop(); const a = g.world.heroes.find((h) => h !== g.me && h.team === g.me.team && !h.dead); return g.renderer.worldToScreen(a.x, a.y, 1.2); });
+  const ally = await page.evaluate(() => {
+    const g = window.__game; g.stop();
+    const hs = g.world.heroes.filter((h) => h !== g.me && !h.dead).sort((a, b) => (a.team === g.me.team ? 0 : 1) - (b.team === g.me.team ? 0 : 1));
+    for (const h of hs) { const p = g.renderer.worldToScreen(h.x, h.y, 1.2); const el = document.elementFromPoint(p.x, p.y); if (p.visible && el && el.tagName === 'CANVAS') return { x: p.x, y: p.y, name: g.world.registry.heroes[h.heroKey].name }; }
+    return { x: 0, y: 0, name: 'none visible' };
+  });
   await page.mouse.click(ally.x, ally.y);
   await page.evaluate(() => window.__game.start());
-  check('left-clicking a unit on the battlefield inspects it', await until(page, () => !document.querySelector('.inspect').classList.contains('hidden')), await page.evaluate(() => document.querySelector('.ins-name') ? document.querySelector('.ins-name').textContent : 'no panel'));
+  check('left-clicking a unit on the battlefield inspects it', await until(page, () => !document.querySelector('.inspect').classList.contains('hidden')),
+    `clicked ${ally.name}, panel ${await page.evaluate(() => document.querySelector('.inspect').classList.contains('hidden') ? 'closed' : document.querySelector('.ins-name').textContent)}`);
   await page.evaluate(() => window.__app.match.inspect.hide());
   await page.click('[data-act=menu]');
   await page.click('[data-act=surrender]'); await page.click('[data-act=confirm-surrender]');

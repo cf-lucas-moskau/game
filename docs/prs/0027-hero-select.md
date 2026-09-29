@@ -22,3 +22,8 @@ hero select:
 - e2e: clicking a roster tile selects that hero; the chosen hero and skin reach the match (`session.roster[0].skin`);
   unlimited reroll still passes; the menu shows painted portraits.
 - Visual: screenshots at 1280x720, 844x390 and 390x844.
+- e2e battlefield inspect: the test used to click the first allied bot. It failed intermittently in the gate
+  ("(Saffi Blinkwick)" was the stale scoreboard panel, so nothing was picked). The debug runs showed every passing
+  click landing on the canvas near the centre. The failures came from the ally having walked off-screen or under the HUD
+  by the time the test reached this step. The test now clicks the first hero (allies first) whose head is on the canvas
+  (`elementFromPoint` is the canvas), and it reports which hero was clicked and which one the panel shows.
