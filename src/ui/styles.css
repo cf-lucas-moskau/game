@@ -168,6 +168,19 @@
 .touch .strip { height: 30px; }
 .touch .feed { top: calc(56px + var(--safe-t)); }
 
+/* ---------- item icons */
+.ico { display: inline-grid; place-items: center; width: 18px; height: 18px; flex: none; vertical-align: -4px; }
+.ico svg { width: 100%; height: 100%; }
+.item .ico { width: 24px; height: 24px; }
+.touch .item .ico { width: 18px; height: 18px; }
+.card .top .nm { display: inline-flex; gap: 6px; align-items: center; }
+.inv .s .ico { width: 22px; height: 22px; margin-bottom: 2px; }
+.build span { display: flex; gap: 6px; align-items: center; }
+table.sb .chip { display: inline-flex; gap: 3px; align-items: center; }
+table.sb .chip .ico { width: 13px; height: 13px; }
+.ins-item .ico { width: 20px; height: 20px; }
+.ins-item small { display: block; font-size: 8.5px; line-height: 1.05; margin-top: 1px; }
+
 /* ---------- inspect panel */
 .inspect { position: absolute; right: calc(12px + var(--safe-r)); top: calc(130px + var(--safe-t)); width: 250px; padding: 12px; border-radius: 14px;
   background: var(--panel); border: 1px solid var(--panel-edge); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); }
@@ -237,7 +250,8 @@ table.sb tr[data-id] { cursor: pointer; } table.sb tr[data-id]:hover td { backgr
 .notice.ok { background: rgba(126, 224, 122, 0.12); border-color: rgba(126, 224, 122, 0.4); }
 .build { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
 .build span.own { color: var(--heal); }
-table.sb { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.sb { width: 100%; border-collapse: collapse; font-size: 14px; table-layout: fixed; }
+table.sb th:nth-child(1) { width: 30%; } table.sb th:nth-child(2) { width: 7%; } table.sb th:nth-child(3) { width: 13%; } table.sb th:nth-child(4) { width: 10%; }
 table.sb th { text-align: left; font: 600 11px var(--text); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding: 6px 8px; }
 table.sb td { padding: 7px 8px; border-top: 1px solid rgba(232, 220, 196, 0.08); vertical-align: middle; }
 table.sb tr.me td { background: rgba(242, 193, 78, 0.08); }

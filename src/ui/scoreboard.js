@@ -1,6 +1,7 @@
 // Scoreboard (Tab): both teams with level, K/D/A, minions, items. Also used by the end screen.
 import { h, clear } from './dom.js';
 import { emblem } from './menu.js';
+import { itemIcon } from './identity.js';
 
 export function teamTables(world, me, onPick = null) {
   const items = world.registry.items;
@@ -15,7 +16,7 @@ export function teamTables(world, me, onPick = null) {
           return h('tr', { class: `${x === me ? 'me' : ''}${x.dead ? ' dead' : ''}`, 'data-id': onPick ? String(x.id) : null, onclick: onPick ? () => onPick(x.id) : null },
             h('td', {}, h('div', { class: 'hero' }, emblem(x.heroKey), h('div', {}, def.name, h('div', { class: 'who' }, x === me ? 'You' : `Bot${x.dead ? ' · respawning' : ''}`)))),
             h('td', {}, String(x.level)), h('td', {}, `${x.kills} / ${x.deaths} / ${x.assists}`), h('td', {}, String(x.cs)),
-            h('td', {}, h('div', { class: 'chips' }, x.items.map((k) => h('span', { class: 'chip' }, items[k].name)))));
+            h('td', {}, h('div', { class: 'chips' }, x.items.map((k) => h('span', { class: 'chip', title: items[k].name }, itemIcon(k, items[k]), items[k].name)))));
         }))));
   });
 }

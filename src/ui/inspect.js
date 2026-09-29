@@ -3,6 +3,7 @@
 // for. Refreshed 4 times a second while open; it follows the unit until closed or it disappears.
 import { h, clear } from './dom.js';
 import { emblem } from './menu.js';
+import { itemIcon } from './identity.js';
 import { statLines } from './format.js';
 import { KIND, STRUCT, TICK_HZ, RULES } from '../sim/constants.js';
 import { autoNumbers } from './numbers.js';
@@ -30,7 +31,7 @@ export class InspectPanel {
       const slots = [];
       for (let i = 0; i < RULES.MAX_ITEMS; i++) {
         const key = e.items[i], it = key && w.registry.items[key];
-        const el = h('div', { class: `ins-item${it ? ' full' : ''}` }, it ? it.name : '');
+        const el = h('div', { class: `ins-item${it ? ' full' : ''}`, title: it ? it.name : '' }, it ? itemIcon(key, it) : null, it ? h('small', {}, it.name) : null);
         if (it) { el.addEventListener('pointerenter', () => this.tip.show(el, it.name, statLines(it.stats).join(' · '), it.desc || '')); el.addEventListener('pointerleave', () => this.tip.hide()); }
         slots.push(el);
       }
