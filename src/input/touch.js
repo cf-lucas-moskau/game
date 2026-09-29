@@ -1,7 +1,7 @@
 // Touch controls: floating joystick (left), attack + ability buttons (right), drag-to-aim with a
 // cancel zone, drawn abilities traced directly on the battlefield, three-finger tap for the perf overlay.
 import { moveCmd, attackCmd, castCmd, spellCmd, stopCmd } from '../sim/commands.js';
-import { autoTarget, clampToRange, forward, lead, hoverTarget } from './intent.js';
+import { autoTarget, clampToRange, forward, lead, screenPick } from './intent.js';
 import { aimFor, isDrawn, SPELL_AIM } from './aim.js';
 import { byRank } from '../sim/abilities.js';
 
@@ -49,8 +49,8 @@ export class TouchInput {
     }));
     cv.addEventListener('pointerup', (this._tapUp = (e) => {
       const a = this._tapAt; this._tapAt = null; if (!a || e.pointerType !== 'touch' || performance.now() - a.t > 350 || Math.hypot(e.clientX - a.x, e.clientY - a.y) > 14) return;
-      const w = this.s.renderer.screenToWorld(e.clientX, e.clientY); if (!w) return;
-      const u = hoverTarget(this.s.world, null, w.x, w.y, 80, true); this.onInspect(u ? u.id : -1);
+      const r = cv.getBoundingClientRect();
+      const u = screenPick(this.s.renderer, this.s.world, null, e.clientX - r.left, e.clientY - r.top, true, 22); this.onInspect(u ? u.id : -1);
     }));
     this.layout(); window.addEventListener('resize', (this._rs = () => this.layout()));
     this.active = new Map(); // pointerId -> gesture

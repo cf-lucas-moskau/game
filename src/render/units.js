@@ -31,7 +31,7 @@ const tmpObj = new THREE.Object3D();
 const tmpColor = new THREE.Color();
 
 // ---------------------------------------------------------------- heroes
-class HeroView {
+export class HeroView {
   constructor(lib, e, parent, skin) {
     this.look = resolveLook(e.heroKey, skin); this.id = e.id; this.team = e.team;
     this.root = new THREE.Group(); parent.add(this.root);
@@ -140,16 +140,21 @@ function mergeSkinned(root) {
     const si = src2.attributes.skinIndex, u = new Uint16Array(si.count * 4);
     for (let i = 0; i < si.count; i++) for (let c = 0; c < 4; c++) u[i * 4 + c] = remap[si.getComponent(i, c)];
     g.setAttribute('skinIndex', new THREE.BufferAttribute(u, 4));
-    // re-bind into the base mesh: per vertex, via its dominant bone,
-    // p' = baseBind^-1 * baseInv_k^-1 * ownInv_k * ownBind * p  (exact for rigidly bound parts like heads)
+    // re-bind into the base mesh: per vertex, via its dominant bone k, find p' so the base mesh draws it where
+    // this mesh does. Attached skinning draws world = meshWorld * bindInv * boneWorld_k * boneInv_k * bind * p, so
+    // p' = B_k^-1 * A_k * p with A_k, B_k those chains for this mesh and the base (exact for rigid parts like heads).
+    // The mesh world and bind matrices must be kept: they differ between the parts once the rig is scaled to height
+    // (dropping them sank every head that sits under its own node into the torso).
     if (m !== base) {
+      root.updateMatrixWorld(true);
       const P = g.attributes.position, N = g.attributes.normal, W = g.attributes.skinWeight, cache = new Map();
       const v = new THREE.Vector3(), nm = new THREE.Matrix3();
+      const chain = (mesh, idx) => new THREE.Matrix4().copy(mesh.matrixWorld).multiply(mesh.bindMatrixInverse).multiply(mesh.skeleton.bones[idx].matrixWorld).multiply(mesh.skeleton.boneInverses[idx]).multiply(mesh.bindMatrix);
       for (let i = 0; i < P.count; i++) {
         let bi = 0, bw = -1; for (let c = 0; c < 4; c++) { const w = W.getComponent(i, c); if (w > bw) { bw = w; bi = c; } }
         const own = si.getComponent(i, bi);
         let M = cache.get(own);
-        if (!M) { const k = remap[own]; M = new THREE.Matrix4().copy(base.bindMatrixInverse).multiply(new THREE.Matrix4().copy(base.skeleton.boneInverses[k]).invert()).multiply(m.skeleton.boneInverses[own]).multiply(m.bindMatrix); cache.set(own, M); }
+        if (!M) { const k = remap[own]; M = chain(base, k).invert().multiply(chain(m, own)); cache.set(own, M); }
         v.fromBufferAttribute(P, i).applyMatrix4(M); P.setXYZ(i, v.x, v.y, v.z);
         nm.getNormalMatrix(M); v.fromBufferAttribute(N, i).applyMatrix3(nm).normalize(); N.setXYZ(i, v.x, v.y, v.z);
       }
