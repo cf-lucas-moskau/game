@@ -18,7 +18,7 @@ Open `index.html?lab=1` for an isolated stage with one hero and training dummies
 `node tools/lab.mjs` renders the same views to PNG from the command line (see the header of `tools/lab.mjs`).
 
 ## How to play
-The whale picks a hero for you (one reroll). Choose the bot difficulty and press **Fight**.
+The whale picks a hero for you (reroll as often as you like). Choose the bot difficulty and press **Fight**.
 Push with your minion waves, destroy the two enemy towers in order, then shatter the enemy Heartstone.
 After 10 minutes sudden death starts and both Heartstones crumble, so every match ends.
 
