@@ -12,6 +12,7 @@ import { view, rx, ry } from './interp.js';
 import { Indicators } from './indicators.js';
 import { FX } from './fx.js';
 import { ZoneViews } from './zones.js';
+import { GlowLights } from './glow-lights.js';
 
 export class GameRenderer {
   constructor(canvas, lib, world, { quality = 'medium', telemetry = null, fixedBuffer = null } = {}) {
@@ -37,6 +38,7 @@ export class GameRenderer {
     this.zones = new ZoneViews(this.env.root); this.fx = new FX(this.env.root, this.q);
     this.indicators = new Indicators(this.env.root); this.extra.push(this.zones, this.fx, this.indicators);
     this.units.fx = this.fx;
+    this.glowLights = new GlowLights(this.env.root, this.q.glowLights || 0);
     this.aim = { active: false }; this.hoverId = -1; this.showRange = false;
     this.post = this.q.post ? new PostFX(gl, { levels: this.q.bloomLevels, msaa: this.q.msaa }) : null;
     this.guard = new ResolutionGuard(0.55, 1);
@@ -89,6 +91,7 @@ export class GameRenderer {
     this.projectiles.update(w, alpha);
     for (const x of this.extra) x.update(w, alpha, dt, this.now, this);
     this.updateCamera(alpha, dt);
+    this.glowLights.update(this.units.glowAnchors, this.cam, this.now);
     const tSubmit = performance.now();
     this.gl.info.reset();
     if (this.post) this.post.render(this.scene, this.camera, this.gl.info); else { this.gl.setRenderTarget(null); this.gl.render(this.scene, this.camera); }
