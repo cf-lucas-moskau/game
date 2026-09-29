@@ -113,6 +113,9 @@ input path), `skip=<seconds>` (fast-forward the sim), `seed=`, `touch=1`, `cpu=1
 - Declare every entity field in `createEntity()`. Adding properties later put V8 objects in dictionary mode
   and every double write allocated (541 -> 116 KB per simulated second after fixing).
 - Avoid per-frame allocation in render code (pre-parse colours, no `Object.values`/spreads/string keys per frame).
+- In hot per-vertex loops write typed arrays directly (`attr.array[i] = v`): non-inlined `setXYZ` calls box each double
+  argument (measured 40 KB/s for the swipe ribbons). Pool per-attack records; never add fields to sim entities from render
+  code (keep presentation state in maps). `for..of` over a Map allocates an entry per element: use `forEach` with a stored callback.
 - In the container, SwiftShader makes frame time, FPS and GL submission meaningless: gate CPU-side metrics,
   use `?cpu=1` (160x90 buffer, >= 200 frames), GC pauses as thread CPU time, heap growth via soak slope,
   and verify CPU throttling with a warmed probe. Details in docs/PERF.md.

@@ -126,3 +126,11 @@ per run the p99 index is the maximum) and excluding pauses that overlap a > 16 m
 that is about half of all GCs, which would hollow out the gate). `gcPauseMaxMs` therefore stays the gated
 metric with its budget; the bench also reports `gcPausesOver5Ms`, `gcContendedMaxMs` and `gcContendedCount`
 (pauses overlapping a long GPU task) as info, and PR write-ups justify failures with same-container A/B runs.
+
+## Combat and ability effects (PR #15, PR #17)
+The first version of the new attack and ability effects doubled GC work (desktop play 34 -> 68 ms, emulated
+phone 227 -> 361 ms per run). Causes, from sampling heap profiles: a record object per auto-attack (minions
+attack constantly), per swipe and per tracked projectile; `for..of` over a Map (entry arrays); and per-vertex
+`BufferAttribute.setXYZ` calls in the swipe ribbons, which box each double argument when not inlined
+(~40 KB/s). Records are now pooled, the Map is swept with a stored `forEach` callback, and ribbons write the
+typed arrays directly: desktop play 39.9 ms, phone 236.5 ms. Draw calls with all effects: 36-41 (budget 50).

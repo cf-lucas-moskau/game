@@ -5,7 +5,6 @@ import { Particles } from './particles.js';
 import { S, PALETTE, TEAM_RGB } from './palette.js';
 import { EV } from '../core/events.js';
 import { KIND } from '../sim/constants.js';
-import { HERO_LOOKS } from '../assets/manifest.js';
 import { rx, ry } from './interp.js';
 
 const C = (hex) => new THREE.Color(hex);
@@ -14,7 +13,6 @@ const COL = {
   ink: C('#6f5cff'), fire: C('#ff8a3d'), ember: C('#ffd27a'), honey: C('#ffc233'), stone: C('#bfae93'), dust: C('#d7c9b0'),
   stun: C('#fff3a0'), root: C('#8b7bff'), clock: C('#f2c14e'), coral: C(PALETTE.coral), tide: C(PALETTE.tide), smoke: C('#9aa0b8'),
 };
-const ACCENT = Object.fromEntries(Object.entries(HERO_LOOKS).map(([k, v]) => [k, C(v.accent)]));
 const rnd = (a, b) => a + Math.random() * (b - a);
 
 export class FX {
@@ -60,8 +58,7 @@ export class FX {
         break;
       }
       case EV.CAST: {
-        const col = ACCENT[e.s] || COL.shield;
-        this.ring(rx(ent) * S, ry(ent) * S, 0.2, 12, 0.5, col, 0.4, 0.14, 2.2);
+        // cast signatures live in ability-fx.js (per-hero style); here only the extra spark
         if (e.s === 'morrow' && e.b === 0) this.burst(x, z, 0.8, 4, 1, COL.clock, 0.4, 0.12, 0.02);
         break;
       }
