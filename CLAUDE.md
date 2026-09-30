@@ -55,7 +55,7 @@ input path), `skip=<seconds>` (fast-forward the sim), `seed=`, `touch=1`, `cpu=1
   animations and effects up close (frame-exact, no match needed); use full-game screenshots for scene-level checks.
 
 ## Current state
-- The repository now lives on GitHub (`cf-lucas-moskau/game`); `main` holds PRs 1-27. Earlier notes: PRs 1-11: PR #10 (VFX) merged after a gate rerun in the new container (see docs/prs/0010-vfx.md), and
+- The repository now lives on GitHub (`cf-lucas-moskau/game`); `main` holds PRs 1-38. Earlier notes: PRs 1-11: PR #10 (VFX) merged after a gate rerun in the new container (see docs/prs/0010-vfx.md), and
   PR #11 (UI) adds the full playable loop: hero select -> match -> end screen -> hero select.
 - Playwright in this container: `PW_PATH=/opt/node22/lib/node_modules/playwright` (Chromium in /opt/pw-browsers).
 - `src/app/app.js` owns the flow (menu with a bot-match backdrop, match, end screen) and tears each match
@@ -109,8 +109,11 @@ input path), `skip=<seconds>` (fast-forward the sim), `seed=`, `touch=1`, `cpu=1
    heart break); bots recover at the fountain and melee divers commit on kills; empty instanced layers no longer draw;
    the spectate bench ran 16 heroes since PR #24 (fixed); deterministic sim math; lockstep authorities; online
    lobbies over WebRTC through the public PeerJS broker (`docs/ONLINE.md`).
-9. Next: a balance pass with the lab (Saffi's survivability, Morrow, Dredge; owner decision), desync resync (replay the
-   command log), optional self-hosted broker, more skins.
+9. Done (PRs #35-#38): kill credit (last hero damage within 15 s), level 6 sooner, 40-item build tree, and a balance
+   pass (docs/prs/0038-balance-pass.md): every hero within 41-58% on two seeds (sd 12.3 -> 4.9 points). Passive numbers
+   live in a patchable `tuning` block per hero (Saffi, Dredge, Coralie so far). Bench scenarios pin `seed=7`.
+10. Next: Auctioneer is slightly low (41-43%); predictor modelling of attack-move engagements and short hops (Saffi
+   corrects ~1 per 10 s at 100 ms ping); desync resync (replay the command log), optional self-hosted broker, more skins.
 
 ## Architecture map
 - `src/core/`: seeded RNG (sfc32), pools, spatial hash, event stream, state hasher, fixed 30 Hz loop.
@@ -156,6 +159,10 @@ input path), `skip=<seconds>` (fast-forward the sim), `seed=`, `touch=1`, `cpu=1
 - Pick units in screen space (`intent.screenPick`), not by projecting the cursor onto the ground.
 - Balance by bot matches needs 480-960 matches per round (a hero's win rate has ~3% standard error at ~350 games). Use the
   simulation lab (`tools/simlab.mjs`): an `--ab` run diverges chaotically from its baseline, so judge only the patched hero's z.
+- Balance levers are few and not obvious: most kit numbers have no measurable effect on bot win rates. Run a
+  sensitivity sweep first (one hard-pushed lever per `--focus X --set ... --ab`, 480 matches), then scale only the
+  levers with |z| > 2, and verify on a fresh seed with 1920 matches. Put passive constants in the hero's `tuning` block.
+- Bench runs must pin their match seed: the roster alone swings prediction corrections and load.
 - Kenney rigs face +z at yaw 0 (`faceToRotY = PI/2 - a`); verified by close-up, don't "fix" it.
 - Background processes do not survive between tool calls in some environments; keep each gate step short.
 - Never run builds, browsers or the simulation lab while gate bench steps run: contention shows up as GC outliers
