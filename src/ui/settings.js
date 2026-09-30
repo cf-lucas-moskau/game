@@ -1,6 +1,6 @@
 // Player settings: persisted per browser, applied live where possible.
 const KEY = 'leviathan-lane:settings';
-export const DEFAULTS = { quality: 'auto', shake: 1, ping: 0, damageNumbers: true, difficulty: 'medium', hero: '', skin: 'classic', volume: 0.8, music: 0.6, sfx: 1 };
+export const DEFAULTS = { quality: 'auto', shake: 1, ping: 0, damageNumbers: true, difficulty: 'medium', hero: '', skin: 'classic', name: '', volume: 0.8, music: 0.6, sfx: 1 };
 export const OPTIONS = {
   quality: [['auto', 'Auto'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High']],
   shake: [[0, 'Off'], [0.5, 'Low'], [1, 'Full']],

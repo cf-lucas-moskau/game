@@ -2,7 +2,7 @@
 // players. Every tick the session asks its authority (src/net/authority.js) which commands to apply: locally that is
 // bots + the player through LocalTransport; online the host adds remote players and broadcasts, a client steps on
 // the host's command stream. Render, UI, audio and prediction are the same in every mode.
-import { createMatch } from '../sim/match.js';
+import { createMatch, stateHash } from '../sim/match.js';
 import { CONTENT } from '../sim/content.js';
 import { HERO_KEYS } from '../sim/heroes/index.js';
 import { BotDirector } from '../ai/director.js';
@@ -58,17 +58,19 @@ export class GameSession {
     this.renderer.predictor = this.predictor;
     this.listeners = new Set();
     this.last = performance.now();
-    this.loop = new FixedLoop({ hz: TICK_HZ, step: () => this.tick(), render: (alpha) => this.frame(alpha) });
+    this.loop = new FixedLoop({ hz: TICK_HZ, step: () => this.tick(), render: (alpha) => this.frame(alpha), background: !!online });
   }
   start() { this.loop.start(); return this; }
+  /** State hash of the world (tests and online diagnostics: every player's world must hash the same at a tick). */
+  hash() { return stateHash(this.world); }
   /** The skin a hero wears in this match (presentation only). */
   skinOf(e) { const r = this.roster[e.playerId]; return r ? r.skin : 'classic'; }
   stop() { this.loop.stop(); }
   /** Receive every sim event the renderer drains (UI: kill feed, banners, damage numbers). */
   tapEvents(fn) { const tap = { onEvent: fn, update() {} }; this.renderer.extra.push(tap); return () => { const i = this.renderer.extra.indexOf(tap); if (i >= 0) this.renderer.extra.splice(i, 1); }; }
-  /** Stop the match and free the renderer and input devices. */
-  dispose() {
-    this.stop(); this.listeners.clear(); this.authority.dispose();
+  /** Stop the match and free the renderer and input devices; `keepChannels` hands online connections back to the lobby. */
+  dispose(keepChannels = false) {
+    this.stop(); this.listeners.clear(); this.authority.dispose(keepChannels);
     for (const i of this.inputs || []) i.dispose();
     this.renderer.dispose();
   }

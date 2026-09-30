@@ -6,6 +6,7 @@
 //   host -> all      lobby { players, settings }      lobby state: slots, names, heroes, skins, ready, bots
 //   client -> host   pick { heroKey, skin }  ready { ready }
 //   host -> all      start { seed, roster, settings } everyone creates the same match
+//   client -> host   loaded {}                        the match is created; the host starts when everyone has loaded
 //   client -> host   c { c: command }                 the player's commands (the host validates them)
 //   host -> all      t { t, c: [commands], h? }       the commands applied at tick t; every HASH_EVERY ticks the
 //                                                     state hash before stepping t, so clients detect a desync
@@ -19,7 +20,7 @@ export const HASH_EVERY = 30;
 export const BUILD = typeof __BUILD_ID__ !== 'undefined' ? __BUILD_ID__ : 'dev';
 
 export const MSG = { HELLO: 'hello', WELCOME: 'welcome', REFUSE: 'refuse', LOBBY: 'lobby', PICK: 'pick', READY: 'ready', START: 'start',
-  CMD: 'c', TICK: 't', PING: 'ping', PONG: 'pong', BYE: 'bye', CHAT: 'chat' };
+  CMD: 'c', TICK: 't', PING: 'ping', PONG: 'pong', BYE: 'bye', CHAT: 'chat', LOADED: 'loaded' };
 
 /**
  * A command as it travels: only the fields the sim reads, numbers kept finite. `ts` (the sender's issue time) rides
@@ -32,4 +33,8 @@ export function wireCommand(c) {
   return o;
 }
 /** Host-side check of a client's command: well-formed, and only for the client's own player. */
+/** Hold a channel's messages until the next owner attaches (between lobby start and match creation). */
+export function holdMessages(ch) { const q = []; ch.pending = q; ch.onmessage = (m) => q.push(m); }
+/** Attach a message handler and deliver anything held for it. */
+export function attach(ch, fn) { ch.onmessage = fn; const q = ch.pending; ch.pending = null; if (q) for (const m of q) fn(m); }
 export function acceptCommand(c, playerId) { return !!c && typeof c === 'object' && c.p === playerId && validCommand(c); }

@@ -39,7 +39,7 @@ function setup({ seed = 21, latency = 3, jitter = 2 } = {}) {
   const loop = (ticks, { hostSteps = true } = {}) => {
     for (let i = 0; i < ticks; i++) {
       clock.t++;
-      if (hostSteps && !host.state.over) { auth.collect(0, hostCmds, noop); host.step(hostCmds); }
+      if (hostSteps && !host.state.over && auth.collect(0, hostCmds, noop)) host.step(hostCmds);
       for (const c of pairs.values()) c.pump();
       for (const cl of clients) {
         if (cl.auth.closed) continue;
