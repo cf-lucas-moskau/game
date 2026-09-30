@@ -115,9 +115,10 @@ export class Hud {
           h('span', { class: 'x' }, '⟶'), h('span', { class: `t${victim.team}` }, this.heroName(victim.id)));
         this.feed.prepend(row); this.feedItems.push({ row, until: performance.now() + 7000 });
         while (this.feedItems.length > 5) this.feedItems.shift().row.remove();
-        if (killer === me) this.showBanner(`You slew ${this.heroName(victim.id)}`, `+${RULES.KILL_GOLD} gold`, 'good', 1800);
+        if (killer === me) this.showBanner(`You slew ${this.heroName(victim.id)}`, `+${e.c} gold`, 'good', 1800);
         break;
       }
+      case EV.ASSIST: if (e.a === me.id) this.showBanner(`Assist on ${this.heroName(e.b)}`, `+${e.v} gold`, 'good', 1400); break;
       case EV.WHALE_WARN: this.showBanner('The whale rolls!', `Get off the ${e.v > 0 ? 'near' : 'far'} edge`, 'warn', 3000); break;
       case EV.STRUCTURE_DOWN: if (e.b === KIND.TOWER) { const mine = e.v === me.team; this.showBanner(mine ? 'Your tower fell' : 'Enemy tower destroyed', mine ? 'Defend the next one' : 'Push on', mine ? 'bad' : 'good', 2600); } break;
       case EV.FX: if (e.s === 'sudden-death') this.showBanner('Sudden death', 'Both Heartstones crumble. Damage +50%.', 'bad', 3800); break;

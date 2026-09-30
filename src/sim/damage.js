@@ -78,6 +78,15 @@ export function dealDamage(world, src, target, amount, type = DMG.PHYS, opts = E
 }
 const EMPTY = Object.freeze({});
 
+/** The enemy hero who most recently damaged `victim` within KILL_CREDIT_WINDOW, or null. */
+function lastHeroDamager(world, victim, t) {
+  const d = victim.damagers, win = sec(RULES.KILL_CREDIT_WINDOW); let best = null, bt = -1;
+  for (let i = 0; i < d.length; i += 2) {
+    const h = world.get(d[i]);
+    if (h && h.kind === KIND.HERO && h.team !== victim.team && t - d[i + 1] <= win && d[i + 1] > bt) { bt = d[i + 1]; best = h; }
+  }
+  return best;
+}
 function recordDamager(world, target, attacker) {
   if (!attacker || attacker.kind !== KIND.HERO || target.kind !== KIND.HERO) return;
   const d = target.damagers; const t = world.tick;
@@ -142,15 +151,17 @@ export function kill(world, victim, killer) {
     victim.targetId = -1; victim.order = 0; victim.windup = 0; victim.shield = 0; victim.channelUntil = 0;
     victim.stunUntil = victim.rootUntil = victim.slowUntil = victim.knockUntil = victim.airborneUntil = victim.dashUntil = 0;
     const def = world.registry.heroes[victim.heroKey]; if (def.onDeath) def.onDeath(world, victim);
-    // assists
+    // the kill goes to the enemy hero who landed the blow, or, when a tower, minion or the whale finished the hero,
+    // to the last enemy hero who hit them within KILL_CREDIT_WINDOW; other recent damagers assist
+    const k = killer && killer.kind === KIND.HERO && killer.team !== victim.team ? killer : lastHeroDamager(world, victim, t);
     const assisters = [];
     for (let i = 0; i < victim.damagers.length; i += 2) {
       const h = world.get(victim.damagers[i]);
-      if (h && h !== killer && t - victim.damagers[i + 1] <= sec(RULES.ASSIST_WINDOW) && h.team !== victim.team) assisters.push(h);
+      if (h && h !== k && t - victim.damagers[i + 1] <= sec(RULES.ASSIST_WINDOW) && h.team !== victim.team) assisters.push(h);
     }
     victim.damagers.length = 0;
-    const k = killer && killer.kind === KIND.HERO && killer.team !== victim.team ? killer : null;
-    if (k) { k.kills++; giveGold(world, k, RULES.KILL_GOLD + 20 * Math.max(0, victim.level - k.level)); giveXp(world, k, RULES.KILL_XP); }
+    let bounty = 0;
+    if (k) { k.kills++; bounty = RULES.KILL_GOLD + 20 * Math.max(0, victim.level - k.level); giveGold(world, k, bounty); giveXp(world, k, RULES.KILL_XP); }
     for (const a of assisters) { a.assists++; giveGold(world, a, RULES.ASSIST_GOLD); giveXp(world, a, RULES.KILL_XP * 0.5); itemsOnAssist(world, a); }
     // takedown hook (kill or assist): resets and stacks that pay off on hero kills
     if (k) takedown(world, k, victim);
@@ -160,7 +171,9 @@ export function kill(world, victim, killer) {
       for (const h of world.heroes) if (h.team !== victim.team && !h.dead) giveGold(world, h, RULES.ASSIST_GOLD);
     }
     world.events.push(EV.DEATH, t, victim.id, killer ? killer.id : -1, victim.x, victim.y, 1, victim.heroKey);
-    world.events.push(EV.KILL, t, victim.id, k ? k.id : (killer ? killer.id : -1), victim.x, victim.y, assisters.length);
+    // KILL: a = victim, b = credited hero (or the unit that struck), v = assists, c = the killer's bounty; one ASSIST per helper
+    world.events.push(EV.KILL, t, victim.id, k ? k.id : (killer ? killer.id : -1), victim.x, victim.y, assisters.length, '', bounty);
+    for (const a of assisters) world.events.push(EV.ASSIST, t, a.id, victim.id, victim.x, victim.y, RULES.ASSIST_GOLD);
     return;
   }
   if (isMinion(victim.kind)) {
