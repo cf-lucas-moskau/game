@@ -7,6 +7,8 @@ import { hypot } from '../../core/dmath.js';
 // Ability numbers: one declaration used by the cast and by tooltips (kit.amount).
 const Q_VAL = { label: 'Physical damage', type: 'phys', base: [70, 105, 140, 175, 210], ratio: 0.8, stat: 'ad' };
 const W_VAL = { label: 'Physical damage', type: 'phys', base: [50, 80, 110, 140, 170], ratio: 0.6, stat: 'ad' };
+// Passive numbers (patchable by the simulation lab): damage reduction cap, reduction per missing health.
+const T = { drCap: 0.2, drPerMissing: 0.25 };
 const E_VAL = { label: 'Bonus damage (+6% of target max health)', type: 'phys', base: [30, 50, 70, 90, 110], ratio: 0.5, stat: 'ad' };
 const R_VAL = { label: 'Physical damage', type: 'phys', base: [150, 250, 350], ratio: 1, stat: 'ad' };
 
@@ -14,10 +16,11 @@ export default {
   key: 'dredge', name: 'Dredge Harrow', title: 'the Anchorhand', role: 'Juggernaut', resource: 'none', difficulty: 'Easy',
   rankOrder: ['Q', 'W', 'E'],
   build: ['storm-cutlass', 'anchor-boots', 'barnacle-plate', 'leviathans-maw', 'molted-shell', 'stillwater-pendant'], // recommended items: shop highlights and bot purchase order
+  tuning: T,
   base: { hp: 650, hpL: 104, ad: 64, adL: 3.8, armor: 32, armorL: 4.4, mr: 32, mrL: 1.6, as: 0.64, asL: 0.022, range: 180, speed: 335, radius: 38 },
-  passive: { name: 'Heavy Chain', desc: 'Takes up to 20% less damage the lower his health: 1% for every 4% missing.' },
+  passive: { name: 'Heavy Chain', get desc() { return `Takes up to ${Math.round(T.drCap * 100)}% less damage the lower his health: 1% for every ${+(1 / T.drPerMissing).toFixed(1)}% missing.`; } },
   init(world, e) { e.heroState = { breachUntil: 0, breachRank: 1 }; },
-  modifyDamageIn(world, e, amt) { return amt * (1 - Math.min(0.2, (1 - e.hp / e.maxHp) / 4)); },
+  modifyDamageIn(world, e, amt) { return amt * (1 - Math.min(T.drCap, (1 - e.hp / e.maxHp) * T.drPerMissing)); },
   onBasicAttack(world, e, target, dmg) {
     const s = e.heroState;
     if (s.breachUntil <= world.tick || target.kind === KIND.TOWER || target.kind === KIND.HEART) return dmg;
