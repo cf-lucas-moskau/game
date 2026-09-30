@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { createMatch, stateHash } from '../src/sim/match.js';
 import { moveCmd, attackMoveCmd, surrenderCmd, validCommand } from '../src/sim/commands.js';
 import { EV } from '../src/core/events.js';
-import { KIND, sec } from '../src/sim/constants.js';
+import { KIND, sec, RULES, TICK_HZ } from '../src/sim/constants.js';
 import { testContent, roster3v3 } from './helpers.js';
 import { kill as killFn } from '../src/sim/damage.js';
 
@@ -76,5 +76,43 @@ describe('entity ids', () => {
     const w = createMatch({ seed: 4, roster: roster3v3(), content: testContent });
     for (let i = 0; i < sec(120); i++) w.step([]);
     w.entities.forEach((e, i) => expect(e.id).toBe(i));
+  });
+});
+
+describe('sudden death', () => {
+  // both Heartstones one decay step from breaking, then the next full second
+  const toTheBrink = (w) => {
+    w.state.suddenDeath = true;
+    for (const s of w.structures) if (s.kind === KIND.HEART) s.hp = s.maxHp * RULES.SUDDEN_DEATH_HEART_DECAY * 0.5;
+    while (w.tick % TICK_HZ !== TICK_HZ - 1) w.step([]);
+    w.step([]);
+  };
+  it('a simultaneous Heartstone break goes to the side with more kills, whichever side that is', () => {
+    for (const team of [0, 1]) {
+      const w = createMatch({ seed: 3, roster: roster3v3(), content: testContent });
+      w.heroes.find((h) => h.team === team).kills = 2;
+      toTheBrink(w);
+      expect(w.state.over).toBe(true);
+      expect(w.state.winner).toBe(team);
+    }
+  });
+  it('more Heartstone health wins the tiebreak first; a perfect tie is a seeded coin', () => {
+    const w = createMatch({ seed: 3, roster: roster3v3(), content: testContent });
+    w.heroes[0].kills = 5; // blue leads in kills...
+    const red = w.structures.find((s) => s.kind === KIND.HEART && s.team === 1);
+    toTheBrink(w);
+    expect(w.state.winner).toBe(0);
+    const w2 = createMatch({ seed: 3, roster: roster3v3(), content: testContent });
+    w2.heroes[0].kills = 5;
+    w2.state.suddenDeath = true;
+    for (const s of w2.structures) if (s.kind === KIND.HEART) s.hp = s.maxHp * RULES.SUDDEN_DEATH_HEART_DECAY * (s.team === 1 ? 0.9 : 0.5); // ...but red's heart is healthier
+    while (w2.tick % TICK_HZ !== TICK_HZ - 1) w2.step([]);
+    w2.step([]);
+    expect(w2.state.winner).toBe(1);
+    expect(red).toBeTruthy();
+    const coin = (seed) => { const x = createMatch({ seed, roster: roster3v3(), content: testContent }); toTheBrink(x); return x.state.winner; };
+    const outcomes = new Set([1, 2, 3, 4, 5, 6, 7, 8].map(coin));
+    expect(outcomes.size).toBe(2); // both sides win some perfect ties
+    expect(coin(5)).toBe(coin(5));
   });
 });

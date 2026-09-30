@@ -144,9 +144,34 @@ function clockSystem(w) {
   }
   if (!st.suddenDeath && t >= sec(RULES.SUDDEN_DEATH)) { st.suddenDeath = true; w.events.push(EV.FX, t, 0, 0, 0, 0, 0, 'sudden-death'); }
   // sudden death: both Heartstones crack and lose health every second, so every match ends
-  if (st.suddenDeath && t % TICK_HZ === 0) for (const s of w.structures) if (s.alive && s.kind === KIND.HEART) {
-    s.vulnerable = s.vulnerable || true; s.hp -= s.maxHp * RULES.SUDDEN_DEATH_HEART_DECAY; if (s.hp <= 0) { s.hp = 0; w.events.push(EV.DEATH, t, s.id, -1, s.x, s.y); w.onStructureDown(s); w.despawn(s); break; }
+  if (st.suddenDeath && t % TICK_HZ === 0) suddenDeathDecay(w, t);
+}
+
+/**
+ * One second of sudden-death decay for both Heartstones at once. When both would shatter in the same second, only
+ * one falls: the side with less Heartstone health before this second, then fewer enemy towers destroyed, fewer kills,
+ * less gold earned; a seeded coin decides a perfect tie. (Decaying in structure order broke Blue's first in every
+ * tie: 14% of bot matches, all lost by Blue.)
+ */
+function suddenDeathDecay(w, t) {
+  const before = [0, 0], broken = [];
+  for (const s of w.structures) if (s.alive && s.kind === KIND.HEART) {
+    before[s.team] = s.hp; s.vulnerable = true; s.hp -= s.maxHp * RULES.SUDDEN_DEATH_HEART_DECAY;
+    if (s.hp <= 0) broken.push(s);
   }
+  if (!broken.length) return;
+  const losing = broken.length === 1 ? broken[0].team : tiebreakLoser(w, before);
+  const loser = broken.find((s) => s.team === losing);
+  for (const s of broken) if (s !== loser) s.hp = 1;
+  loser.hp = 0; w.events.push(EV.DEATH, t, loser.id, -1, loser.x, loser.y); w.onStructureDown(loser); w.despawn(loser);
+}
+/** The team that loses a simultaneous Heartstone break (see suddenDeathDecay). */
+export function tiebreakLoser(w, heartHp) {
+  const towersDown = [0, 0], kills = [0, 0], gold = [0, 0];
+  for (const s of w.structures) if (s.kind === KIND.TOWER && (!s.alive || s.dead)) towersDown[1 - s.team]++;
+  for (const h of w.heroes) { kills[h.team] += h.kills; gold[h.team] += h.gold + h.items.reduce((a, k) => a + ((w.registry.items[k] && w.registry.items[k].cost) || 0), 0); }
+  for (const [b, r] of [[heartHp[0], heartHp[1]], [towersDown[0], towersDown[1]], [kills[0], kills[1]], [Math.round(gold[0]), Math.round(gold[1])]]) if (b !== r) return b < r ? TEAM.BLUE : TEAM.RED;
+  return w.rng.chance(0.5) ? TEAM.BLUE : TEAM.RED;
 }
 
 function spawnWave(w) {
