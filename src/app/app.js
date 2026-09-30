@@ -27,6 +27,7 @@ import { SOUNDS } from '../audio/sounds.js';
 import { intensityFor } from '../audio/theory.js';
 import { PortraitStudio } from '../render/portraits.js';
 import { setPortraitSource } from '../ui/identity.js';
+import { installCursors, uninstallCursors } from '../ui/cursors.js';
 import { OnlineScreen } from '../ui/online.js';
 import { openLobby, joinLobby, brokerFrom } from '../net/peer.js';
 
@@ -47,6 +48,7 @@ export class App {
     this.perf = new PerfOverlay(this.ui);
     this.dim = h('div', { class: 'dim' }); this.ui.prepend(this.dim);
     this.settings.on((k, v) => this.applySetting(k, v));
+    this.applyCursor(this.settings.get('cursor'));
     addEventListener('ll-toggle', (e) => this.onToggle(e.detail));
     addEventListener('keydown', (e) => { if (!this.match && e.code === 'Escape') this.settingsPanel.hide(); if (!this.match && e.code === 'F3') { e.preventDefault(); this.perf.toggle(); } });
     this.last = { heroKey: null, difficulty: 'medium' };
@@ -220,7 +222,9 @@ export class App {
     if (!target) return;
     if (target.open) target.hide(); else { for (const p of panels) if (p !== target && p !== this.settingsPanel) p.hide(); target.show(); }
   }
+  applyCursor(v) { if (v === 'system') uninstallCursors(); else installCursors().catch(() => {}); }
   applySetting(k, v) {
+    if (k === 'cursor') this.applyCursor(v);
     const s = this.match && this.match.session;
     if (!s) return;
     if (k === 'shake') s.renderer.shakeScale = v;
