@@ -130,6 +130,6 @@ export class ZoneViews {
     this.telegraphs.length = w;
     this.ribbon.geometry.setDrawRange(0, Math.max(0, (this.nv / 2 - 1) * 6)); this.ribbon.visible = this.nv > 0;
     this.rPos.needsUpdate = this.rDat.needsUpdate = true;
-    this.discs.geometry.instanceCount = this.nd; this.dA.needsUpdate = this.dB.needsUpdate = true;
+    this.discs.geometry.instanceCount = this.nd; this.discs.visible = this.nd > 0; this.dA.needsUpdate = this.dB.needsUpdate = true;
   }
 }

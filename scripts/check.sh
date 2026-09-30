@@ -22,7 +22,7 @@ run() {
     tests) npx vitest run --reporter=dot ;;
     build) npx vite build --logLevel warn && SIZE=$(stat -c %s dist/index.html) && echo "   dist/index.html: $((SIZE/1024)) KB" && [ "$SIZE" -le 16000000 ] && key > dist/.commit ;;
     e2e|bench-*|soak) [ "$(cat dist/.commit 2>/dev/null)" = "$commit" ] || { echo "dist/ is not built from $commit: run the build step"; return 1; } ;;&
-    e2e) node tools/e2e.mjs ;;
+    e2e) node tools/e2e.mjs && node tools/e2e-online.mjs ;;
     bench-desktop) node tools/bench.mjs --scenario desktop-medium ;;
     bench-play) node tools/bench.mjs --scenario play-ping100 ;;
     bench-mobile) node tools/bench.mjs --scenario mobile-low ;;

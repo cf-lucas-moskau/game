@@ -4,7 +4,7 @@ import * as THREE from 'three';
 
 export class Particles {
   constructor(parent, cap = 3000) {
-    this.cap = cap; this.head = 0; this.time = 0;
+    this.cap = cap; this.head = 0; this.time = 0; this.aliveUntil = 0; // last moment any spawned particle is visible
     const g = new THREE.InstancedBufferGeometry().copy(new THREE.PlaneGeometry(1, 1));
     const A = (n) => new THREE.InstancedBufferAttribute(new Float32Array(cap * n), n).setUsage(THREE.DynamicDrawUsage);
     this.aPos = A(4);  // x y z, birth time
@@ -41,9 +41,11 @@ export class Particles {
     this.aPos.setXYZW(i, x, y, z, this.time); this.aVel.setXYZW(i, vx, vy, vz, life);
     this.aCol.setXYZW(i, r, g, b, intensity); this.aPar.setXYZW(i, s0, s1, gravity, drag);
     if (i < this.minI) this.minI = i; if (i > this.maxI) this.maxI = i; this.dirty = true;
+    if (this.time + life > this.aliveUntil) this.aliveUntil = this.time + life;
   }
   update(dt) {
     this.time += dt; this.uniforms.uTime.value = this.time;
+    this.mesh.visible = this.time <= this.aliveUntil; // an instanced draw with nothing alive is still a draw call
     if (!this.dirty) return;
     // upload only the touched range of the ring
     for (const a of [this.aPos, this.aVel, this.aCol, this.aPar]) {

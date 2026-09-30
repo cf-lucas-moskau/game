@@ -2,6 +2,7 @@
 import { EV } from '../../core/events.js';
 import { skillshot, aoe, enemiesNearPolyline, dealDamage, DMG, scale, sec, fx, amount } from './kit.js';
 import { addShield, haste } from '../damage.js';
+import { hypot } from '../../core/dmath.js';
 
 // Ability numbers: one declaration used by the cast and by tooltips (kit.amount).
 const Q_VAL1 = { label: 'Magic damage', type: 'magic', base: [65, 100, 135, 170, 205], ratio: 0.55, stat: 'ap', bonus: { ratio: 0.2, stat: 'ad' } };
@@ -43,12 +44,12 @@ export default {
       } },
     W: { values: [W_VAL1], name: 'Wind-Up', cd: [12, 11, 10, 9, 8], cost: 60,
       desc: 'Shield for 2 s. If it breaks, gain 40% move speed.',
-      cast(world, e, c) { addEcho(world, e); addShield(world, e, amount(e, W_VAL1, c.rank), 2); e.heroState.windupShield = 1; } },
+      cast(world, e, c) { addEcho(world, e); addShield(world, e, amount(e, W_VAL1, c.rank), 2, e); e.heroState.windupShield = 1; } },
     E: { values: [E_VAL1], name: 'Step Through', cd: [14, 13, 12, 11, 10], cost: 70,
       desc: 'Teleport to your most recent echo, damaging enemies along the path.',
       cast(world, e, c) {
         const s = e.heroState; const echo = s.echoes[s.echoes.length - 1];
-        if (!echo || Math.hypot(echo.x - e.x, echo.y - e.y) > 1100) return false;
+        if (!echo || hypot(echo.x - e.x, echo.y - e.y) > 1100) return false;
         const fx0 = e.x, fy0 = e.y;
         const hit = enemiesNearPolyline(world, e.team, [fx0, fy0, echo.x, echo.y], 60);
         for (const u of hit) dealDamage(world, e, u, amount(e, E_VAL1, c.rank), DMG.MAGIC, { ability: true });

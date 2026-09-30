@@ -1,9 +1,10 @@
+import { atan2 } from './dmath.js';
 export const TAU = Math.PI * 2;
 export const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 export const lerp = (a, b, t) => a + (b - a) * t;
 export const dist2 = (ax, ay, bx, by) => { const dx = bx - ax, dy = by - ay; return dx * dx + dy * dy; };
 export const dist = (ax, ay, bx, by) => Math.sqrt(dist2(ax, ay, bx, by));
-export const angleTo = (ax, ay, bx, by) => Math.atan2(by - ay, bx - ax);
+export const angleTo = (ax, ay, bx, by) => atan2(by - ay, bx - ax);
 export const lerpAngle = (a, b, t) => {
   let d = (b - a) % TAU;
   if (d > Math.PI) d -= TAU; else if (d < -Math.PI) d += TAU;

@@ -1,4 +1,5 @@
-// Application flow: hero select (with a live bot match as backdrop) -> match -> end screen -> again.
+// Application flow: hero select (with a live bot match as backdrop) -> match -> end screen -> again; or hero select ->
+// online lobby (host or join) -> online match -> end screen -> back to the lobby.
 // Owns canvases, sessions, input devices and the UI layer, and tears each match down completely.
 import { GameSession } from './session.js';
 import { startSpectate } from './spectate.js';
@@ -26,6 +27,8 @@ import { SOUNDS } from '../audio/sounds.js';
 import { intensityFor } from '../audio/theory.js';
 import { PortraitStudio } from '../render/portraits.js';
 import { setPortraitSource } from '../ui/identity.js';
+import { OnlineScreen } from '../ui/online.js';
+import { openLobby, joinLobby, brokerFrom } from '../net/peer.js';
 
 const END_SCREEN_DELAY = 2600; // let the Heartstone shatter before the result covers it
 
@@ -71,7 +74,51 @@ export class App {
       pick: () => HERO_KEYS[(Math.random() * HERO_KEYS.length) | 0],
       onPlay: (cfg) => this.startMatch(cfg),
       onSettings: () => this.settingsPanel.show(),
+      onOnline: (cfg) => this.showOnline(cfg),
     });
+  }
+
+  // ---------------------------------------------------------------- online lobby
+  /** cfg: { heroKey, skin, joinCode?, resume? } — the lobby screen over the menu backdrop. */
+  showOnline(cfg = {}) {
+    if (this.match || !this.backdrop) { this.showMenu(); }
+    if (this.menu) { this.menu.dispose(); this.menu = null; }
+    const broker = brokerFrom(this.params.get('broker'));
+    this.online = new OnlineScreen(this.ui, {
+      heroes: HEROES, settings: this.settings, heroKey: cfg.heroKey || this.settings.get('hero'), skin: cfg.skin || this.settings.get('skin'),
+      joinCode: cfg.joinCode || '', resume: cfg.resume || null,
+      net: { openLobby: (o) => openLobby({ ...o, broker }), joinLobby: (code) => joinLobby(code, { broker, metadata: {} }) },
+      onStart: (x) => this.startOnlineMatch(x),
+      onBack: () => this.showMenu(),
+    });
+  }
+  /** The lobby started: everyone creates the same match (the host decides it, clients follow its command stream). */
+  startOnlineMatch({ role, lobby, registration, start }) {
+    const names = new Map(start.roster.map((r) => [r.playerId, r.name]));
+    const heroName = (p) => { const r = start.roster.find((x) => x.playerId === p); return r ? HEROES[r.heroKey].short || HEROES[r.heroKey].name.split(' ')[0] : ''; };
+    const online = role === 'host'
+      ? { role, peers: start.peers, onPeer: (ev, p) => { if (ev === 'left') this.toast(`${names.get(p) || 'A player'} left: a bot plays ${heroName(p)} now.`); } }
+      : { role, channel: start.channel, onHost: (ev, info) => this.onHostEvent(ev, info) };
+    this.onlineCtx = { role, lobby, registration };
+    this.startMatch({ online, roster: start.roster, seed: start.seed, player: start.player, difficulty: start.difficulty });
+  }
+  /** Client side: the host left, the connection dropped, a desync, or the host reopened the lobby. */
+  onHostEvent(ev, info) {
+    const m = this.match; if (!m) return;
+    if (ev === 'lobby') { // back to the lobby with the same connection
+      const lobby = this.onlineCtx.lobby; this.teardown(true);
+      lobby.rebind(info); this.showOnline({ resume: { client: lobby } });
+      return;
+    }
+    const text = ev === 'desync' ? 'Your game fell out of sync with the host. Please leave and rejoin the lobby.'
+      : ev === 'bye' ? (info.reason || 'The host left the match.') : 'The connection to the host was lost.';
+    if (m.ended) { this.toast(text); return; }
+    m.ended = true; for (const i of m.session.inputs) i.dispose(); m.session.inputs = []; m.session.stop();
+    m.end = new EndScreen(this.ui, m.session, { note: text, actions: [{ label: 'Back to hero select', act: 'again', primary: true, onClick: () => this.showMenu() }] });
+  }
+  toast(text) {
+    const t = h('div', { class: 'toast', role: 'status' }, text); this.ui.append(t);
+    setTimeout(() => t.classList.add('out'), 4200); setTimeout(() => t.remove(), 4700);
   }
 
   // ---------------------------------------------------------------- match
@@ -86,7 +133,9 @@ export class App {
       canvas, lib: this.lib, seed: cfg.seed ?? ((Math.random() * 0xffff) | 0 || 7), quality: this.quality(), telemetry: this.telemetry,
       heroKey: cfg.heroKey, skin: cfg.skin, heroes: cfg.heroes || null, net, autopilot: !!cfg.autopilot, difficulty: cfg.difficulty || 'medium',
       skipSeconds: cfg.skipSeconds || 0, fixedBuffer: this.params.get('cpu') ? [160, 90] : null,
+      roster: cfg.roster || null, player: cfg.player || 0, online: cfg.online || null,
     });
+    const online = !!cfg.online;
     session.renderer.shakeScale = this.settings.get('shake');
     const toggle = (what) => dispatchEvent(new CustomEvent('ll-toggle', { detail: what }));
     const inputs = [];
@@ -108,12 +157,16 @@ export class App {
       onSettings: () => this.settingsPanel.show(),
       onSurrender: () => { m.pause.hide(); session.send(surrenderCmd(session.player)); },
       onLeave: () => this.showMenu(),
+      leaveLabel: online ? 'Leave match' : 'Leave to hero select',
     });
+    // online host: everyone must load the match before it begins
+    if (online && cfg.online.role === 'host') { m.wait = h('div', { class: 'net-wait', role: 'status' }, 'Waiting for players to load the match…'); this.ui.append(m.wait); }
     session.on((ev, arg) => {
       if (ev === 'frame') {
         for (const i of inputs) i.update();
         const now = performance.now();
         m.hud.update(now); m.floaters.update(now); m.shop.update(); m.scoreboard.update(now); m.inspect.update(now); this.perf.update(now);
+        if (m.wait && !session.authority.loading) { m.wait.remove(); m.wait = null; }
         toggle(this.dim, 'on', session.me.dead);
         const t1 = performance.now();
         m.sfx.update(); this.updateMusic(m);
@@ -141,10 +194,15 @@ export class App {
       if (this.match !== m) return;
       m.shop.hide(); m.scoreboard.hide(); m.pause.hide(); this.tooltip.hide(); toggle(this.dim, 'on', false);
       m.hud.el.classList.add('hidden'); m.floaters.el.classList.add('hidden');
+      const ctx = m.session.online ? this.onlineCtx : null;
       m.end = new EndScreen(this.ui, m.session, {
         surrendered: m.session.world.state.surrendered,
         onPlayAgain: () => this.showMenu(),
         onRematch: () => this.startMatch({ ...this.last }),
+        note: ctx && ctx.role === 'client' ? 'The host can bring everyone back to the lobby for another match.' : '',
+        actions: !ctx ? null : ctx.role === 'host'
+          ? [{ label: 'Leave', act: 'again', onClick: () => this.showMenu() }, { label: 'Back to lobby', act: 'lobby', primary: true, onClick: () => this.backToLobby() }]
+          : [{ label: 'Leave', act: 'again', primary: true, onClick: () => this.showMenu() }],
       });
     }, END_SCREEN_DELAY);
   }
@@ -166,18 +224,27 @@ export class App {
     const s = this.match && this.match.session;
     if (!s) return;
     if (k === 'shake') s.renderer.shakeScale = v;
-    if (k === 'ping') s.transport.setConditions({ ping: v, jitter: Math.round(v * 0.15), loss: v ? 0.01 : 0 });
+    if (k === 'ping' && !s.online) s.transport.setConditions({ ping: v, jitter: Math.round(v * 0.15), loss: v ? 0.01 : 0 });
   }
-  /** Dispose whatever is on screen: the menu with its backdrop, or a match with its UI. */
-  teardown() {
+  /** Host: the same players back in the lobby, over the same connections. */
+  backToLobby() {
+    const ctx = this.onlineCtx; this.teardown(true);
+    ctx.lobby.reopen(); this.showOnline({ resume: { host: ctx.lobby, registration: ctx.registration } });
+  }
+  /** Dispose whatever is on screen: the menu with its backdrop, or a match with its UI (`keepChannels`: back to lobby). */
+  teardown(keepChannels = false) {
     this.tooltip.hide(); this.settingsPanel.hide(); toggle(this.dim, 'on', false);
     if (this.menu) { this.menu.dispose(); this.menu = null; }
+    if (this.online) { this.online.dispose(); this.online = null; }
     if (this.backdrop) { this.backdrop.dispose(); this.backdrop.canvas.remove(); this.backdrop = null; }
     const m = this.match;
     if (m) {
       clearTimeout(m.endTimer);
       for (const x of [m.hud, m.floaters, m.sfx, m.shop, m.scoreboard, m.inspect, m.pause, m.end]) if (x) x.dispose();
-      m.session.dispose(); m.canvas.remove();
+      if (m.wait) m.wait.remove();
+      m.session.dispose(keepChannels); m.canvas.remove();
+      // leaving an online match for good: the host's lobby registration goes too
+      if (!keepChannels && m.session.online === 'host' && this.onlineCtx && this.onlineCtx.registration) { this.onlineCtx.registration.close(); this.onlineCtx = null; }
       this.match = null; if (window.__game === m.session) window.__game = null;
     }
   }

@@ -118,7 +118,7 @@ export class HeroFx {
       k.age = (t - z.born) / TICK_HZ; k.left = (z.until - t) / TICK_HZ; k.fade = Math.min(1, k.age * 8) * Math.min(1, k.left * 4);
       d.draw(api, z, k);
     }
-    this.props.forEach(this._flushProp || (this._flushProp = (p) => { p.mesh.count = p.n; if (p.n) p.mesh.instanceMatrix.needsUpdate = true; }));
+    this.props.forEach(this._flushProp || (this._flushProp = (p) => { p.mesh.count = p.n; p.mesh.visible = p.n > 0; if (p.n) p.mesh.instanceMatrix.needsUpdate = true; }));
   }
   decalPhase(world, now) {
     this.sync(world, now);

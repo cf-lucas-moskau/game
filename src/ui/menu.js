@@ -30,9 +30,10 @@ export class HeroSelect {
    * @param pick     () => random hero key
    * @param settings Settings store (hero, skin and difficulty are remembered)
    * @param onPlay   ({ heroKey, skin, difficulty }) => void
+   * @param onOnline ({ heroKey, skin }) => void: open online play (host or join a lobby)
    */
-  constructor(root, { heroes, pick, settings, touch, onPlay, onSettings }) {
-    this.heroes = heroes; this.pick = pick; this.settings = settings; this.onPlay = onPlay; this.group = 'all';
+  constructor(root, { heroes, pick, settings, touch, onPlay, onSettings, onOnline = null }) {
+    this.heroes = heroes; this.pick = pick; this.settings = settings; this.onPlay = onPlay; this.onOnline = onOnline; this.group = 'all';
     const last = settings.get('hero');
     this.heroKey = heroes[last] ? last : pick(); this.random = !heroes[last];
     this.skin = validSkin(this.heroKey, settings.get('skin')) ? settings.get('skin') : DEFAULT_SKIN;
@@ -96,6 +97,7 @@ export class HeroSelect {
           h('button', { class: v === diff ? 'on' : '', 'aria-pressed': v === diff ? 'true' : 'false', onclick: () => { this.settings.set('difficulty', v); this.render(); } }, label)))),
       h('div', { class: 'actions' },
         h('button', { class: 'btn', onclick: () => this.reroll(), 'data-act': 'reroll', title: 'A random hero (always a different one)' }, 'Random'),
+        this.onOnline ? h('button', { class: 'btn', onclick: () => this.onOnline({ heroKey: this.heroKey, skin: this.skin }), 'data-act': 'online', title: 'Play with friends: host or join a lobby' }, 'Online') : null,
         h('button', { class: 'btn primary', 'data-act': 'play', onclick: () => this.onPlay({ heroKey: this.heroKey, skin: this.skin, difficulty: this.settings.get('difficulty') }) }, 'Fight')));
   }
   reroll() {

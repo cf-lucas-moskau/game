@@ -4,6 +4,7 @@ import { spawnZone } from '../zones.js';
 import { aoe, enemiesNearPolyline, dash, dealDamage, DMG, scale, sec, fx, pickTarget, clampY, amount } from './kit.js';
 import { slow } from '../damage.js';
 import { EV } from '../../core/events.js';
+import { sin, cos, atan2, hypot } from '../../core/dmath.js';
 
 // Ability numbers: one declaration used by the cast and by tooltips (kit.amount).
 const Q_VAL1 = { label: 'Burn every 0.25 s', type: 'magic', base: [8, 12, 16, 20, 24], ratio: 0.06, stat: 'ad' };
@@ -53,11 +54,11 @@ export default {
     W: { values: [W_VAL1], name: 'Wax Drip', cd: [10, 9.5, 9, 8.5, 8], cost: 0, range: 400,
       desc: 'Cone that slows 40% and marks. Hitting a marked target restores double flame.',
       cast(world, e, c) {
-        const dir = Math.atan2(c.y - e.y, c.x - e.x), half = Math.PI / 5;
+        const dir = atan2(c.y - e.y, c.x - e.x), half = Math.PI / 5;
         aoe(world, e.team, e.x, e.y, 420, (u) => {
-          let a = Math.atan2(u.y - e.y, u.x - e.x) - dir; a = Math.atan2(Math.sin(a), Math.cos(a));
+          let a = atan2(u.y - e.y, u.x - e.x) - dir; a = atan2(sin(a), cos(a));
           if (Math.abs(a) > half) return;
-          slow(world, u, 0.4, 1.5); u.markUntil = world.tick + sec(3); u.markBy = e.id;
+          slow(world, u, 0.4, 1.5, e); u.markUntil = world.tick + sec(3); u.markBy = e.id;
           dealDamage(world, e, u, amount(e, W_VAL1, c.rank), DMG.PHYS, { ability: true, dot: true });
         });
         fx(world, e, 'saffi-wax', e.x, e.y, dir);
@@ -67,9 +68,9 @@ export default {
       cast(world, e, c) {
         const t = pickTarget(world, e, c.rawX, c.rawY, 580, false, c.targetId);
         if (!t) return false;
-        const ang = Math.atan2(t.y - e.y, t.x - e.x), stop = t.radius + e.radius;
-        const d = Math.max(0, Math.hypot(t.x - e.x, t.y - e.y) - stop);
-        dash(world, e, e.x + Math.cos(ang) * d, e.y + Math.sin(ang) * d, 0.18, null, (w) => {
+        const ang = atan2(t.y - e.y, t.x - e.x), stop = t.radius + e.radius;
+        const d = Math.max(0, hypot(t.x - e.x, t.y - e.y) - stop);
+        dash(world, e, e.x + cos(ang) * d, e.y + sin(ang) * d, 0.18, null, (w) => {
           if (t.dead || !t.alive) return;
           let dmg = amount(e, E_VAL1, c.rank);
           if (t.hp / t.maxHp < 0.3) { dmg *= 2; fx(w, t, 'saffi-snuff-exec'); }

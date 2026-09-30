@@ -37,7 +37,7 @@ export class Floaters {
       const amt = Math.round(e.v); if (amt < 1) return;
       if (e.b === me.id && e.a !== me.id) this.spawn(e.x, e.y, String(amt), `${e.s === 'm' ? 'magic' : e.s === 't' ? 'true' : 'dealt'}${amt >= 200 ? ' big' : ''}`);
       else if (e.a === me.id && amt >= 4) this.spawn(e.x, e.y, `-${amt}`, 'taken', 2.3);
-    } else if (e.type === EV.HEAL && e.a === me.id && e.v >= 25) this.spawn(e.x, e.y, `+${Math.round(e.v)}`, 'heal', 2.4);
+    } else if (e.type === EV.HEAL && e.c !== 1 && e.a === me.id && e.v >= 25) this.spawn(e.x, e.y, `+${Math.round(e.v)}`, 'heal', 2.4);
     else if (e.type === EV.GOLD && e.a === me.id && e.v >= 1) this.spawn(e.x, e.y, `+${Math.round(e.v)}g`, 'gold', 2.8);
   }
   update(now) {

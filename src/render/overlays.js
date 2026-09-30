@@ -51,7 +51,7 @@ export class HealthBars {
       this.iCol.setXYZW(n, c.r, c.g, c.b, hero ? 1 : 0);
       n++;
     }
-    this.mesh.geometry.instanceCount = n;
+    this.mesh.geometry.instanceCount = n; this.mesh.visible = n > 0;
     this.iPos.needsUpdate = this.iData.needsUpdate = this.iCol.needsUpdate = true;
   }
 }
@@ -85,7 +85,7 @@ export class GroundDecals {
       const c = e.id === myId ? SELF_RGB : TEAM_RGB[e.team === myTeam ? 0 : 1];
       this.iCol.setXYZ(n, c.r, c.g, c.b); n++;
     }
-    this.mesh.geometry.instanceCount = n; this.iPos.needsUpdate = this.iCol.needsUpdate = true;
+    this.mesh.geometry.instanceCount = n; this.mesh.visible = n > 0; this.iPos.needsUpdate = this.iCol.needsUpdate = true;
   }
 }
 
@@ -179,6 +179,6 @@ export class ProjectileViews {
       this.iD.setXYZ(n, p.dirX, p.dirY, s.stretch || 1); n++;
     }
     if (this.start.size > 64) for (const id of this.start.keys()) if (!world.projectiles.some((q) => q.id === id && q.alive)) this.start.delete(id);
-    this.mesh.geometry.instanceCount = n; this.iA.needsUpdate = this.iB.needsUpdate = this.iC.needsUpdate = this.iD.needsUpdate = true;
+    this.mesh.geometry.instanceCount = n; this.mesh.visible = n > 0; this.iA.needsUpdate = this.iB.needsUpdate = this.iC.needsUpdate = this.iD.needsUpdate = true;
   }
 }

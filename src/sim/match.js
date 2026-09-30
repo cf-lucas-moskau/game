@@ -11,6 +11,7 @@ import { combatSystem } from './systems/combat.js';
 import { projectileSystem } from './projectile.js';
 import { zoneSystem } from './zones.js';
 import { StateHasher } from '../core/hash.js';
+import { sq } from '../core/dmath.js';
 
 /**
  * Build a ready-to-run match.
@@ -136,7 +137,7 @@ function clockSystem(w) {
     const p = w.pickups[i];
     for (const h of w.heroes) {
       if (h.dead) continue;
-      if ((h.x - p.x) ** 2 + (h.y - p.y) ** 2 <= (RULES.RELIC_RADIUS + h.radius) ** 2) {
+      if (sq(h.x - p.x) + sq(h.y - p.y) <= sq(RULES.RELIC_RADIUS + h.radius)) {
         heal(w, h, h, h.maxHp * RULES.RELIC_HEAL); h.mana = Math.min(h.maxMana, h.mana + h.maxMana * 0.15);
         w.events.push(EV.RELIC, t, h.id, 0, p.x, p.y, 0); w.pickups.splice(i, 1); break;
       }
@@ -144,9 +145,34 @@ function clockSystem(w) {
   }
   if (!st.suddenDeath && t >= sec(RULES.SUDDEN_DEATH)) { st.suddenDeath = true; w.events.push(EV.FX, t, 0, 0, 0, 0, 0, 'sudden-death'); }
   // sudden death: both Heartstones crack and lose health every second, so every match ends
-  if (st.suddenDeath && t % TICK_HZ === 0) for (const s of w.structures) if (s.alive && s.kind === KIND.HEART) {
-    s.vulnerable = s.vulnerable || true; s.hp -= s.maxHp * RULES.SUDDEN_DEATH_HEART_DECAY; if (s.hp <= 0) { s.hp = 0; w.events.push(EV.DEATH, t, s.id, -1, s.x, s.y); w.onStructureDown(s); w.despawn(s); break; }
+  if (st.suddenDeath && t % TICK_HZ === 0) suddenDeathDecay(w, t);
+}
+
+/**
+ * One second of sudden-death decay for both Heartstones at once. When both would shatter in the same second, only
+ * one falls: the side with less Heartstone health before this second, then fewer enemy towers destroyed, fewer kills,
+ * less gold earned; a seeded coin decides a perfect tie. (Decaying in structure order broke Blue's first in every
+ * tie: 14% of bot matches, all lost by Blue.)
+ */
+function suddenDeathDecay(w, t) {
+  const before = [0, 0], broken = [];
+  for (const s of w.structures) if (s.alive && s.kind === KIND.HEART) {
+    before[s.team] = s.hp; s.vulnerable = true; s.hp -= s.maxHp * RULES.SUDDEN_DEATH_HEART_DECAY;
+    if (s.hp <= 0) broken.push(s);
   }
+  if (!broken.length) return;
+  const losing = broken.length === 1 ? broken[0].team : tiebreakLoser(w, before);
+  const loser = broken.find((s) => s.team === losing);
+  for (const s of broken) if (s !== loser) s.hp = 1;
+  loser.hp = 0; w.events.push(EV.DEATH, t, loser.id, -1, loser.x, loser.y); w.onStructureDown(loser); w.despawn(loser);
+}
+/** The team that loses a simultaneous Heartstone break (see suddenDeathDecay). */
+export function tiebreakLoser(w, heartHp) {
+  const towersDown = [0, 0], kills = [0, 0], gold = [0, 0];
+  for (const s of w.structures) if (s.kind === KIND.TOWER && (!s.alive || s.dead)) towersDown[1 - s.team]++;
+  for (const h of w.heroes) { kills[h.team] += h.kills; gold[h.team] += h.gold + h.items.reduce((a, k) => a + ((w.registry.items[k] && w.registry.items[k].cost) || 0), 0); }
+  for (const [b, r] of [[heartHp[0], heartHp[1]], [towersDown[0], towersDown[1]], [kills[0], kills[1]], [Math.round(gold[0]), Math.round(gold[1])]]) if (b !== r) return b < r ? TEAM.BLUE : TEAM.RED;
+  return w.rng.chance(0.5) ? TEAM.BLUE : TEAM.RED;
 }
 
 function spawnWave(w) {
@@ -177,7 +203,7 @@ function heroSystem(w) {
     if (e.dead) continue;
     if (t % TICK_HZ === 0) {
       const outOfCombat = t - e.lastCombatTick > sec(5);
-      if (!def.noRegen) heal(w, e, e, e.hpRegen * (outOfCombat ? 2.5 : 1), true);
+      if (!def.noRegen) heal(w, null, e, e.hpRegen * (outOfCombat ? 2.5 : 1), true);
       e.mana = Math.min(e.maxMana, e.mana + e.manaRegen);
     }
     for (let k = 0; k < e.items.length; k++) { const it = w.registry.items[e.items[k]]; if (it && it.onTick) it.onTick(w, e); }
@@ -217,7 +243,7 @@ function economySystem(w) {
     const fx = sideX(team, MAP.FOUNTAIN_X);
     const list = FOUNT; list.length = 0;
     const ids = w.scratch, n = w.hash.query(fx, 450, MAP.FOUNTAIN_R + 130, ids);
-    for (let i = 0; i < n; i++) { const u = w.entities[ids[i]]; if (u.alive && !u.dead && (u.x - fx) ** 2 + (u.y - 450) ** 2 <= (MAP.FOUNTAIN_R + u.radius) ** 2) list.push(u); }
+    for (let i = 0; i < n; i++) { const u = w.entities[ids[i]]; if (u.alive && !u.dead && sq(u.x - fx) + sq(u.y - 450) <= sq(MAP.FOUNTAIN_R + u.radius)) list.push(u); }
     for (const u of list) {
       if (u.kind !== KIND.HERO && u.kind !== KIND.PEBBLE) { if (u.team !== team && u.kind !== KIND.TOWER && u.kind !== KIND.HEART) dealDamage(w, null, u, RULES.FOUNTAIN_DPS / 10, DMG.TRUE); continue; }
       if (u.team === team) { heal(w, null, u, u.maxHp * RULES.FOUNTAIN_HEAL_PCT / 10, true); u.mana = Math.min(u.maxMana, u.mana + u.maxMana * 0.012); }

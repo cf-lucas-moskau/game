@@ -45,7 +45,8 @@ async function boot() {
         net: params.has('ping') || params.has('loss') ? { ping: num('ping', 0), jitter: num('jitter', 0), loss: num('loss', 0) } : undefined,
         autopilot: params.get('play') === 'auto', skipSeconds: num('skip', 0),
       });
-    } else app.showMenu();
+    } else if (params.has('join')) { app.showMenu(); app.showOnline({ joinCode: params.get('join') }); } // invite link
+    else app.showMenu();
   }
   if (params.get('bench')) {
     const warm = num('warmup', 5), secs = num('seconds', 90);

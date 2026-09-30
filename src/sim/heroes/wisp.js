@@ -3,6 +3,7 @@ import { KIND, LANE } from '../constants.js';
 import { skillshot, dash, dealDamage, DMG, sec, fx, amount, pickTarget, clampY, byRank } from './kit.js';
 import { haste, heal, slow } from '../damage.js';
 import { EV } from '../../core/events.js';
+import { sin, cos, atan2, hypot } from '../../core/dmath.js';
 
 // Ability numbers: one declaration used by the cast and by tooltips (kit.amount).
 const Q_VAL = { label: 'Magic damage', type: 'magic', base: [80, 120, 160, 200, 240], ratio: 0.55, stat: 'ap', bonus: { ratio: 0.6, stat: 'ad' } };
@@ -36,7 +37,7 @@ export default {
         const rank = c.rank;
         skillshot(world, e, c.x, c.y, { kind: 'wisp-moths', speed: 1400, range: 650, radius: 55,
           onHit: (w, p, u) => {
-            dealDamage(w, e, u, amount(e, Q_VAL, rank), DMG.MAGIC, { ability: true }); slow(w, u, 0.25, 1.25);
+            dealDamage(w, e, u, amount(e, Q_VAL, rank), DMG.MAGIC, { ability: true }); slow(w, u, 0.25, 1.25, e);
             if (u.kind === KIND.HERO) { e.heroState.marks.set(u.id, w.tick + sec(MARK_SEC)); fx(w, e, 'wisp-mark', u.x, u.y, MARK_SEC, u.id); }
           } });
       } },
@@ -51,8 +52,8 @@ export default {
           world.events.push(EV.BLINK, t, e.id, 0, x0, y0, 0, 'wisp-swap');
           return;
         }
-        const a = Math.atan2(c.y - e.y, c.x - e.x), d = Math.min(650, Math.hypot(c.x - e.x, c.y - e.y));
-        s.shadeX = Math.max(0, Math.min(LANE.W, e.x + Math.cos(a) * d)); s.shadeY = clampY(e.y + Math.sin(a) * d); s.shadeUntil = t + sec(SHADE_SEC);
+        const a = atan2(c.y - e.y, c.x - e.x), d = Math.min(650, hypot(c.x - e.x, c.y - e.y));
+        s.shadeX = Math.max(0, Math.min(LANE.W, e.x + cos(a) * d)); s.shadeY = clampY(e.y + sin(a) * d); s.shadeUntil = t + sec(SHADE_SEC);
         fx(world, e, 'wisp-shade', s.shadeX, s.shadeY, SHADE_SEC);
       } },
     E: { name: 'Dusk Veil', cd: [16, 15, 14, 13, 12], cost: 40,
@@ -62,8 +63,8 @@ export default {
       desc: 'Dives at an enemy hero: heavy damage, 50% more if dusk-marked (consumed) and 50% more below 30% health.',
       cast(world, e, c) {
         const t = pickTarget(world, e, c.rawX, c.rawY, 770, true, c.targetId); if (!t) return false;
-        const rank = c.rank, a = Math.atan2(t.y - e.y, t.x - e.x), stop = t.radius + e.radius, d = Math.max(0, Math.hypot(t.x - e.x, t.y - e.y) - stop);
-        dash(world, e, e.x + Math.cos(a) * d, e.y + Math.sin(a) * d, 0.18, null, (w) => {
+        const rank = c.rank, a = atan2(t.y - e.y, t.x - e.x), stop = t.radius + e.radius, d = Math.max(0, hypot(t.x - e.x, t.y - e.y) - stop);
+        dash(world, e, e.x + cos(a) * d, e.y + sin(a) * d, 0.18, null, (w) => {
           if (t.dead || !t.alive) return;
           let dmg = amount(e, R_VAL, rank); const marks = e.heroState.marks;
           if ((marks.get(t.id) || 0) > w.tick) { dmg *= 1.5; marks.delete(t.id); }

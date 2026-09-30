@@ -18,8 +18,8 @@ function chill(world, e, u) {
   if (!c) { c = { n: 0, until: 0, immuneUntil: 0 }; s.chill.set(u.id, c); }
   if (c.until <= t) c.n = 0;
   c.n = Math.min(MAX_CHILL, c.n + 1); c.until = t + sec(CHILL_SEC);
-  slow(world, u, 0.08 * c.n, CHILL_SEC * 0.5);
-  if (c.n >= MAX_CHILL && c.immuneUntil <= t) { c.n = 0; c.immuneUntil = t + sec(IMMUNE_SEC); stun(world, u, FREEZE_SEC); fx(world, e, 'rime-freeze', u.x, u.y, FREEZE_SEC, u.id); }
+  slow(world, u, 0.08 * c.n, CHILL_SEC * 0.5, e);
+  if (c.n >= MAX_CHILL && c.immuneUntil <= t) { c.n = 0; c.immuneUntil = t + sec(IMMUNE_SEC); stun(world, u, FREEZE_SEC, e); fx(world, e, 'rime-freeze', u.x, u.y, FREEZE_SEC, u.id); }
 }
 export const chillOf = (world, e, u) => { const c = e.heroState.chill.get(u.id); return c && c.until > world.tick ? c.n : 0; };
 
@@ -46,7 +46,7 @@ export default {
         spawnZone(world, { kind: 'rime-field', team: e.team, owner: e.id, x: c.x, y: c.y, r: 230, duration: 3, every: 0.25,
           onTick: (w, z) => {
             const second = (w.tick - z.born) % sec(1) === 0;
-            aoe(w, z.team, z.x, z.y, z.r, (u) => { slow(w, u, 0.25, 0.4); if (second) { dealDamage(w, e, u, amount(e, W_VAL, rank), DMG.MAGIC, { ability: true, dot: true }); chill(w, e, u); } });
+            aoe(w, z.team, z.x, z.y, z.r, (u) => { slow(w, u, 0.25, 0.4, e); if (second) { dealDamage(w, e, u, amount(e, W_VAL, rank), DMG.MAGIC, { ability: true, dot: true }); chill(w, e, u); } });
           } });
       } },
     E: { values: [E_VAL], name: 'Shatter', cd: [10, 9.5, 9, 8.5, 8], cost: 60,
@@ -68,7 +68,7 @@ export default {
           onTick: (w, z) => {
             const age = w.tick - z.born; if (age < sec(0.8)) return;
             const second = (age - sec(0.8)) % sec(1) === 0;
-            aoe(w, z.team, z.x, z.y, z.r, (u) => { slow(w, u, 0.4, 0.3); if (second) { dealDamage(w, e, u, amount(e, R_VAL, rank), DMG.MAGIC, { ability: true }); chill(w, e, u); } });
+            aoe(w, z.team, z.x, z.y, z.r, (u) => { slow(w, u, 0.4, 0.3, e); if (second) { dealDamage(w, e, u, amount(e, R_VAL, rank), DMG.MAGIC, { ability: true }); chill(w, e, u); } });
           } });
         fx(world, e, 'rime-whiteout-warn', c.x, c.y, 0.8);
       } },

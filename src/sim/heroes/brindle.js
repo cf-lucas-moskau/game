@@ -4,6 +4,7 @@ import { spawnZone } from '../zones.js';
 import { spawnProjectile } from '../projectile.js';
 import { aoe, alliesInRadius, dealDamage, DMG, scale, sec, fx, pickTarget, amount } from './kit.js';
 import { addShield, slow, heal } from '../damage.js';
+import { hypot } from '../../core/dmath.js';
 
 // Ability numbers: one declaration used by the cast and by tooltips (kit.amount).
 const Q_VAL1 = { label: 'Magic damage over 3 s', type: 'magic', base: [90, 130, 170, 210, 250], ratio: 0.6, stat: 'ap' };
@@ -49,16 +50,16 @@ export default {
     W: { values: [W_VAL1], name: 'Buzz Shield', cd: [10, 9.5, 9, 8.5, 8], cost: 5, costType: 'swarm', range: 700, freeTarget: true,
       desc: 'Bees form a shield on an ally (or yourself).',
       cast(world, e, c) {
-        let best = e, bd = Math.hypot(c.rawX - e.x, c.rawY - e.y) - 120;
-        for (const a of alliesInRadius(world, e.team, e.x, e.y, 700)) { if (a.kind !== KIND.HERO) continue; const d = Math.hypot(a.x - c.rawX, a.y - c.rawY); if (d < bd) { bd = d; best = a; } }
-        addShield(world, best, amount(e, W_VAL1, c.rank), 2.5);
+        let best = e, bd = hypot(c.rawX - e.x, c.rawY - e.y) - 120;
+        for (const a of alliesInRadius(world, e.team, e.x, e.y, 700)) { if (a.kind !== KIND.HERO) continue; const d = hypot(a.x - c.rawX, a.y - c.rawY); if (d < bd) { bd = d; best = a; } }
+        addShield(world, best, amount(e, W_VAL1, c.rank), 2.5, e);
         fx(world, best, 'brindle-shield', best.x, best.y, 2.5);
       } },
     E: { name: 'Honey Pool', cd: [12, 11.5, 11, 10.5, 10], cost: 0, costType: 'none', range: 700,
       desc: 'Sticky zone that slows enemies 30%.',
       cast(world, e, c) {
         spawnZone(world, { kind: 'brindle-honey', team: e.team, owner: e.id, x: c.x, y: c.y, r: 220, duration: 3, every: 0.2,
-          onTick: (w, z) => aoe(w, z.team, z.x, z.y, z.r, (u) => slow(w, u, 0.3, 0.35)) });
+          onTick: (w, z) => aoe(w, z.team, z.x, z.y, z.r, (u) => slow(w, u, 0.3, 0.35, e)) });
       } },
     R: { values: [R_VAL1], name: 'Hive Dome', cd: [70, 60, 50], cost: 0, costType: 'none',
       desc: 'Needs 15+ bees. Consumes the swarm for a dome that slows enemies 50% and heals allies for 4 s.',
@@ -68,7 +69,7 @@ export default {
         const healPerSec = amount(e, R_VAL1, rank) * (bees / 15);
         spawnZone(world, { kind: 'brindle-dome', team: e.team, owner: e.id, x, y, r: 340, duration: 4, every: 0.25,
           onTick: (w, z) => {
-            aoe(w, z.team, z.x, z.y, z.r, (u) => slow(w, u, 0.5, 0.3));
+            aoe(w, z.team, z.x, z.y, z.r, (u) => slow(w, u, 0.5, 0.3, e));
             for (const a of alliesInRadius(w, z.team, z.x, z.y, z.r)) heal(w, e, a, healPerSec / 4, true);
           } });
         fx(world, e, 'brindle-dome', x, y, 4);

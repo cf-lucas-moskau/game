@@ -1,5 +1,6 @@
 import { EV } from '../core/events.js';
 import { DT } from './constants.js';
+import { sq } from '../core/dmath.js';
 
 // Projectiles live outside the entity table (they are not targetable).
 // Straight skillshots, homing auto-attacks, boomerangs and piercing lines share one record.
@@ -17,7 +18,7 @@ export function spawnProjectile(world, o) {
     born: world.tick,
   };
   if (p.targetId < 0) {
-    const dx = (o.tx ?? o.x + 1) - o.x, dy = (o.ty ?? o.y) - o.y, l = Math.sqrt((dx) ** 2 + (dy) ** 2) || 1;
+    const dx = (o.tx ?? o.x + 1) - o.x, dy = (o.ty ?? o.y) - o.y, l = Math.sqrt(sq(dx) + sq(dy)) || 1;
     p.dirX = dx / l; p.dirY = dy / l;
   }
   world.projectiles.push(p);
@@ -31,7 +32,7 @@ export function projectileSystem(world) {
     if (p.targetId >= 0) { // homing
       const t = world.get(p.targetId);
       if (!t || t.dead) { p.alive = false; continue; }
-      const dx = t.x - p.x, dy = t.y - p.y, d = Math.sqrt((dx) ** 2 + (dy) ** 2);
+      const dx = t.x - p.x, dy = t.y - p.y, d = Math.sqrt(sq(dx) + sq(dy));
       if (d <= step + t.radius * 0.5) { p.x = t.x; p.y = t.y; if (p.onHit) p.onHit(world, p, t); p.alive = false; continue; }
       p.dirX = dx / d; p.dirY = dy / d; p.x += p.dirX * step; p.y += p.dirY * step;
       continue;
@@ -39,7 +40,7 @@ export function projectileSystem(world) {
     if (p.boomerang && p.returning) {
       const o = world.get(p.owner);
       if (!o || o.dead) { p.alive = false; continue; }
-      const dx = o.x - p.x, dy = o.y - p.y, d = Math.sqrt((dx) ** 2 + (dy) ** 2);
+      const dx = o.x - p.x, dy = o.y - p.y, d = Math.sqrt(sq(dx) + sq(dy));
       if (d <= step + o.radius) { p.alive = false; if (p.onEnd) p.onEnd(world, p); continue; }
       p.dirX = dx / d; p.dirY = dy / d;
     }

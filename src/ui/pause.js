@@ -3,12 +3,12 @@ import { h, clear } from './dom.js';
 import { OPTIONS } from './settings.js';
 
 export class PauseMenu {
-  constructor(root, { onResume, onSettings, onSurrender, onLeave }) {
+  constructor(root, { onResume, onSettings, onSurrender, onLeave, leaveLabel = 'Leave to hero select' }) {
     this.confirming = false;
     this.body = h('div', { class: 'stack' });
     this.el = h('div', { class: 'modal pause screen hidden', role: 'dialog', 'aria-label': 'Menu', onpointerdown: (e) => { if (e.target === this.el) onResume(); } },
       h('div', { class: 'panel' }, h('header', {}, h('h2', {}, 'Menu'), h('button', { class: 'x-btn', onclick: onResume, 'aria-label': 'Close menu' }, '✕')), this.body));
-    this.actions = { onResume, onSettings, onSurrender, onLeave };
+    this.actions = { onResume, onSettings, onSurrender, onLeave, leaveLabel };
     root.append(this.el); this.open = false;
   }
   render() {
@@ -21,7 +21,7 @@ export class PauseMenu {
           h('button', { class: 'btn danger', onclick: a.onSurrender, 'data-act': 'confirm-surrender' }, 'Yes, surrender'),
           h('button', { class: 'btn', onclick: () => { this.confirming = false; this.render(); } }, 'Keep fighting'))
         : h('button', { class: 'btn danger', onclick: () => { this.confirming = true; this.render(); }, 'data-act': 'surrender' }, 'Surrender'),
-      h('button', { class: 'btn', onclick: a.onLeave }, 'Leave to hero select'));
+      h('button', { class: 'btn', onclick: a.onLeave, 'data-act': 'leave' }, a.leaveLabel));
   }
   show() { this.open = true; this.confirming = false; this.render(); this.el.classList.remove('hidden'); }
   hide() { this.open = false; this.el.classList.add('hidden'); }

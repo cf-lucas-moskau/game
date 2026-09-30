@@ -122,19 +122,34 @@ shapes shared with the indicators. Both dispatch `ll-toggle` events for UI panel
 
 - `app.js`: the flow: menu with a live bot-match backdrop, match, end screen, back to the menu. Each match is
   torn down completely (GL context, inputs, UI, audio voices).
-- `session.js`: one match: world, bots, transport, renderer, predictor, loop.
+- `session.js`: one match: world, authority (local, online host or client), bots where the match is decided,
+  renderer, predictor, loop (which keeps simulating in hidden tabs online).
 - `predictor.js`: client-side prediction for the local hero's movement; corrections are counted by telemetry.
 - `spectate.js`: bot-only matches (menu backdrop, `?spectate=1`).
 - `lab.js`: the Leviathan Lab (`?lab=1`): one hero on an isolated stage with dummies, camera presets, forced
   animation clips, casting, pause and frame stepping. `tools/lab.mjs` drives it from the command line.
 
-## Networking (`src/net/`)
+## Networking (`src/net/`, `docs/ONLINE.md`)
 
-`transport.js` is the only path from clients to the sim. `LocalTransport` runs the authoritative sim in the
-page and simulates ping, jitter and loss; each command rides in several packets and is deduplicated by
-sequence number. A `NetTransport` (WebSocket to a Node.js authoritative server running the same `sim/`) will
-implement the same `send(cmd, now)` / `receive(now, out)` interface; the sim is already deterministic and
-headless (`tools/simulate.mjs` runs it in Node).
+Every tick `GameSession` asks its **authority** which commands to apply (`authority.js`):
+- `LocalAuthority`: single player. Bots, plus the player through `transport.js` (`LocalTransport`), which simulates
+  ping, jitter and loss (each command rides in several packets, deduplicated by sequence number).
+- `HostAuthority`: the online host. Bots, the host player and remote players' validated commands (`protocol.js`); it
+  broadcasts every tick's commands, and a state hash every 30 ticks.
+- `ClientAuthority`: an online client. It sends the player's commands to the host and steps only on the host's
+  tick bundles (lockstep with the host as authority); it detects desyncs and catches up after hitches.
+
+Lockstep needs the same world on every machine from the same inputs, so the sim uses `core/dmath.js` instead of
+engine-approximated math (a test forbids `Math.sin`, `atan2`, `hypot`, `**` in the sim). Players connect directly by
+WebRTC (`peer.js`), introduced through the public PeerJS broker by a lobby code; `lobby.js` holds the lobby state
+machines (seats, picks, readiness, start, back to lobby). No server of ours runs anywhere.
+
+## Statistics and the simulation lab (`src/stats/`, `docs/SIMLAB.md`)
+
+`match-stats.js` builds per-hero and per-match statistics from the event stream alone (damage events carry their
+cause, crowd control, slows and shields their source). `simlab.js` plans reproducible bot matches (rosters, sides,
+builds, seeds from the run seed and match index) and applies balance patches; `aggregate.js` and `report.js` turn
+records into tables. `tools/simlab.mjs` runs matches on worker threads.
 
 ## Performance (`src/perf/`, `tools/`, `docs/PERF.md`)
 

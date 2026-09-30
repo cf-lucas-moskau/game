@@ -4,6 +4,7 @@ import { spawnZone } from '../zones.js';
 import { aoe, dealDamage, DMG, sec, fx, amount, pickTarget, clampY, byRank } from './kit.js';
 import { slow, root } from '../damage.js';
 import { EV } from '../../core/events.js';
+import { sin, cos, atan2, hypot } from '../../core/dmath.js';
 
 // Ability numbers: one declaration used by the cast and by tooltips (kit.amount).
 const P_VAL = { label: 'Constellation burst (+4% of the target\'s max health)', type: 'magic', base: 70, ratio: 0.45, stat: 'ap' };
@@ -22,7 +23,7 @@ function star(world, e, u, n = 1) {
   if (c.n >= MAX_STARS) {
     c.n = 0; c.until = 0;
     const burst = amount(e, P_VAL, 1) + 0.04 * u.maxHp;
-    dealDamage(world, e, u, burst, DMG.MAGIC, { ability: true }); slow(world, u, 0.4, 1.5);
+    dealDamage(world, e, u, burst, DMG.MAGIC, { ability: true }); slow(world, u, 0.4, 1.5, e);
     fx(world, e, 'lumen-constellation', u.x, u.y, 0, u.id);
   } else fx(world, e, 'lumen-star', u.x, u.y, c.n, u.id);
 }
@@ -55,17 +56,17 @@ export default {
         spawnZone(world, { kind: 'lumen-thread', team: e.team, owner: e.id, x: e.x, y: e.y, r: 20, duration: 2, every: 0.5, data: { target: t.id },
           onTick: (w, z) => {
             const u = w.get(z.data.target);
-            if (!u || u.dead || e.dead || Math.hypot(u.x - e.x, u.y - e.y) > 900) { z.until = w.tick; z.onEnd = null; return; }
+            if (!u || u.dead || e.dead || hypot(u.x - e.x, u.y - e.y) > 900) { z.until = w.tick; z.onEnd = null; return; }
             if (w.tick === z.born) return;
             dealDamage(w, e, u, amount(e, W_VAL, rank) / 2, DMG.MAGIC, { ability: true, dot: true });
           },
-          onEnd: (w, z) => { const u = w.get(z.data.target); if (u && !u.dead && !e.dead && Math.hypot(u.x - e.x, u.y - e.y) <= 900) { star(w, e, u); root(w, u, 0.75); } } });
+          onEnd: (w, z) => { const u = w.get(z.data.target); if (u && !u.dead && !e.dead && hypot(u.x - e.x, u.y - e.y) <= 900) { star(w, e, u); root(w, u, 0.75, e); } } });
       } },
     E: { name: 'Wayfinder', cd: [16, 15, 14, 13, 12], cost: 50, range: 380,
       desc: 'Blinks 380 along her chart; her next spell within 4 s costs no mana.',
       cast(world, e, c) {
-        const x0 = e.x, y0 = e.y, a = Math.atan2(c.y - e.y, c.x - e.x), d = Math.min(380, Math.hypot(c.x - e.x, c.y - e.y));
-        e.x = e.px = Math.max(0, Math.min(LANE.W, e.x + Math.cos(a) * d)); e.y = e.py = clampY(e.y + Math.sin(a) * d); e.windup = 0;
+        const x0 = e.x, y0 = e.y, a = atan2(c.y - e.y, c.x - e.x), d = Math.min(380, hypot(c.x - e.x, c.y - e.y));
+        e.x = e.px = Math.max(0, Math.min(LANE.W, e.x + cos(a) * d)); e.y = e.py = clampY(e.y + sin(a) * d); e.windup = 0;
         world.events.push(EV.BLINK, world.tick, e.id, 0, x0, y0, 0, 'lumen-wayfinder');
         e.heroState.freeUntil = world.tick + sec(4);
       } },

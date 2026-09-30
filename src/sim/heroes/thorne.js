@@ -3,6 +3,7 @@ import { KIND } from '../constants.js';
 import { spawnZone } from '../zones.js';
 import { skillshot, aoe, alliesInRadius, dealDamage, DMG, sec, fx, amount } from './kit.js';
 import { slow, root, heal } from '../damage.js';
+import { sin, cos, hypot } from '../../core/dmath.js';
 
 // Ability numbers: one declaration used by the cast and by tooltips (kit.amount).
 const Q_VAL = { label: 'Thorn damage per shot', type: 'magic', base: [22, 32, 42, 52, 62], ratio: 0.16, stat: 'ap' };
@@ -25,7 +26,7 @@ function sow(world, e, x, y, rank, keepThree) {
     onTick: (w, z) => {
       if (w.tick < z.data.next) return;
       let best = null, bs = Infinity;
-      w.forEachInRadius(z.x, z.y, BUSH_R, z.team, 'enemy', (u) => { if (u.kind === KIND.TOWER || u.kind === KIND.HEART) return; const s = Math.hypot(u.x - z.x, u.y - z.y) - (u.kind === KIND.HERO ? 300 : 0); if (s < bs || (s === bs && u.id < best.id)) { bs = s; best = u; } });
+      w.forEachInRadius(z.x, z.y, BUSH_R, z.team, 'enemy', (u) => { if (u.kind === KIND.TOWER || u.kind === KIND.HEART) return; const s = hypot(u.x - z.x, u.y - z.y) - (u.kind === KIND.HERO ? 300 : 0); if (s < bs || (s === bs && u.id < best.id)) { bs = s; best = u; } });
       if (!best) return;
       z.data.next = w.tick + sec(1.2);
       skillshot(w, e, best.x, best.y, { kind: 'thorne-thorn', x: z.x, y: z.y, speed: 1400, range: BUSH_R + 60, radius: 30,
@@ -52,8 +53,8 @@ export default {
         skillshot(world, e, c.x, c.y, { kind: 'thorne-vine', speed: 1200, range: 800, radius: 55,
           onHit: (w, p, u) => {
             dealDamage(w, e, u, amount(e, W_VAL, rank), DMG.MAGIC, { ability: true });
-            const near = bushes(w, e).some((z) => sprouted(w, z) && Math.hypot(z.x - u.x, z.y - u.y) < 400);
-            root(w, u, near ? 1.8 : 1.2); fx(w, e, 'thorne-snare', u.x, u.y, near ? 1.8 : 1.2, u.id);
+            const near = bushes(w, e).some((z) => sprouted(w, z) && hypot(z.x - u.x, z.y - u.y) < 400);
+            root(w, u, near ? 1.8 : 1.2, e); fx(w, e, 'thorne-snare', u.x, u.y, near ? 1.8 : 1.2, u.id);
           } });
       } },
     E: { values: [E_VAL, E_VAL2], name: 'Overgrowth', cd: [14, 13, 12, 11, 10], cost: 70,
@@ -61,7 +62,7 @@ export default {
       cast(world, e, c) {
         const mine = bushes(world, e).filter((z) => sprouted(world, z)); if (!mine.length) return false;
         for (const z of mine) {
-          aoe(world, e.team, z.x, z.y, 260, (u) => { dealDamage(world, e, u, amount(e, E_VAL, c.rank), DMG.MAGIC, { ability: true }); slow(world, u, 0.25, 1); });
+          aoe(world, e.team, z.x, z.y, 260, (u) => { dealDamage(world, e, u, amount(e, E_VAL, c.rank), DMG.MAGIC, { ability: true }); slow(world, u, 0.25, 1, e); });
           for (const a of alliesInRadius(world, e.team, z.x, z.y, 260)) if (a !== e) heal(world, e, a, amount(e, E_VAL2, c.rank));
           heal(world, e, e, amount(e, E_VAL2, c.rank) * 0.6);
           fx(world, e, 'thorne-pulse', z.x, z.y);
@@ -71,8 +72,8 @@ export default {
       desc: 'A grove bursts from the ground: damage and a 50% slow in 300 units, and five thornbushes ring the spot for 6 s.',
       cast(world, e, c) {
         const rank = c.rank;
-        aoe(world, e.team, c.x, c.y, 300, (u) => { dealDamage(world, e, u, amount(e, R_VAL, rank), DMG.MAGIC, { ability: true }); slow(world, u, 0.5, 2); });
-        for (let i = 0; i < 5; i++) { const a = (i / 5) * Math.PI * 2; sow(world, e, c.x + Math.cos(a) * 240, c.y + Math.sin(a) * 240, rank, false); }
+        aoe(world, e.team, c.x, c.y, 300, (u) => { dealDamage(world, e, u, amount(e, R_VAL, rank), DMG.MAGIC, { ability: true }); slow(world, u, 0.5, 2, e); });
+        for (let i = 0; i < 5; i++) { const a = (i / 5) * Math.PI * 2; sow(world, e, c.x + cos(a) * 240, c.y + sin(a) * 240, rank, false); }
         fx(world, e, 'thorne-grove', c.x, c.y);
       } },
   },

@@ -25,7 +25,8 @@ npx playwright install chromium        # needed by e2e, bench, soak (or set PW_P
 npm run dev                            # play: http://localhost:5173/ (hero select), or ?hero=vesper&ping=100 to skip it
 npm test                               # vitest: sim, heroes, items, bots, transport, predictor
 npm run build                          # single self-contained dist/index.html (assets inlined), must stay < 16 MB
-node tools/simulate.mjs 10             # headless bot-vs-bot matches: length, win rates, sim cost
+node tools/simlab.mjs run --matches 960           # simulation lab: bot matches -> balance statistics (docs/SIMLAB.md)
+node tools/simlab.mjs run --focus saffi --set heroes.saffi.base.ad=x1.1 --ab   # try a balance change, A/B
 node tools/bench.mjs                   # performance benchmark (see docs/PERF.md)
 node tools/soak.mjs 4                  # leak check: retained-heap slope
 node tools/shot.mjs "?quality=medium&skip=150" out.png 15 1280 720   # screenshot helper
@@ -34,7 +35,7 @@ node tools/lab.mjs strip --hero saffi --clip attack    # animation frames across
 node tools/lab.mjs ability --hero gus --slot R         # timeline of an ability after the cast
 node tools/lab.mjs attack --hero vesper                # auto-attack timeline;  shot / info: see the file header
 ```
-URL parameters: `lab=1` (Leviathan Lab: isolated stage, `window.__lab`, panel; `cam= zoom= paused=1 panel=0 dummy= dummies=`), `hero=`, `heroes=a,b,c,d,e,f` (roster), `ping= jitter= loss=` (simulated network),
+URL parameters: `join=CODE` (online invite), `broker=host:port`, `netdebug=1`, `lab=1` (Leviathan Lab: isolated stage, `window.__lab`, panel; `cam= zoom= paused=1 panel=0 dummy= dummies=`), `hero=`, `heroes=a,b,c,d,e,f` (roster), `ping= jitter= loss=` (simulated network),
 `bots=easy|medium|hard`, `quality=low|medium|high`, `spectate=1`, `play=auto` (autopilot through the
 input path), `skip=<seconds>` (fast-forward the sim), `seed=`, `touch=1`, `cpu=1` (CPU measurement mode), `bench=1`.
 
@@ -103,8 +104,13 @@ input path), `skip=<seconds>` (fast-forward the sim), `seed=`, `touch=1`, `cpu=1
    rendered at runtime (`src/render/portraits.js`), sunk-head fix in `mergeSkinned`, screen-space picking, and the
    hero select screen. Balance by bot matches is recorded in docs/prs/0024-ten-heroes.md (the original six were
    already spread 37-73%; melee divers Saffi/Wisp are low because of shared bot engagement logic, not their kits).
-8. Next: batch pack props/domes (draw-call headroom), bots that play melee divers better (Saffi, Wisp), more skins, then phase 5: `NetTransport` + Node.js
-   WebSocket authoritative server (the owner can host Node).
+8. Done (PRs #28-#33, owner request "simulation lab, diver bots, draw calls, client-hosted online play"):
+   simulation lab (`tools/simlab.mjs`, `docs/SIMLAB.md`); sudden-death tiebreak fix (blue lost every simultaneous
+   heart break); bots recover at the fountain and melee divers commit on kills; empty instanced layers no longer draw;
+   the spectate bench ran 16 heroes since PR #24 (fixed); deterministic sim math; lockstep authorities; online
+   lobbies over WebRTC through the public PeerJS broker (`docs/ONLINE.md`).
+9. Next: a balance pass with the lab (Saffi's survivability, Morrow, Dredge; owner decision), desync resync (replay the
+   command log), optional self-hosted broker, more skins.
 
 ## Architecture map
 - `src/core/`: seeded RNG (sfc32), pools, spatial hash, event stream, state hasher, fixed 30 Hz loop.
@@ -112,7 +118,9 @@ input path), `skip=<seconds>` (fast-forward the sim), `seed=`, `touch=1`, `cpu=1
   (`damage.js`), abilities framework (`abilities.js`), heroes (`heroes/*.js`, one module each), items
   (`items/index.js`), commands schema + validation (`commands.js`). Same seed + command log = same state hash.
 - `src/ai/`: bots as ordinary clients emitting commands (states lane/trade/allin/retreat/siege; per-hero scripts).
-- `src/net/transport.js`: LocalTransport with ping/jitter/loss + redundancy, allocation-free.
+- `src/net/`: `authority.js` (local / online host / online client), `protocol.js` (messages, command validation, build
+  id), `lobby.js` (lobby state machines), `peer.js` (WebRTC via the public PeerJS broker), `transport.js`
+  (LocalTransport with ping/jitter/loss + redundancy, allocation-free).
 - `src/app/`: `session.js` (player + bots through the transport), `predictor.js` (client prediction),
   `spectate.js` (bot-only).
 - `src/input/`: `desktop.js`, `touch.js`, shared `intent.js` targeting and `aim.js` aim shapes.
@@ -129,6 +137,8 @@ input path), `skip=<seconds>` (fast-forward the sim), `seed=`, `touch=1`, `cpu=1
 - `src/audio/`: Web Audio engine, synth voices, sounds, sfx director (sim events -> sounds), music director.
 - `src/app/app.js`: application flow and lifecycle.
 - `src/perf/`: telemetry (`window.__perf`) and budgets.
+- `src/stats/`: simulation lab core (match statistics collector from events, match plans, patches, aggregation,
+  reports); CLI `tools/simlab.mjs`, guide `docs/SIMLAB.md`.
 
 ## Lessons learned (keep these)
 - Declare every entity field in `createEntity()`. Adding properties later put V8 objects in dictionary mode
@@ -144,6 +154,12 @@ input path), `skip=<seconds>` (fast-forward the sim), `seed=`, `touch=1`, `cpu=1
   is wrong. Measure what is drawn (the portrait studio renders a small silhouette) instead of trusting bind data.
 - `mergeSkinned` must keep each part's mesh world and bind matrices when re-binding (dropping them sank heads).
 - Pick units in screen space (`intent.screenPick`), not by projecting the cursor onto the ground.
-- Balance by bot matches needs 480-960 matches per round (a hero's win rate has ~3% standard error at ~350 games).
+- Balance by bot matches needs 480-960 matches per round (a hero's win rate has ~3% standard error at ~350 games). Use the
+  simulation lab (`tools/simlab.mjs`): an `--ab` run diverges chaotically from its baseline, so judge only the patched hero's z.
 - Kenney rigs face +z at yaw 0 (`faceToRotY = PI/2 - a`); verified by close-up, don't "fix" it.
 - Background processes do not survive between tool calls in some environments; keep each gate step short.
+- Never run builds, browsers or the simulation lab while gate bench steps run: contention shows up as GC outliers
+  (a 46.9 ms desktop pause during a concurrent e2e run).
+- The sim must stay cross-engine deterministic for online play: only `src/core/dmath.js` math (tests enforce it).
+- The container's proxy blocks WebSocket upgrades: the public PeerJS broker cannot be reached from here; the online
+  e2e runs a local PeerJS server (`peer`) with the same protocol.

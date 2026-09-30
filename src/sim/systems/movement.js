@@ -2,6 +2,7 @@ import { LANE, DT, KIND, RULES, isStructure } from '../constants.js';
 import { ORDER } from '../entity.js';
 import { moveSpeed, canMove } from '../stats.js';
 import { blockingWall } from '../zones.js';
+import { atan2, sq } from '../../core/dmath.js';
 
 function tryMove(world, e, dx, dy) {
   const x0 = e.x, y0 = e.y;
@@ -9,7 +10,7 @@ function tryMove(world, e, dx, dy) {
   const w = blockingWall(world, e, x0, y0, x1, y1);
   if (w) {
     // slide along the wall direction
-    const wx = w.bx - w.ax, wy = w.by - w.ay, wl = Math.sqrt((wx) ** 2 + (wy) ** 2) || 1;
+    const wx = w.bx - w.ax, wy = w.by - w.ay, wl = Math.sqrt(sq(wx) + sq(wy)) || 1;
     const ux = wx / wl, uy = wy / wl, d = dx * ux + dy * uy;
     x1 = x0 + ux * d; y1 = y0 + uy * d;
     if (blockingWall(world, e, x0, y0, x1, y1)) return false;
@@ -36,13 +37,13 @@ export function movementSystem(world) {
         if (tg && !tg.dead) { tx = tg.x; ty = tg.y; go = true; stopDist = e.range + e.radius + tg.radius - 8; }
       }
       if (go && e.windup === 0) {
-        const dx = tx - e.x, dy = ty - e.y, d = Math.sqrt((dx) ** 2 + (dy) ** 2);
+        const dx = tx - e.x, dy = ty - e.y, d = Math.sqrt(sq(dx) + sq(dy));
         if (d > stopDist) {
           const step = Math.min(d - stopDist + 1, moveSpeed(world, e) * DT);
           let ux = dx / d, uy = dy / d;
           if (!(e.targetId >= 0 && d < stopDist + 150)) { avoidStructures(world, e, ux, uy, ty); ux = AV.x; uy = AV.y; }
           tryMove(world, e, ux * step, uy * step);
-          e.facing = Math.atan2(uy, ux);
+          e.facing = atan2(uy, ux);
           e.moving = true;
         } else { e.moving = false; if (e.order === ORDER.MOVE) e.order = ORDER.IDLE; }
       } else e.moving = false;
@@ -72,7 +73,7 @@ function avoidStructures(world, e, ux, uy, goalY) {
     const k = ((clear - Math.abs(lateral)) / clear) * 1.6;
     ax += -uy * side * k; ay += ux * side * k;
   }
-  const l = Math.sqrt((ax) ** 2 + (ay) ** 2) || 1; AV.x = ax / l; AV.y = ay / l;
+  const l = Math.sqrt(sq(ax) + sq(ay)) || 1; AV.x = ax / l; AV.y = ay / l;
 }
 const MASS = { [KIND.HERO]: 3, [KIND.PEBBLE]: 5, [KIND.MELEE]: 1, [KIND.RANGED]: 1, [KIND.SIEGE]: 2 };
 function separation(world) {

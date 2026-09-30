@@ -2,6 +2,7 @@
 import { spawnZone } from '../zones.js';
 import { aoe, alliesInRadius, dash, dealDamage, DMG, sec, fx, amount, clampY } from './kit.js';
 import { slow, stun, heal, haste } from '../damage.js';
+import { sin, cos, atan2 } from '../../core/dmath.js';
 
 // Ability numbers: one declaration used by the cast and by tooltips (kit.amount).
 const Q_VAL = { label: 'Magic damage (+40% on the beat)', type: 'magic', base: [70, 105, 140, 175, 210], ratio: 0.55, stat: 'ap' };
@@ -28,10 +29,10 @@ export default {
     Q: { values: [Q_VAL], name: 'Crescendo', cd: [7, 6.5, 6, 5.5, 5], cost: [50, 55, 60, 65, 70], range: 460,
       desc: 'A wave of sound in a cone: damage and a 25% slow (45% on the beat).',
       cast(world, e, c) {
-        const k = empower(world, e), dir = Math.atan2(c.y - e.y, c.x - e.x), half = Math.PI / 4;
+        const k = empower(world, e), dir = atan2(c.y - e.y, c.x - e.x), half = Math.PI / 4;
         aoe(world, e.team, e.x, e.y, 480, (u) => {
-          let a = Math.atan2(u.y - e.y, u.x - e.x) - dir; a = Math.atan2(Math.sin(a), Math.cos(a)); if (Math.abs(a) > half) return;
-          dealDamage(world, e, u, amount(e, Q_VAL, c.rank) * k, DMG.MAGIC, { ability: true }); slow(world, u, k > 1 ? 0.45 : 0.25, 1.5);
+          let a = atan2(u.y - e.y, u.x - e.x) - dir; a = atan2(sin(a), cos(a)); if (Math.abs(a) > half) return;
+          dealDamage(world, e, u, amount(e, Q_VAL, c.rank) * k, DMG.MAGIC, { ability: true }); slow(world, u, k > 1 ? 0.45 : 0.25, 1.5, e);
         });
         fx(world, e, 'cantor-crescendo', e.x, e.y, dir, k > 1 ? 1 : 0);
       } },
@@ -45,9 +46,9 @@ export default {
     E: { values: [E_VAL], name: 'Staccato', cd: [12, 11, 10, 9, 8], cost: 55, range: 380,
       desc: 'Leaps 380 and lands on a hard note: damage around him. On the beat the note stuns for 0.6 s.',
       cast(world, e, c) {
-        const k = empower(world, e), rank = c.rank, a = Math.atan2(c.y - e.y, c.x - e.x);
-        dash(world, e, e.x + Math.cos(a) * 380, clampY(e.y + Math.sin(a) * 380), 0.25, null, (w) => {
-          aoe(w, e.team, e.x, e.y, 200, (u) => { dealDamage(w, e, u, amount(e, E_VAL, rank), DMG.MAGIC, { ability: true }); if (k > 1) stun(w, u, 0.6); });
+        const k = empower(world, e), rank = c.rank, a = atan2(c.y - e.y, c.x - e.x);
+        dash(world, e, e.x + cos(a) * 380, clampY(e.y + sin(a) * 380), 0.25, null, (w) => {
+          aoe(w, e.team, e.x, e.y, 200, (u) => { dealDamage(w, e, u, amount(e, E_VAL, rank), DMG.MAGIC, { ability: true }); if (k > 1) stun(w, u, 0.6, e); });
           fx(w, e, 'cantor-staccato', e.x, e.y, 0, k > 1 ? 1 : 0);
         }, 'cantor-leap');
       } },

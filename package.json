@@ -17,6 +17,7 @@
     "@gltf-transform/core": "^4.5.0",
     "@gltf-transform/extensions": "^4.5.0",
     "@gltf-transform/functions": "^4.5.0",
+    "peer": "^1.0.2",
     "vite": "^5.4.21",
     "vite-plugin-singlefile": "^2.3.3",
     "vitest": "^2.1.9"
@@ -24,6 +25,7 @@
   "dependencies": {
     "@fontsource-variable/bricolage-grotesque": "^5.3.0",
     "@fontsource/gloock": "^5.3.0",
+    "peerjs": "^1.5.5",
     "three": "^0.169.0"
   }
 }

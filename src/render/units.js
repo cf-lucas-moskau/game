@@ -377,7 +377,9 @@ class MinionBatch {
     this.iTint.setXYZW(i, tint.r, tint.g, tint.b, 0.12 + flash * 0.6);
   }
   end() {
-    this.mesh.count = this.count; this.mesh.instanceMatrix.needsUpdate = true;
+    this.mesh.count = this.count; this.mesh.visible = this.count > 0; // zero instances would still cost a draw call
+    if (!this.count) return;
+    this.mesh.instanceMatrix.needsUpdate = true;
     if (this.static) { if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true; }
     else { this.iFrame.needsUpdate = true; this.iTint.needsUpdate = true; }
   }
@@ -464,7 +466,7 @@ class BeeSwarm {
         tmpObj.rotation.set(0, -a, 0); tmpObj.scale.setScalar(1); tmpObj.updateMatrix(); this.mesh.setMatrixAt(n++, tmpObj.matrix);
       }
     }
-    this.mesh.count = n; this.mesh.instanceMatrix.needsUpdate = true;
+    this.mesh.count = n; this.mesh.visible = n > 0; if (n) this.mesh.instanceMatrix.needsUpdate = true;
   }
 }
 
