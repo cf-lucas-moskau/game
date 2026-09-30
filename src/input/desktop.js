@@ -6,6 +6,7 @@
 import { moveCmd, attackCmd, attackMoveCmd, castCmd, spellCmd, stopCmd, itemActiveCmd } from '../sim/commands.js';
 import { screenPick, clampToRange } from './intent.js';
 import { aimFor, isDrawn, SPELL_AIM } from './aim.js';
+import { isStructure } from '../sim/constants.js';
 
 const SLOT_KEYS = { KeyQ: 0, KeyW: 1, KeyE: 2, KeyR: 3 };
 export class DesktopInput {
@@ -16,7 +17,8 @@ export class DesktopInput {
     this.stroke = null;
     const on = (t, ev, f, o) => { t.addEventListener(ev, f, o); (this.off ||= []).push(() => t.removeEventListener(ev, f, o)); };
     on(canvas, 'contextmenu', (e) => e.preventDefault());
-    on(canvas, 'pointermove', (e) => { if (e.pointerType === 'mouse') this.move(e); });
+    on(canvas, 'pointermove', (e) => { if (e.pointerType === 'mouse') { this.inside = true; this.move(e); } });
+    on(canvas, 'pointerleave', () => { this.inside = false; });
     on(canvas, 'pointerdown', (e) => { if (e.pointerType === 'mouse') this.down(e); });
     on(window, 'pointerup', (e) => { if (e.pointerType === 'mouse' && e.button === 2) this.mouse.right = false; });
     on(window, 'keydown', (e) => this.key(e, true));
@@ -30,8 +32,7 @@ export class DesktopInput {
   toWorld() { const p = this.s.renderer.screenToWorld(this.mouse.sx, this.mouse.sy); if (p) { this.mouse.x = p.x; this.mouse.y = p.y; } return this.mouse; }
   move(e) {
     this.mouse.sx = e.clientX; this.mouse.sy = e.clientY; this.toWorld();
-    const h = this.pick(this.me);
-    this.s.renderer.hoverId = h && h.team !== this.me.team ? h.id : -1;
+    this.hover();
     if (this.stroke) this.addStrokePoint();
     if (this.aim.active) { this.aim.x = this.mouse.x; this.aim.y = this.mouse.y; }
   }
@@ -53,9 +54,19 @@ export class DesktopInput {
       this.onInspect(u ? u.id : -1);
     }
   }
-  /** Called every frame: holding right mouse keeps steering (throttled to 8/s). */
+  /** What is under the mouse: the renderer's hover highlight (enemies) and the cursor. */
+  hover() {
+    const h = this.pick(null, true), me = this.me, targetable = h && h.untargetableUntil <= this.world().tick;
+    this.s.renderer.hoverId = h && h !== me && h.team !== me.team && targetable ? h.id : -1;
+    this.setCursor(this.aim.active || this.attackArmed || this.stroke ? 'target'
+      : !h ? 'default' : h.team === me.team ? 'ally' : targetable && !(isStructure(h.kind) && !h.vulnerable) ? 'attack' : 'default');
+  }
+  /** Cursor for the canvas (src/ui/cursors.js); touches the DOM only when it changes. */
+  setCursor(c) { if (c !== this.cursor) { this.cursor = c; this.canvas.dataset.cursor = c; } }
+  /** Called every frame: holding right mouse keeps steering (throttled to 8/s); units move under a still cursor. */
   update() {
     const now = performance.now();
+    if (this.inside) this.hover();
     if (this.mouse.right && !this.stroke && now - this.lastSteer > 125) {
       this.lastSteer = now; this.toWorld();
       const h = this.pick(this.me);
@@ -115,5 +126,5 @@ export class DesktopInput {
     }
     this.aim.active = false; this.toWorld(); this.cast(slot, a);
   }
-  dispose() { for (const f of this.off || []) f(); }
+  dispose() { for (const f of this.off || []) f(); delete this.canvas.dataset.cursor; }
 }

@@ -28,6 +28,19 @@ const until = async (page, fn, arg, ms = 20000) => { try { await page.waitForFun
   const q = await screenOf(page, b.x + 300, b.y);
   await page.mouse.move(q.x, q.y); await page.keyboard.press('q');
   check('Q quick-casts at the cursor', await until(page, () => window.__game.me.cds[0] > 0));
+  // game cursors: installed as image-set CSS cursors, and the canvas switches them by what is under the mouse
+  check('game cursors are installed', await page.evaluate(() => /image-set|url\(/.test(getComputedStyle(document.documentElement).getPropertyValue('--cur-attack'))));
+  const cursorOver = async (pick) => {
+    const p = await page.evaluate((pick) => { const g = window.__game; g.stop(); const u = pick === 'ally' ? g.world.heroes.find((h) => h !== g.me && h.team === g.me.team && !h.dead) : g.world.heroes.find((h) => h.team !== g.me.team && !h.dead);
+      if (pick === 'enemy') { u.x = g.me.x + 200; u.y = g.me.y; u.px = u.x; u.py = u.y; } return g.renderer.worldToScreen(u.x, u.y, 1.2); }, pick);
+    await page.mouse.move(p.x, p.y); await page.mouse.move(p.x + 1, p.y);
+    await page.evaluate(() => { window.__game.renderer.render(0, 0); window.__game.start(); });
+    return until(page, () => !!document.querySelector('canvas.view').dataset.cursor, null, 3000).then(() => page.evaluate(() => document.querySelector('canvas.view').dataset.cursor));
+  };
+  const cAlly = await cursorOver('ally'), cEnemy = await cursorOver('enemy');
+  await page.keyboard.down('a'); await page.waitForTimeout(150);
+  const cArmed = await page.evaluate(() => document.querySelector('canvas.view').dataset.cursor); await page.keyboard.up('a'); await page.mouse.down({ button: 'right' }); await page.mouse.up({ button: 'right' }); // a right click disarms
+  check('the cursor shows allies, enemies and attack-move targeting', cAlly === 'ally' && cEnemy === 'attack' && cArmed === 'target', `${cAlly} / ${cEnemy} / ${cArmed}`);
   // draw a closed loop with W held (stop first: the camera follows the hero, so screen points
   // computed up front only map to a fixed world shape while the hero stands still)
   await page.keyboard.press('s');

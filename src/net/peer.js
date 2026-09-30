@@ -48,8 +48,8 @@ function channelOf(conn) {
   conn.on('iceStateChanged', (s) => { if (s === 'failed' || s === 'closed' || s === 'disconnected') closed(); });
   return ch;
 }
-// `?netdebug=1` logs the signaling and WebRTC negotiation to the console (support and diagnostics)
-const DEBUG = typeof location !== 'undefined' && /[?&]netdebug=1/.test(location.search) ? 3 : 0;
+// `?netdebug=1` logs connection errors, `?netdebug=3` the whole signaling and WebRTC negotiation (support, diagnostics)
+const DEBUG = typeof location !== 'undefined' ? +((/[?&]netdebug=(\d)/.exec(location.search) || [])[1] || 0) : 0; // 1 errors, 3 everything
 function newPeer(id, broker) {
   return new Peer(id, { ...broker, config: { iceServers: ICE }, debug: DEBUG });
 }
@@ -85,20 +85,31 @@ export async function openLobby({ onJoin, broker = PUBLIC_BROKER, attempts = 6 }
   throw new Error('Could not find a free lobby code. Try again.');
 }
 
+/**
+ * A timeout that tolerates a busy page: when it fires late (the main thread was blocked, e.g. by a slow device
+ * painting portraits), the network had no chance to deliver, so it grants another period (at most twice).
+ */
+function patientTimeout(fn, ms) {
+  let due = performance.now() + ms, extensions = 0, id = 0;
+  const tick = () => { const late = performance.now() - due; if (late > 1000 && extensions < 2) { extensions++; due = performance.now() + ms; id = setTimeout(tick, ms); } else fn(); };
+  id = setTimeout(tick, ms);
+  return () => clearTimeout(id);
+}
+
 /** Join a lobby by code. Resolves to an open channel, or rejects with a readable message. */
 export function joinLobby(code, { broker = PUBLIC_BROKER, metadata = {}, timeoutMs = 15000, brokerTimeoutMs = 30000 } = {}) {
   return new Promise((res, rej) => {
     const peer = newPeer(undefined, broker);
-    let timer = 0;
-    const fail = (e) => { if (DEBUG) console.warn('join failed', e && e.type, e && e.message); clearTimeout(timer); peer.destroy(); rej(Object.assign(new Error(errorText(e)), { type: e && e.type })); };
+    let cancel = () => {};
+    const fail = (e) => { if (DEBUG) console.warn('join failed', e && e.type, e && e.message); cancel(); peer.destroy(); rej(Object.assign(new Error(errorText(e)), { type: e && e.type })); };
     // two phases, two clocks: reaching the broker, then the direct connection to the host
-    timer = setTimeout(() => fail({ type: 'network' }), brokerTimeoutMs);
+    cancel = patientTimeout(() => fail({ type: 'network' }), brokerTimeoutMs);
     peer.on('error', fail);
     peer.on('open', () => {
-      clearTimeout(timer); timer = setTimeout(() => fail({ type: 'webrtc' }), timeoutMs);
+      cancel(); cancel = patientTimeout(() => fail({ type: 'webrtc' }), timeoutMs);
       const conn = peer.connect(PREFIX + normalizeCode(code), { reliable: true, serialization: 'json', metadata });
       conn.on('open', () => {
-        clearTimeout(timer);
+        cancel();
         const ch = channelOf(conn);
         const close = ch.close; ch.close = () => { close(); peer.destroy(); };
         // once connected, the broker is no longer needed

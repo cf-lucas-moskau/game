@@ -35,6 +35,7 @@ const ROWS = [
   ['quality', 'Graphics quality', 'Applies from the next match'],
   ['shake', 'Camera shake', ''],
   ['damageNumbers', 'Damage numbers', ''],
+  ['cursor', 'Cursor', 'Game cursors change with what is under them'],
   ['ping', 'Simulated ping', 'Test how the game feels online'],
 ];
 export class SettingsPanel {

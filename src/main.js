@@ -7,6 +7,7 @@ import { Lab, labPanel } from './app/lab.js';
 import { loadFonts } from './ui/fonts.js';
 import { defaultQuality } from './render/quality.js';
 import { HERO_KEYS } from './sim/heroes/index.js';
+import { installCursors } from './ui/cursors.js';
 
 const params = new URLSearchParams(location.search);
 const root = document.getElementById('app');
@@ -21,6 +22,7 @@ async function boot() {
   await Promise.all([lib.loadAll((p) => { bootText.textContent = `Waking the whale… ${Math.round(p * 100)}%`; }), loadFonts()]);
   telemetry.gauges.loadMs = Math.round(performance.now() - t0);
   const veil = root.querySelector('#boot'); veil.classList.add('out'); setTimeout(() => veil.remove(), 400);
+  if (params.has('lab') || params.has('spectate')) installCursors().catch(() => {}); // the app installs them per its settings
   if (params.has('lab')) {
     // Leviathan Lab: heroes, animations and effects up close (see src/app/lab.js, tools/lab.mjs)
     const lab = window.__lab = new Lab({ root, lib, quality: params.get('quality') || 'high', hero: params.get('hero') || 'vesper', skin: params.get('skin') || undefined, dummy: params.get('dummy') || 'morrow', dummies: num('dummies', 2) });
