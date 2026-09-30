@@ -7,7 +7,7 @@ import { isStructure } from '../constants.js';
 import { sin, cos, atan2, hypot } from '../../core/dmath.js';
 
 // Ability numbers: one declaration used by the cast and by tooltips (kit.amount).
-const Q_VAL1 = { label: 'Magic damage', type: 'magic', base: [60, 90, 120, 150, 180], ratio: 0.55, stat: 'ap' };
+const Q_VAL1 = { label: 'Magic damage', type: 'magic', base: [81, 122, 162, 203, 243], ratio: 0.55, stat: 'ap' };
 const W_VAL1 = { label: 'Magic damage', type: 'magic', base: [40, 60, 80, 100, 120], ratio: 0.3, stat: 'ap' };
 
 const INK_MAX = 100, INK_REGEN = 14, CLOSE_DIST = 60;

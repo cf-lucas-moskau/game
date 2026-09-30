@@ -6,14 +6,14 @@ import { slow, root, knockUp, knock, addShield } from '../damage.js';
 import { sin, cos, atan2, hypot } from '../../core/dmath.js';
 
 // Ability numbers: one declaration used by the cast and by tooltips (kit.amount).
-const Q_VAL = { label: 'Physical damage', type: 'phys', base: [60, 95, 130, 165, 200], ratio: 0.6, stat: 'ad', bonus: { ratio: 0.03, stat: 'maxHp' } };
+const Q_VAL = { label: 'Physical damage', type: 'phys', base: [30, 48, 65, 83, 100], ratio: 0.6, stat: 'ad', bonus: { ratio: 0.03, stat: 'maxHp' } };
 const W_VAL = { label: 'Shield', type: 'shield', base: [60, 85, 110, 135, 160], ratio: 0.08, stat: 'maxHp' };
 const W_VAL2 = { label: 'Burst when it ends', type: 'magic', base: [35, 50, 65, 80, 95], ratio: 0.03, stat: 'maxHp' };
 const E_VAL = { label: 'Physical damage', type: 'phys', base: [40, 65, 90, 115, 140], ratio: 0.45, stat: 'ad' };
 const R_VAL = { label: 'Magic damage', type: 'magic', base: [150, 250, 350], ratio: 0.06, stat: 'maxHp' };
 
 // Passive numbers (patchable by the simulation lab): reef stacks, armor and magic resist per stack.
-const T = { maxReef: 6, perStack: 2 };
+const T = { maxReef: 4, perStack: 1.5 };
 function grow(world, e, n) { const s = e.heroState; s.reef = Math.min(T.maxReef, s.reef + n); s.lastGrow = world.tick; e.statsDirty = true; }
 
 export default {
@@ -21,7 +21,7 @@ export default {
   rankOrder: ['Q', 'W', 'E'],
   build: ['barnacle-plate', 'anchor-boots', 'molted-shell', 'coral-aegis', 'stillwater-pendant', 'borrowed-seconds'], // recommended items: shop highlights and bot purchase order
   tuning: T,
-  base: { hp: 640, hpL: 104, ad: 58, adL: 3.4, armor: 34, armorL: 4.6, mr: 32, mrL: 1.8, as: 0.63, asL: 0.02, range: 175, speed: 335, mana: 320, manaL: 40, manaRegen: 2.6, radius: 38 },
+  base: { hp: 600, hpL: 104, ad: 58, adL: 3.4, armor: 34, armorL: 4.6, mr: 32, mrL: 1.8, as: 0.63, asL: 0.02, range: 175, speed: 335, mana: 320, manaL: 40, manaRegen: 2.6, radius: 38 },
   passive: { name: 'Living Reef', get desc() { return `Hits from heroes grow reef on her (up to ${T.maxReef} stacks): each gives ${T.perStack} armor and magic resist. Out of combat the reef recedes.`; } },
   init(world, e) { e.heroState = { reef: 0, lastGrow: -999, shieldUntil: 0, shieldRank: 1 }; },
   onTick(world, e) {
@@ -38,7 +38,7 @@ export default {
   onRespawn(world, e) { e.heroState.reef = 0; e.heroState.shieldUntil = 0; e.statsDirty = true; },
   modifyStats(world, e) { const n = e.heroState ? e.heroState.reef : 0; return n ? { armor: n * T.perStack, mr: n * T.perStack } : null; },
   abilities: {
-    Q: { values: [Q_VAL], name: 'Coral Spike', cd: [10, 9.5, 9, 8.5, 8], cost: [50, 55, 60, 65, 70], range: 650,
+    Q: { values: [Q_VAL], name: 'Coral Spike', cd: [12.5, 12, 11.25, 10.5, 10], cost: [50, 55, 60, 65, 70], range: 650,
       desc: 'Coral erupts along a line after 0.4 s: damage and a 0.5 s knock-up.',
       cast(world, e, c) {
         const rank = c.rank, dir = atan2(c.y - e.y, c.x - e.x), x0 = e.x, y0 = e.y, x1 = e.x + cos(dir) * 650, y1 = clampY(e.y + sin(dir) * 650);

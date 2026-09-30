@@ -16,7 +16,7 @@ export default {
   key: 'wisp', name: 'Wisp Umbrel', title: 'the Duskmoth', role: 'Assassin', resource: 'energy', difficulty: 'Hard',
   rankOrder: ['Q', 'W', 'E'],
   build: ['storm-cutlass', 'swiftfin-treads', 'reefbreaker', 'cursed-coin', 'leviathans-maw', 'borrowed-seconds'], // recommended items: shop highlights and bot purchase order
-  base: { hp: 630, hpL: 102, ad: 66, adL: 3.8, armor: 30, armorL: 4.5, mr: 30, mrL: 1.4, as: 0.68, asL: 0.028, range: 160, speed: 350, radius: 30 },
+  base: { hp: 780, hpL: 112, ad: 66, adL: 3.8, armor: 30, armorL: 4.5, mr: 30, mrL: 1.4, as: 0.68, asL: 0.028, range: 160, speed: 350, radius: 30 },
   passive: { name: 'Eclipse', desc: 'When an enemy hero she damaged dies, her Q, W and E come off cooldown, she regains 60 energy and heals 12% of her max health.' },
   init(world, e) { e.resource = ENERGY; e.maxResource = ENERGY; e.heroState = { marks: new Map(), shadeUntil: 0, shadeX: 0, shadeY: 0 }; },
   onTick(world, e) {

@@ -54,7 +54,7 @@ describe('heroes', () => {
     const w = duel('saffi', 'morrow'); const s = w.heroes[0]; const foe = w.heroes[1];
     place(s, 1600, 450); place(foe, 3600, 450);
     const hp0 = s.hp; steps(w, sec(3));
-    expect(s.hp).toBeLessThan(hp0 - s.maxHp * 0.03);
+    expect(s.hp).toBeLessThan(hp0 - s.maxHp * HEROES.saffi.tuning.drain * 2); // 3 s of wick burn
     place(foe, 1700, 450); const low = s.hp;
     steps(w, sec(2), () => [{ t: 2, p: 0, id: foe.id }]);
     expect(s.hp).toBeGreaterThan(low);

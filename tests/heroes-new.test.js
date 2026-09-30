@@ -90,7 +90,7 @@ describe('new heroes', () => {
   it('Dredge: takes less damage when hurt; Hull Breach stuns on the next attack', () => {
     const def = HEROES.dredge; const w = duel('dredge', 'morrow'); const d = w.heroes[0], m = w.heroes[1];
     d.hp = d.maxHp; const fullIn = def.modifyDamageIn(w, d, 100); d.hp = d.maxHp * 0.2; const lowIn = def.modifyDamageIn(w, d, 100);
-    expect(fullIn).toBe(100); expect(lowIn).toBe(80);
+    expect(fullIn).toBe(100); expect(lowIn).toBeCloseTo(100 * (1 - def.tuning.drCap), 6); // at 80% missing the reduction is capped
     d.hp = d.maxHp; place(d, 1600, 450); place(m, 1750, 450); m.speed = 0;
     steps(w, 1, once(castCmd(0, 2, d.x, d.y)));
     let stunned = false; steps(w, sec(3), () => { if (m.stunUntil > w.tick) stunned = true; return [attackCmd(0, m.id)]; });
