@@ -166,7 +166,7 @@ export class App {
     const s = this.match && this.match.session;
     if (!s) return;
     if (k === 'shake') s.renderer.shakeScale = v;
-    if (k === 'ping') s.transport.setConditions({ ping: v, jitter: Math.round(v * 0.15), loss: v ? 0.01 : 0 });
+    if (k === 'ping' && !s.online) s.transport.setConditions({ ping: v, jitter: Math.round(v * 0.15), loss: v ? 0.01 : 0 });
   }
   /** Dispose whatever is on screen: the menu with its backdrop, or a match with its UI. */
   teardown() {
