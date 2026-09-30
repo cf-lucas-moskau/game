@@ -31,3 +31,16 @@ Owner request: "I want a custom cursor in game please".
   `attack`, with attack-move armed `target`.
 - Visual: a contact sheet of the rasterized cursors (1x and 2x) on sky, whale-dark and bone backgrounds.
   Headless screenshots do not capture the OS cursor, so the sheet renders the same raster images the browser uses.
+
+## Online e2e flake found in the gate
+
+The gate's online e2e failed on this PR: the guest page did not reach the local broker in time ("Could not reach the
+matchmaking service"). Debugging runs with errors-only logging (`?netdebug=1`; `=3` is verbose) showed that the join
+timeout itself fired. That was 1 run in 4 before any fix. Both test pages were rendering the menu backdrop at full
+resolution on the one software GPU, starving the pages' event loops. Two fixes:
+- **CPU measurement mode.** `?cpu=1` now also puts the menu backdrop into the 160x90 buffer, as it already did for
+  matches and spectate.
+- **Patient timeouts.** The join timeouts notice when they fire late because the page was blocked, and grant up to
+  two more periods instead of failing. A slow phone could hit the same.
+
+After: 5 of 5 online e2e runs pass.

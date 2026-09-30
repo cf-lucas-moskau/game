@@ -68,7 +68,8 @@ export class App {
   showMenu() {
     this.teardown();
     const canvas = this.canvas();
-    this.backdrop = startSpectate({ canvas, lib: this.lib, seed: (Math.random() * 0xffff) | 0, quality: this.touch ? 'low' : this.quality(), skipSeconds: 95 });
+    this.backdrop = startSpectate({ canvas, lib: this.lib, seed: (Math.random() * 0xffff) | 0, quality: this.touch ? 'low' : this.quality(), skipSeconds: 95,
+      fixedBuffer: this.params.get('cpu') ? [160, 90] : null }); // CPU measurement mode spares the (software) GPU here too
     this.backdrop.canvas = canvas;
     this.music.set(intensityFor({ inMenu: true }), 84); this.audio.muffle(false);
     this.menu = new HeroSelect(this.ui, {
