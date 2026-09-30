@@ -4,6 +4,7 @@ import { spawnZone } from '../zones.js';
 import { spawnProjectile } from '../projectile.js';
 import { aoe, alliesInRadius, dealDamage, DMG, scale, sec, fx, pickTarget, amount } from './kit.js';
 import { addShield, slow, heal } from '../damage.js';
+import { hypot } from '../../core/dmath.js';
 
 // Ability numbers: one declaration used by the cast and by tooltips (kit.amount).
 const Q_VAL1 = { label: 'Magic damage over 3 s', type: 'magic', base: [90, 130, 170, 210, 250], ratio: 0.6, stat: 'ap' };
@@ -49,8 +50,8 @@ export default {
     W: { values: [W_VAL1], name: 'Buzz Shield', cd: [10, 9.5, 9, 8.5, 8], cost: 5, costType: 'swarm', range: 700, freeTarget: true,
       desc: 'Bees form a shield on an ally (or yourself).',
       cast(world, e, c) {
-        let best = e, bd = Math.hypot(c.rawX - e.x, c.rawY - e.y) - 120;
-        for (const a of alliesInRadius(world, e.team, e.x, e.y, 700)) { if (a.kind !== KIND.HERO) continue; const d = Math.hypot(a.x - c.rawX, a.y - c.rawY); if (d < bd) { bd = d; best = a; } }
+        let best = e, bd = hypot(c.rawX - e.x, c.rawY - e.y) - 120;
+        for (const a of alliesInRadius(world, e.team, e.x, e.y, 700)) { if (a.kind !== KIND.HERO) continue; const d = hypot(a.x - c.rawX, a.y - c.rawY); if (d < bd) { bd = d; best = a; } }
         addShield(world, best, amount(e, W_VAL1, c.rank), 2.5, e);
         fx(world, best, 'brindle-shield', best.x, best.y, 2.5);
       } },

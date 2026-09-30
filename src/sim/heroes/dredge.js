@@ -2,6 +2,7 @@
 import { KIND, LANE } from '../constants.js';
 import { skillshot, aoe, dash, dealDamage, DMG, sec, fx, amount, clampY } from './kit.js';
 import { slow, stun, knockUp, knock } from '../damage.js';
+import { hypot } from '../../core/dmath.js';
 
 // Ability numbers: one declaration used by the cast and by tooltips (kit.amount).
 const Q_VAL = { label: 'Physical damage', type: 'phys', base: [70, 105, 140, 175, 210], ratio: 0.8, stat: 'ad' };
@@ -33,7 +34,7 @@ export default {
         skillshot(world, e, c.x, c.y, { kind: 'dredge-anchor', speed: 1500, range: 800, radius: 50,
           onHit: (w, p, u) => {
             dealDamage(w, e, u, amount(e, Q_VAL, rank), DMG.PHYS, { ability: true });
-            const d = Math.min(300, Math.max(0, Math.hypot(u.x - e.x, u.y - e.y) - 120));
+            const d = Math.min(300, Math.max(0, hypot(u.x - e.x, u.y - e.y) - 120));
             knock(w, u, e.x - u.x, e.y - u.y, d, 0.3, false, e); slow(w, u, 0.3, 1, e);
             fx(w, e, 'dredge-drag', u.x, u.y, 0, u.id);
           } });

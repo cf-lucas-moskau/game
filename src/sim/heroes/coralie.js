@@ -3,6 +3,7 @@ import { KIND } from '../constants.js';
 import { spawnZone } from '../zones.js';
 import { aoe, dash, dealDamage, DMG, sec, fx, amount, clampY, enemiesNearPolyline } from './kit.js';
 import { slow, root, knockUp, knock, addShield } from '../damage.js';
+import { sin, cos, atan2, hypot } from '../../core/dmath.js';
 
 // Ability numbers: one declaration used by the cast and by tooltips (kit.amount).
 const Q_VAL = { label: 'Physical damage', type: 'phys', base: [60, 95, 130, 165, 200], ratio: 0.6, stat: 'ad', bonus: { ratio: 0.03, stat: 'maxHp' } };
@@ -38,7 +39,7 @@ export default {
     Q: { values: [Q_VAL], name: 'Coral Spike', cd: [10, 9.5, 9, 8.5, 8], cost: [50, 55, 60, 65, 70], range: 650,
       desc: 'Coral erupts along a line after 0.4 s: damage and a 0.5 s knock-up.',
       cast(world, e, c) {
-        const rank = c.rank, dir = Math.atan2(c.y - e.y, c.x - e.x), x0 = e.x, y0 = e.y, x1 = e.x + Math.cos(dir) * 650, y1 = clampY(e.y + Math.sin(dir) * 650);
+        const rank = c.rank, dir = atan2(c.y - e.y, c.x - e.x), x0 = e.x, y0 = e.y, x1 = e.x + cos(dir) * 650, y1 = clampY(e.y + sin(dir) * 650);
         fx(world, e, 'coralie-spike-warn', x1, y1, dir);
         world.schedule(sec(0.4), (w) => {
           for (const u of enemiesNearPolyline(w, e.team, [x0, y0, x1, y1], 70)) { dealDamage(w, e, u, amount(e, Q_VAL, rank), DMG.PHYS, { ability: true }); knockUp(w, u, 0.5, e); }
@@ -56,9 +57,9 @@ export default {
       cast(world, e, c) {
         const rank = c.rank, x0 = e.x, y0 = e.y, tx = c.x, ty = c.y, hit = [];
         dash(world, e, tx, ty, 0.3, (w, me) => {
-          aoe(w, me.team, me.x, me.y, 110, (u) => { if (hit.includes(u.id)) return; hit.push(u.id); knock(w, u, tx - u.x, ty - u.y, Math.max(0, Math.hypot(tx - u.x, ty - u.y) - 60), 0.25, false, e); slow(w, u, 0.35, 1.5, e); dealDamage(w, e, u, amount(e, E_VAL, rank), DMG.PHYS, { ability: true }); });
+          aoe(w, me.team, me.x, me.y, 110, (u) => { if (hit.includes(u.id)) return; hit.push(u.id); knock(w, u, tx - u.x, ty - u.y, Math.max(0, hypot(tx - u.x, ty - u.y) - 60), 0.25, false, e); slow(w, u, 0.35, 1.5, e); dealDamage(w, e, u, amount(e, E_VAL, rank), DMG.PHYS, { ability: true }); });
         }, null, 'coralie-surge');
-        fx(world, e, 'coralie-undertow', x0, y0, Math.atan2(ty - y0, tx - x0));
+        fx(world, e, 'coralie-undertow', x0, y0, atan2(ty - y0, tx - x0));
       } },
     R: { values: [R_VAL], name: 'Reef Bloom', cd: [110, 95, 80], cost: 100,
       desc: 'After 0.7 s a ring of coral erupts around her: damage and a 1 s root in 360 units. Her reef grows to full.',

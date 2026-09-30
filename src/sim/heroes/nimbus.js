@@ -3,6 +3,7 @@ import { KIND } from '../constants.js';
 import { spawnZone } from '../zones.js';
 import { skillshot, aoe, dealDamage, DMG, sec, fx, amount } from './kit.js';
 import { slow, knock } from '../damage.js';
+import { sin, cos, atan2, sq } from '../../core/dmath.js';
 
 // Ability numbers: one declaration used by the cast and by tooltips (kit.amount).
 const P_VAL = { label: 'Chain lightning per target', type: 'magic', base: 30, ratio: 0.3, stat: 'ap', bonus: { ratio: 0.35, stat: 'ad' } };
@@ -18,7 +19,7 @@ function charge(world, e) { const s = e.heroState; s.static = Math.min(MAX_STATI
 function nearest(world, e, x, y, r, n, skip) {
   const out = [];
   world.forEachInRadius(x, y, r, e.team, 'enemy', (u) => { if (u.kind !== KIND.TOWER && u.kind !== KIND.HEART && !skip.includes(u)) out.push(u); });
-  out.sort((a, b) => (b.kind === KIND.HERO) - (a.kind === KIND.HERO) || ((a.x - x) ** 2 + (a.y - y) ** 2) - ((b.x - x) ** 2 + (b.y - y) ** 2) || a.id - b.id);
+  out.sort((a, b) => (b.kind === KIND.HERO) - (a.kind === KIND.HERO) || (sq(a.x - x) + sq(a.y - y)) - (sq(b.x - x) + sq(b.y - y)) || a.id - b.id);
   return out.slice(0, n);
 }
 const heroHit = (world, e, u) => { if (u.kind === KIND.HERO) charge(world, e); };
@@ -69,9 +70,9 @@ export default {
     E: { values: [E_VAL], name: 'Gale Push', cd: [13, 12, 11, 10, 9], cost: 60, range: 420,
       desc: 'A gust in a cone: damages, knocks enemies back 260 and slows 30% for 1 s.',
       cast(world, e, c) {
-        const dir = Math.atan2(c.y - e.y, c.x - e.x), half = Math.PI / 4.5;
+        const dir = atan2(c.y - e.y, c.x - e.x), half = Math.PI / 4.5;
         aoe(world, e.team, e.x, e.y, 440, (u) => {
-          let a = Math.atan2(u.y - e.y, u.x - e.x) - dir; a = Math.atan2(Math.sin(a), Math.cos(a));
+          let a = atan2(u.y - e.y, u.x - e.x) - dir; a = atan2(sin(a), cos(a));
           if (Math.abs(a) > half) return;
           dealDamage(world, e, u, amount(e, E_VAL, c.rank), DMG.MAGIC, { ability: true }); heroHit(world, e, u);
           knock(world, u, u.x - e.x, u.y - e.y, 260, 0.25, false, e); slow(world, u, 0.3, 1.25, e);

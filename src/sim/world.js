@@ -3,6 +3,7 @@ import { SpatialHash } from '../core/spatial-hash.js';
 import { EventStream } from '../core/events.js';
 import { createEntity, resetEntity, isTargetable } from './entity.js';
 import { LANE, KIND } from './constants.js';
+import { sq } from '../core/dmath.js';
 
 // World = all simulation state. No DOM, no wall clock, no Math.random.
 export class World {
@@ -95,7 +96,7 @@ export class World {
     let best = null, bd = Infinity;
     for (let i = 0; i < list.length; i++) {
       const e = list[i]; if (pred && !pred(e)) continue;
-      const d = (e.x - x) ** 2 + (e.y - y) ** 2;
+      const d = sq(e.x - x) + sq(e.y - y);
       if (d < bd || (d === bd && e.id < best.id)) { bd = d; best = e; }
     }
     return best;

@@ -11,6 +11,7 @@ import { combatSystem } from './systems/combat.js';
 import { projectileSystem } from './projectile.js';
 import { zoneSystem } from './zones.js';
 import { StateHasher } from '../core/hash.js';
+import { sq } from '../core/dmath.js';
 
 /**
  * Build a ready-to-run match.
@@ -136,7 +137,7 @@ function clockSystem(w) {
     const p = w.pickups[i];
     for (const h of w.heroes) {
       if (h.dead) continue;
-      if ((h.x - p.x) ** 2 + (h.y - p.y) ** 2 <= (RULES.RELIC_RADIUS + h.radius) ** 2) {
+      if (sq(h.x - p.x) + sq(h.y - p.y) <= sq(RULES.RELIC_RADIUS + h.radius)) {
         heal(w, h, h, h.maxHp * RULES.RELIC_HEAL); h.mana = Math.min(h.maxMana, h.mana + h.maxMana * 0.15);
         w.events.push(EV.RELIC, t, h.id, 0, p.x, p.y, 0); w.pickups.splice(i, 1); break;
       }
@@ -242,7 +243,7 @@ function economySystem(w) {
     const fx = sideX(team, MAP.FOUNTAIN_X);
     const list = FOUNT; list.length = 0;
     const ids = w.scratch, n = w.hash.query(fx, 450, MAP.FOUNTAIN_R + 130, ids);
-    for (let i = 0; i < n; i++) { const u = w.entities[ids[i]]; if (u.alive && !u.dead && (u.x - fx) ** 2 + (u.y - 450) ** 2 <= (MAP.FOUNTAIN_R + u.radius) ** 2) list.push(u); }
+    for (let i = 0; i < n; i++) { const u = w.entities[ids[i]]; if (u.alive && !u.dead && sq(u.x - fx) + sq(u.y - 450) <= sq(MAP.FOUNTAIN_R + u.radius)) list.push(u); }
     for (const u of list) {
       if (u.kind !== KIND.HERO && u.kind !== KIND.PEBBLE) { if (u.team !== team && u.kind !== KIND.TOWER && u.kind !== KIND.HEART) dealDamage(w, null, u, RULES.FOUNTAIN_DPS / 10, DMG.TRUE); continue; }
       if (u.team === team) { heal(w, null, u, u.maxHp * RULES.FOUNTAIN_HEAL_PCT / 10, true); u.mana = Math.min(u.maxMana, u.mana + u.maxMana * 0.012); }

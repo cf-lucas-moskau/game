@@ -3,6 +3,7 @@ import { KIND } from '../constants.js';
 import { skillshot, dealDamage, DMG, scale, sec, fx, pickTarget, amount } from './kit.js';
 import { stun, knock, giveGold } from '../damage.js';
 import { recomputeHero } from '../stats.js';
+import { hypot } from '../../core/dmath.js';
 
 // Ability numbers: one declaration used by the cast and by tooltips (kit.amount).
 const Q_VAL1 = { label: 'Magic damage', type: 'magic', base: [70, 110, 150, 190, 230], ratio: 0.6, stat: 'ap' };
@@ -46,7 +47,7 @@ export default {
       cast(world, e, c) {
         const t = pickTarget(world, e, c.rawX, c.rawY, 720, false, c.targetId);
         if (!t) return false;
-        const d = Math.hypot(e.x - t.x, e.y - t.y), pull = Math.max(0, Math.min(380, d - 160));
+        const d = hypot(e.x - t.x, e.y - t.y), pull = Math.max(0, Math.min(380, d - 160));
         knock(world, t, e.x - t.x, e.y - t.y, pull, 0.25, true, e);
         dealDamage(world, e, t, amount(e, E_VAL1, c.rank), DMG.MAGIC, { ability: true });
         fx(world, e, 'auctioneer-hook', t.x, t.y);

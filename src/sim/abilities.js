@@ -3,6 +3,7 @@ import { sec, KIND, LANE } from './constants.js';
 import { canCast } from './stats.js';
 import { heal, haste } from './damage.js';
 import { canPay, spend } from './resources.js';
+import { atan2, hypot, sq } from '../core/dmath.js';
 
 export const SLOTS = ['Q', 'W', 'E', 'R'];
 
@@ -44,7 +45,7 @@ export function tryCast(world, e, slot, cmd) {
   // clamp target to range
   let tx = cmd.x, ty = cmd.y;
   if (ab.range) {
-    const dx = tx - e.x, dy = ty - e.y, d = Math.hypot(dx, dy);
+    const dx = tx - e.x, dy = ty - e.y, d = hypot(dx, dy);
     if (d > ab.range && !ab.freeTarget) { tx = e.x + (dx / d) * ab.range; ty = e.y + (dy / d) * ab.range; }
   }
   ty = Math.max(LANE.MIN_Y, Math.min(LANE.MAX_Y, ty));
@@ -55,7 +56,7 @@ export function tryCast(world, e, slot, cmd) {
   const baseCd = abilityCooldown(world, e, ab, rank);
   e.cds[slot] = sec(baseCd * (1 - e.cdr));
   if (ab.castTime) e.castLockUntil = world.tick + sec(ab.castTime);
-  e.facing = Math.atan2(ty - e.y, tx - e.x);
+  e.facing = atan2(ty - e.y, tx - e.x);
   if (e.order === 2 && !ab.keepAttack) e.windup = 0;
   world.events.push(EV.CAST, world.tick, e.id, slot, tx, ty, rank, e.heroKey);
   if (def.onCast) def.onCast(world, e, slot, ctx);
@@ -68,7 +69,7 @@ function pay(world, e, def, ab, cost) { spend(e, ab.costType || def.resource, co
 // ---- summoner spells ------------------------------------------------------------
 export const SPELLS = {
   dash: { name: 'Dash', cd: 30, cast(world, e, x, y) {
-    const dx = x - e.x, dy = y - e.y, d = Math.hypot(dx, dy) || 1, r = Math.min(400, d);
+    const dx = x - e.x, dy = y - e.y, d = hypot(dx, dy) || 1, r = Math.min(400, d);
     const fx = e.x, fy = e.y;
     e.x += (dx / d) * r; e.y = Math.max(LANE.MIN_Y, Math.min(LANE.MAX_Y, e.y + (dy / d) * r)); e.px = e.x; e.py = e.y;
     world.events.push(EV.BLINK, world.tick, e.id, 0, fx, fy, 0, 'dash');
@@ -77,7 +78,7 @@ export const SPELLS = {
     const amt = 90 + 15 * e.level;
     heal(world, e, e, amt); haste(world, e, 0.3, 1);
     let best = null, bd = 850 * 850;
-    for (const h of world.heroes) if (h !== e && h.team === e.team && !h.dead) { const d = (h.x - e.x) ** 2 + (h.y - e.y) ** 2; if (d < bd && h.hp / h.maxHp < 1) { bd = d; best = h; } }
+    for (const h of world.heroes) if (h !== e && h.team === e.team && !h.dead) { const d = sq(h.x - e.x) + sq(h.y - e.y); if (d < bd && h.hp / h.maxHp < 1) { bd = d; best = h; } }
     if (best) { heal(world, e, best, amt); haste(world, best, 0.3, 1); }
     world.events.push(EV.FX, world.tick, e.id, 0, e.x, e.y, 0, 'heal-spell');
     return true; } },

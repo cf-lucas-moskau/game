@@ -4,6 +4,7 @@ import { ORDER, isTargetable } from '../entity.js';
 import { dealDamage, DMG } from '../damage.js';
 import { canAct } from '../stats.js';
 import { spawnProjectile } from '../projectile.js';
+import { sin, cos, atan2, sq } from '../../core/dmath.js';
 
 const inRange = (a, b, extra = 0) => {
   const r = a.range + a.radius + b.radius + extra; const dx = b.x - a.x, dy = b.y - a.y;
@@ -32,7 +33,7 @@ function startAttack(world, e, tg) {
   e.attackCd = period;
   e.windup = Math.max(2, Math.round(period * (e.kind === KIND.TOWER ? 0.15 : 0.3)));
   e.windupTarget = tg.id;
-  e.facing = Math.atan2(tg.y - e.y, tg.x - e.x);
+  e.facing = atan2(tg.y - e.y, tg.x - e.x);
   world.events.push(EV.AUTO_ATTACK, world.tick, e.id, tg.id, e.x, e.y, e.windup);
 }
 function releaseAttack(world, e) {
@@ -89,7 +90,7 @@ function minionThink(world, e) {
     for (let i = 0; i < Q.length; i++) {
       const u = Q[i];
       if (isStructure(u.kind) && !u.vulnerable) continue;
-      let score = (u.x - e.x) ** 2 + (u.y - e.y) ** 2;
+      let score = sq(u.x - e.x) + sq(u.y - e.y);
       if (u.kind === KIND.HERO) score += (t - (u.lastHeroHitTick || -9999) < sec(2)) ? -200000 : 400000;
       if (isStructure(u.kind)) score += 150000;
       if (score < bestScore || (score === bestScore && u.id < best.id)) { bestScore = score; best = u; }
@@ -112,7 +113,7 @@ function towerThink(world, e) {
       const u = Q[i];
       if (u.kind === KIND.HERO && t - (u.lastHeroHitTick || -9999) < sec(2)) {
         // was the hit against an ally inside tower range?
-        for (const h of world.heroes) if (h.team === e.team && !h.dead && t - h.lastHeroDamageTick < sec(2) && (h.x - e.x) ** 2 + (h.y - e.y) ** 2 < (e.range + 200) ** 2) { aggro = u; break outer; }
+        for (const h of world.heroes) if (h.team === e.team && !h.dead && t - h.lastHeroDamageTick < sec(2) && sq(h.x - e.x) + sq(h.y - e.y) < sq(e.range + 200)) { aggro = u; break outer; }
       }
     }
   }
@@ -122,7 +123,7 @@ function towerThink(world, e) {
   world.query(e.x, e.y, e.range, e.team, 1, Q);
   for (let i = 0; i < Q.length; i++) {
     const u = Q[i]; if (u.kind === KIND.HEART) continue;
-    let d = (u.x - e.x) ** 2 + (u.y - e.y) ** 2; if (u.kind === KIND.HERO || u.kind === KIND.PEBBLE) d += 1e7;
+    let d = sq(u.x - e.x) + sq(u.y - e.y); if (u.kind === KIND.HERO || u.kind === KIND.PEBBLE) d += 1e7;
     if (d < bd || (d === bd && u.id < best.id)) { bd = d; best = u; }
   }
   e.targetId = best ? best.id : -1;
@@ -137,7 +138,7 @@ function pebbleThink(world, e) {
   if (n) { e.targetId = n.id; e.order = ORDER.ATTACK; }
   else if (owner && !owner.dead) {
     e.targetId = -1;
-    const d = Math.sqrt((owner.x - e.x) ** 2 + (owner.y - e.y) ** 2);
-    if (d > 260) { e.order = ORDER.MOVE; e.moveX = owner.x - 120 * Math.cos(owner.facing); e.moveY = owner.y - 120 * Math.sin(owner.facing); }
+    const d = Math.sqrt(sq(owner.x - e.x) + sq(owner.y - e.y));
+    if (d > 260) { e.order = ORDER.MOVE; e.moveX = owner.x - 120 * cos(owner.facing); e.moveY = owner.y - 120 * sin(owner.facing); }
   }
 }

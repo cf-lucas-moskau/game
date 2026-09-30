@@ -1,5 +1,6 @@
 import { EV } from '../core/events.js';
 import { KIND, RULES, sec, isMinion, isStructure, TEAM } from './constants.js';
+import { hypot, sq } from '../core/dmath.js';
 
 export const DMG = { PHYS: 0, MAGIC: 1, TRUE: 2 };
 /** What caused a hit, carried on EV.DAMAGE as `c` (statistics, e.g. the simulation lab). */
@@ -123,7 +124,7 @@ export function haste(world, e, pct, s) { const t = world.tick; if (e.hasteUntil
 /** Knock a unit toward/away with a short forced movement. */
 export function knock(world, e, dirX, dirY, distance, s, airborne = false, src = null) {
   if (isStructure(e.kind) || e.invulnUntil > world.tick) return;
-  const len = Math.hypot(dirX, dirY) || 1; const ticks = Math.max(1, sec(s));
+  const len = hypot(dirX, dirY) || 1; const ticks = Math.max(1, sec(s));
   e.knockVx = (dirX / len) * distance / ticks; e.knockVy = (dirY / len) * distance / ticks;
   e.knockUntil = world.tick + ticks; e.windup = 0; e.channelUntil = 0;
   if (airborne) e.airborneUntil = world.tick + ticks;
@@ -166,8 +167,8 @@ export function kill(world, victim, killer) {
     const spec = world.minionSpec(victim.kind);
     if (killer && killer.kind === KIND.HERO) { killer.cs++; giveGold(world, killer, spec.gold); if (world.registry.heroes[killer.heroKey].onMinionKill) world.registry.heroes[killer.heroKey].onMinionKill(world, killer, victim); itemsOnMinionKill(world, killer); }
     // xp shared among enemy heroes in radius
-    let n = 0; for (const h of world.heroes) if (h.team !== victim.team && !h.dead && (h.x - victim.x) ** 2 + (h.y - victim.y) ** 2 < RULES.XP_SHARE_RADIUS ** 2) n++;
-    if (n) for (const h of world.heroes) if (h.team !== victim.team && !h.dead && (h.x - victim.x) ** 2 + (h.y - victim.y) ** 2 < RULES.XP_SHARE_RADIUS ** 2) giveXp(world, h, spec.xp * (n > 1 ? 1.2 / n : 1));
+    let n = 0; for (const h of world.heroes) if (h.team !== victim.team && !h.dead && sq(h.x - victim.x) + sq(h.y - victim.y) < sq(RULES.XP_SHARE_RADIUS)) n++;
+    if (n) for (const h of world.heroes) if (h.team !== victim.team && !h.dead && sq(h.x - victim.x) + sq(h.y - victim.y) < sq(RULES.XP_SHARE_RADIUS)) giveXp(world, h, spec.xp * (n > 1 ? 1.2 / n : 1));
   }
   if (isStructure(victim.kind)) {
     for (const h of world.heroes) if (h.team !== victim.team) giveGold(world, h, RULES.TOWER_GOLD);

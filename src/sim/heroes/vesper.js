@@ -4,6 +4,7 @@ import { enemiesNearPolyline, dealDamage, DMG, scale, sec, fx, clipPolyline, pol
 import { root } from '../damage.js';
 import { pointInPoly } from '../../core/math.js';
 import { isStructure } from '../constants.js';
+import { sin, cos, atan2, hypot } from '../../core/dmath.js';
 
 // Ability numbers: one declaration used by the cast and by tooltips (kit.amount).
 const Q_VAL1 = { label: 'Magic damage', type: 'magic', base: [60, 90, 120, 150, 180], ratio: 0.55, stat: 'ap' };
@@ -12,11 +13,11 @@ const W_VAL1 = { label: 'Magic damage', type: 'magic', base: [40, 60, 80, 100, 1
 const INK_MAX = 100, INK_REGEN = 14, CLOSE_DIST = 60;
 const masterpiece = (world, e) => e.heroState.mpUntil > world.tick;
 function straightStroke(e, x, y, len) {
-  const a = Math.atan2(y - e.y, x - e.x);
-  return [e.x + Math.cos(a) * 60, e.y + Math.sin(a) * 60, e.x + Math.cos(a) * (60 + len), clampY(e.y + Math.sin(a) * (60 + len))];
+  const a = atan2(y - e.y, x - e.x);
+  return [e.x + cos(a) * 60, e.y + sin(a) * 60, e.x + cos(a) * (60 + len), clampY(e.y + sin(a) * (60 + len))];
 }
-function circleStroke(x, y, r, n = 14) { const p = []; for (let i = 0; i <= n; i++) { const a = (i / n) * Math.PI * 2; p.push(x + Math.cos(a) * r, clampY(y + Math.sin(a) * r)); } return p; }
-export const isClosed = (pts) => pts && pts.length >= 8 && Math.hypot(pts[0] - pts[pts.length - 2], pts[1] - pts[pts.length - 1]) <= CLOSE_DIST && polylineLength(pts) > 200;
+function circleStroke(x, y, r, n = 14) { const p = []; for (let i = 0; i <= n; i++) { const a = (i / n) * Math.PI * 2; p.push(x + cos(a) * r, clampY(y + sin(a) * r)); } return p; }
+export const isClosed = (pts) => pts && pts.length >= 8 && hypot(pts[0] - pts[pts.length - 2], pts[1] - pts[pts.length - 1]) <= CLOSE_DIST && polylineLength(pts) > 200;
 const lashCost = (world, e, pts) => (masterpiece(world, e) ? 0 : Math.round(8 + polylineLength(pts) / 18));
 
 export default {
@@ -53,7 +54,7 @@ export default {
         pts = clipPolyline(pts, 1400);
         const poly = pts; const n = poly.length / 2; const amp = masterpiece(world, e) ? 1.5 : 1;
         let cx = 0, cy = 0; for (let i = 0; i < n; i++) { cx += poly[i * 2]; cy += poly[i * 2 + 1]; } cx /= n; cy /= n;
-        let r = 0; for (let i = 0; i < n; i++) r = Math.max(r, Math.hypot(poly[i * 2] - cx, poly[i * 2 + 1] - cy));
+        let r = 0; for (let i = 0; i < n; i++) r = Math.max(r, hypot(poly[i * 2] - cx, poly[i * 2 + 1] - cy));
         const rank = c.rank;
         world.forEachInRadius(cx, cy, r, e.team, 'enemy', (u) => {
           if (isStructure(u.kind) || !pointInPoly(u.x, u.y, poly, n)) return;
@@ -66,7 +67,7 @@ export default {
       cast(world, e, c) {
         let pts;
         if (c.pts && c.pts.length >= 4) pts = clipPolyline(anchorStroke(e, c.pts, 600), 500);
-        else { const a = Math.atan2(c.y - e.y, c.x - e.x) + Math.PI / 2; pts = [c.x - Math.cos(a) * 200, clampY(c.y - Math.sin(a) * 200), c.x + Math.cos(a) * 200, clampY(c.y + Math.sin(a) * 200)]; }
+        else { const a = atan2(c.y - e.y, c.x - e.x) + Math.PI / 2; pts = [c.x - cos(a) * 200, clampY(c.y - sin(a) * 200), c.x + cos(a) * 200, clampY(c.y + sin(a) * 200)]; }
         for (let i = 0; i + 3 < pts.length; i += 2) spawnWall(world, { kind: 'ink-wall', team: e.team, owner: e.id, ax: pts[i], ay: pts[i + 1], bx: pts[i + 2], by: pts[i + 3], duration: 3 });
         spawnZone(world, { kind: 'vesper-wall', team: e.team, owner: e.id, x: pts[0], y: pts[1], duration: 3, data: { pts } });
       } },

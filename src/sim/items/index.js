@@ -3,6 +3,7 @@
 import { EV } from '../../core/events.js';
 import { KIND, sec, TICK_HZ } from '../constants.js';
 import { dealDamage, DMG, addShield, slow, haste, kill } from '../damage.js';
+import { hypot } from '../../core/dmath.js';
 
 const cdReady = (w, e, key) => (e.itemState[key] || 0) <= w.tick;
 const fx = (w, e, name, v = 0) => w.events.push(EV.FX, w.tick, e.id, 0, e.x, e.y, v, name);
@@ -58,7 +59,7 @@ export const ITEMS = {
     onBuy(w, e) { e.itemState.barnacle = 0; e.itemState.bx = e.x; e.itemState.by = e.y; },
     onSell(w, e) { e.itemState.barnacle = 0; },
     onTick(w, e) {
-      const s = e.itemState, moved = Math.hypot(e.x - s.bx, e.y - s.by) > 2; s.bx = e.x; s.by = e.y;
+      const s = e.itemState, moved = hypot(e.x - s.bx, e.y - s.by) > 2; s.bx = e.x; s.by = e.y;
       const before = s.barnacle;
       s.barnacle = moved ? Math.max(0, s.barnacle - 25 / TICK_HZ) : Math.min(50, s.barnacle + 5 / TICK_HZ);
       if (Math.floor(before) !== Math.floor(s.barnacle)) e.statsDirty = true;
@@ -86,7 +87,7 @@ export const ITEMS = {
   'stormcallers-horn': { name: "Stormcaller's Horn", cost: 2600, stats: { hp: 300, cdr: 0.1 }, unique: true, tags: ['support'], activeCd: 60,
     desc: 'Active: nearby allies gain 30% move speed for 3 s (60 s cooldown).',
     active(w, e) {
-      for (const h of w.heroes) if (h.team === e.team && !h.dead && Math.hypot(h.x - e.x, h.y - e.y) < 700) haste(w, h, 0.3, 3);
+      for (const h of w.heroes) if (h.team === e.team && !h.dead && hypot(h.x - e.x, h.y - e.y) < 700) haste(w, h, 0.3, 3);
       fx(w, e, 'horn');
     } },
 
