@@ -136,11 +136,12 @@ function patchValue(before, value, path) {
   return Array.isArray(before) && typeof value === 'number' ? before.map(() => value) : value;
 }
 
-/** Numeric paths a patch can change for one hero (base stats, ability cooldowns, costs, ranges, value specs). */
+/** Numeric paths a patch can change for one hero (base stats, passive tuning, ability cooldowns, costs, ranges, value specs). */
 export function patchablePaths(heroKey, content = CONTENT) {
   const def = content.heroes[heroKey]; if (!def) throw new Error(`unknown hero ${heroKey}`);
   const out = [];
   for (const [k, v] of Object.entries(def.base)) out.push([`heroes.${heroKey}.base.${k}`, v]);
+  for (const [k, v] of Object.entries(def.tuning || {})) out.push([`heroes.${heroKey}.tuning.${k}`, v, 'passive']);
   for (const [slot, a] of Object.entries(def.abilities)) {
     for (const k of ['cd', 'cost', 'range']) if (a[k] !== undefined) out.push([`heroes.${heroKey}.abilities.${slot}.${k}`, a[k]]);
     (a.values || []).forEach((spec, j) => { for (const k of ['base', 'ratio']) if (spec[k] !== undefined) out.push([`heroes.${heroKey}.abilities.${slot}.values.${j}.${k}`, spec[k], spec.label]); });

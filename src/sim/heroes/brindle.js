@@ -7,9 +7,9 @@ import { addShield, slow, heal } from '../damage.js';
 import { hypot } from '../../core/dmath.js';
 
 // Ability numbers: one declaration used by the cast and by tooltips (kit.amount).
-const Q_VAL1 = { label: 'Magic damage over 3 s', type: 'magic', base: [90, 130, 170, 210, 250], ratio: 0.6, stat: 'ap' };
-const W_VAL1 = { label: 'Shield', type: 'shield', base: [80, 110, 140, 170, 200], ratio: 0.6, stat: 'ap' };
-const R_VAL1 = { label: 'Heal per second', type: 'heal', base: [40, 60, 80], ratio: 0.2, stat: 'ap' };
+const Q_VAL1 = { label: 'Magic damage over 3 s', type: 'magic', base: [104, 150, 196, 242, 288], ratio: 0.6, stat: 'ap' };
+const W_VAL1 = { label: 'Shield', type: 'shield', base: [104, 143, 182, 221, 260], ratio: 0.6, stat: 'ap' };
+const R_VAL1 = { label: 'Heal per second', type: 'heal', base: [72, 108, 144], ratio: 0.2, stat: 'ap' };
 
 const MAX_BEES = 20;
 function addBee(world, e, n = 1) { e.resource = Math.min(MAX_BEES, e.resource + n); e.heroState.lastGain = world.tick; }
@@ -33,8 +33,8 @@ export default {
   },
   onRespawn(world, e) { e.resource = 8; },
   abilities: {
-    Q: { values: [Q_VAL1], name: 'Sting', cd: [3, 3, 3, 3, 3], cost: 3, costType: 'swarm', range: 650, freeTarget: true,
-      desc: 'Fling 3 bees at a target for damage over 3 s.',
+    Q: { values: [Q_VAL1], name: 'Sting', cd: [3, 3, 3, 3, 3], cost: 2, costType: 'swarm', range: 650, freeTarget: true,
+      desc: 'Fling a clutch of bees at a target for damage over 3 s.',
       cast(world, e, c) {
         const t = pickTarget(world, e, c.rawX, c.rawY, 700, false, c.targetId);
         if (!t) return false;
@@ -47,7 +47,7 @@ export default {
             spawnZone(w, { kind: 'brindle-sting-dot', team: e.team, owner: e.id, x: u.x, y: u.y, duration: 3, data: { target: u.id } });
           } });
       } },
-    W: { values: [W_VAL1], name: 'Buzz Shield', cd: [10, 9.5, 9, 8.5, 8], cost: 5, costType: 'swarm', range: 700, freeTarget: true,
+    W: { values: [W_VAL1], name: 'Buzz Shield', cd: [9, 8.5, 8, 7.5, 7], cost: 3, costType: 'swarm', range: 700, freeTarget: true,
       desc: 'Bees form a shield on an ally (or yourself).',
       cast(world, e, c) {
         let best = e, bd = hypot(c.rawX - e.x, c.rawY - e.y) - 120;

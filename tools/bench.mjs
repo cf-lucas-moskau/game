@@ -19,10 +19,12 @@ const quick = args.has('--quick') || args.has('--gate');
 // 160x90 buffer so rasterization on the software GPU does not starve the main thread and hundreds of
 // frames are sampled; `full` renders at real resolution for frame-time / GPU reporting.
 const MIN_FRAMES = 200; // p95 from >= 200 samples keeps at least 10 samples in the tail
+// Every scenario pins its match seed: the roster decides much of the load and the prediction corrections
+// (a Saffi-controlled match corrects ~1 per 10 s on any build), so unpinned runs were not comparable.
 const SCENARIOS = [
-  { name: 'desktop-medium', viewport: { width: 1280, height: 720 }, query: 'quality=medium&skip=150&spectate=1', seconds: quick ? 30 : 90 },
-  { name: 'play-ping100', viewport: { width: 1280, height: 720 }, query: 'quality=medium&skip=60&play=auto&ping=100&jitter=15&loss=0.01', seconds: quick ? 30 : 90 },
-  { name: 'mobile-low', viewport: { width: 844, height: 390 }, mobile: true, cpuThrottle: 4, query: 'quality=low&skip=150&play=auto&ping=100&jitter=20&loss=0.02', seconds: quick ? 70 : 120 },
+  { name: 'desktop-medium', viewport: { width: 1280, height: 720 }, query: 'quality=medium&skip=150&spectate=1&seed=7', seconds: quick ? 30 : 90 },
+  { name: 'play-ping100', viewport: { width: 1280, height: 720 }, query: 'quality=medium&skip=60&play=auto&ping=100&jitter=15&loss=0.01&seed=7', seconds: quick ? 30 : 90 },
+  { name: 'mobile-low', viewport: { width: 844, height: 390 }, mobile: true, cpuThrottle: 4, query: 'quality=low&skip=150&play=auto&ping=100&jitter=20&loss=0.02&seed=7', seconds: quick ? 70 : 120 },
 ];
 const lowerIsBetter = (k) => !/fps/i.test(k);
 

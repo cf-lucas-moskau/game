@@ -140,3 +140,25 @@ From PR #24 to PR #29 the `desktop-medium` scenario (spectate, bots only) ran a 
 took every hero key as the roster, which had been six before PR #24 added ten heroes. Its draw calls (45), triangles
 (78k) and GC numbers in that period measured 16 heroes. The scenario is six heroes again (drawn from the seed);
 compare `desktop-medium` results only within one side of this change.
+
+## Pinned bench seeds (PR #38)
+
+Until PR #38 the bench scenarios took their match seed from the clock, so every run played a different roster and
+match. The PR #38 gate failed `mobile-low.correctionsPer10s` (1.33 per 10 s, budget 1; the previous five gates
+measured 0.08-0.33). A same-seed A/B settled it: five seeds, 60 s each, 4x CPU throttle, mobile viewport, 100 ms ping.
+
+| seed | local hero | main 5ed721e | PR #38 |
+| --- | --- | --- | --- |
+| 11 | Saffi | 6 | 7 |
+| 22 | Wisp | 4 | 1 |
+| 33 | Kestrel | 2 | 0 |
+| 44 | Lumen | 1 | 1 |
+| 55 | Lumen | 3 | 2 |
+| total | | 16 | 11 |
+
+- There was no regression. The count depends on the match: a Saffi-controlled hero exceeds the budget on the old
+  build too. Her short hops and trail are movement the predictor does not model.
+- All three scenarios now pass `seed=7`, so runs compare like with like. The soak already pinned `seed=11`.
+- Correction events were traced in the browser (hooking `telemetry.corrections`). None coincided with a stun, root,
+  slow or knock-up on the local hero, so crowd control is not the source. Modelling the remaining cases (attack-move
+  engagements, hops) in `src/app/predictor.js` is future work.

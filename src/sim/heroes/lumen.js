@@ -8,8 +8,8 @@ import { sin, cos, atan2, hypot } from '../../core/dmath.js';
 
 // Ability numbers: one declaration used by the cast and by tooltips (kit.amount).
 const P_VAL = { label: 'Constellation burst (+4% of the target\'s max health)', type: 'magic', base: 70, ratio: 0.45, stat: 'ap' };
-const Q_VAL = { label: 'Magic damage', type: 'magic', base: [70, 110, 150, 190, 230], ratio: 0.6, stat: 'ap' };
-const W_VAL = { label: 'Magic damage per second', type: 'magic', base: [30, 45, 60, 75, 90], ratio: 0.2, stat: 'ap' };
+const Q_VAL = { label: 'Magic damage', type: 'magic', base: [43, 68, 93, 118, 143], ratio: 0.6, stat: 'ap' };
+const W_VAL = { label: 'Magic damage per second', type: 'magic', base: [26, 38, 51, 64, 77], ratio: 0.2, stat: 'ap' };
 const R_VAL = { label: 'Magic damage', type: 'magic', base: [120, 190, 260], ratio: 0.5, stat: 'ap' };
 
 const MAX_STARS = 3, STAR_SEC = 6;
