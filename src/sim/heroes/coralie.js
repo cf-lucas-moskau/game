@@ -12,15 +12,17 @@ const W_VAL2 = { label: 'Burst when it ends', type: 'magic', base: [35, 50, 65, 
 const E_VAL = { label: 'Physical damage', type: 'phys', base: [40, 65, 90, 115, 140], ratio: 0.45, stat: 'ad' };
 const R_VAL = { label: 'Magic damage', type: 'magic', base: [150, 250, 350], ratio: 0.06, stat: 'maxHp' };
 
-const MAX_REEF = 6, PER_STACK = 2;
-function grow(world, e, n) { const s = e.heroState; s.reef = Math.min(MAX_REEF, s.reef + n); s.lastGrow = world.tick; e.statsDirty = true; }
+// Passive numbers (patchable by the simulation lab): reef stacks, armor and magic resist per stack.
+const T = { maxReef: 6, perStack: 2 };
+function grow(world, e, n) { const s = e.heroState; s.reef = Math.min(T.maxReef, s.reef + n); s.lastGrow = world.tick; e.statsDirty = true; }
 
 export default {
   key: 'coralie', name: 'Coralie Brine', title: 'the Reefwarden', role: 'Tank', resource: 'mana', difficulty: 'Easy',
   rankOrder: ['Q', 'W', 'E'],
   build: ['barnacle-plate', 'anchor-boots', 'molted-shell', 'coral-aegis', 'stillwater-pendant', 'borrowed-seconds'], // recommended items: shop highlights and bot purchase order
+  tuning: T,
   base: { hp: 640, hpL: 104, ad: 58, adL: 3.4, armor: 34, armorL: 4.6, mr: 32, mrL: 1.8, as: 0.63, asL: 0.02, range: 175, speed: 335, mana: 320, manaL: 40, manaRegen: 2.6, radius: 38 },
-  passive: { name: 'Living Reef', desc: 'Hits from heroes grow reef on her (up to 6 stacks): each gives 2 armor and magic resist. Out of combat the reef recedes.' },
+  passive: { name: 'Living Reef', get desc() { return `Hits from heroes grow reef on her (up to ${T.maxReef} stacks): each gives ${T.perStack} armor and magic resist. Out of combat the reef recedes.`; } },
   init(world, e) { e.heroState = { reef: 0, lastGrow: -999, shieldUntil: 0, shieldRank: 1 }; },
   onTick(world, e) {
     const s = e.heroState, t = world.tick;
@@ -34,7 +36,7 @@ export default {
   },
   onTookDamage(world, e, amt, attacker) { if (attacker && attacker.kind === KIND.HERO && amt > 0 && world.tick - e.heroState.lastGrow >= 8) grow(world, e, 1); },
   onRespawn(world, e) { e.heroState.reef = 0; e.heroState.shieldUntil = 0; e.statsDirty = true; },
-  modifyStats(world, e) { const n = e.heroState ? e.heroState.reef : 0; return n ? { armor: n * PER_STACK, mr: n * PER_STACK } : null; },
+  modifyStats(world, e) { const n = e.heroState ? e.heroState.reef : 0; return n ? { armor: n * T.perStack, mr: n * T.perStack } : null; },
   abilities: {
     Q: { values: [Q_VAL], name: 'Coral Spike', cd: [10, 9.5, 9, 8.5, 8], cost: [50, 55, 60, 65, 70], range: 650,
       desc: 'Coral erupts along a line after 0.4 s: damage and a 0.5 s knock-up.',
@@ -68,7 +70,7 @@ export default {
         spawnZone(world, { kind: 'coralie-bloom', team: e.team, owner: e.id, x, y, r: 360, duration: 0.7 });
         world.schedule(sec(0.7), (w) => {
           aoe(w, e.team, x, y, 360, (u) => { dealDamage(w, e, u, amount(e, R_VAL, rank), DMG.MAGIC, { ability: true }); root(w, u, 1, e); });
-          if (!e.dead) grow(w, e, MAX_REEF);
+          if (!e.dead) grow(w, e, T.maxReef);
           fx(w, e, 'coralie-bloom', x, y);
         });
       } },
