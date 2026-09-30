@@ -18,7 +18,7 @@ function addEchoAt(world, s, x, y) {
 export default {
   key: 'morrow', name: 'Morrow', title: 'the Clockwright', role: 'Skirmisher', resource: 'mana', difficulty: 'Medium',
   rankOrder: ['Q', 'E', 'W'],
-  build: ['stormglass-orb', 'lanternfish-lens', 'quickcurrent-boots', 'kelp-crown', 'borrowed-seconds', 'cloudwool-cloak'], // recommended items: shop highlights and bot purchase order
+  build: ['lanternfish-lens', 'stormstep-sandals', 'kelp-crown', 'deepwater-codex', 'borrowed-seconds', 'stillwater-pendant'], // recommended items: shop highlights and bot purchase order
   passive: { name: 'Echoes', desc: 'His spells leave clock-faced echoes where he stood (up to 4, 4 s). Step Through blinks to the latest; Rewind returns him 4 s back in time, health included.' },
   base: { hp: 590, hpL: 96, ad: 54, adL: 3.2, armor: 26, armorL: 4.2, mr: 30, mrL: 1.3, as: 0.66, asL: 0.02, range: 450, speed: 335, mana: 380, manaL: 45, manaRegen: 3, projectile: 1600, radius: 34 },
   init(world, e) { e.heroState = { echoes: [], hist: new Float32Array(HISTORY * 3), histHead: 0, histFill: 0, windupShield: 0 }; },

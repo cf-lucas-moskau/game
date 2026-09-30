@@ -16,7 +16,7 @@ function heroRecord(h) {
   return {
     player: h.playerId, hero: h.heroKey, team: h.team, win: false,
     kills: 0, deaths: 0, assists: 0, level: 1, cs: 0,
-    goldEarned: 0, goldSpent: 0, items: [], // net gold earned (gold now + spent - starting gold); items: [{ key, min }]
+    goldEarned: 0, goldSpent: 0, items: [], // net gold earned (gold now + spent - starting gold); items: [{ key, min, price }]
     // damage dealt, in final amounts after resistances (shield absorption included)
     dmgHeroes: 0, dmgHeroesPhys: 0, dmgHeroesMagic: 0, dmgHeroesTrue: 0,
     dmgHeroesBasic: 0, dmgHeroesAbility: 0, dmgHeroesOther: 0,
@@ -93,7 +93,7 @@ export class MatchStats {
       case EV.CAST: { const r = this.byId.get(e.a); if (r && e.b >= 0 && e.b < 4) r.casts[e.b]++; break; }
       case EV.ITEM_BOUGHT: {
         const r = this.byId.get(e.a); if (!r) break;
-        r.items.push({ key: e.s, min: +min.toFixed(2) }); r.goldSpent += e.v;
+        r.items.push({ key: e.s, min: +min.toFixed(2), price: e.v }); r.goldSpent += e.v; // price paid (components owned are used up)
         if (r.firstItemMin === null) r.firstItemMin = +min.toFixed(2);
         break;
       }

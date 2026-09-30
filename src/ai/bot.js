@@ -3,7 +3,7 @@
 import { Rng } from '../core/rng.js';
 import { CMD, moveCmd, attackCmd, attackMoveCmd, castCmd, spellCmd, buyCmd, stopCmd } from '../sim/commands.js';
 import { KIND, LANE, MAP, sideX, sec } from '../sim/constants.js';
-import { canShop } from '../sim/match.js';
+import { canShop, purchasePlan } from '../sim/match.js';
 import { snapshot, alive, d, hpr, fwd, power, underTower, minionsTankingTower, predict, towerCovers } from './perception.js';
 import { SCRIPTS } from './heroes/index.js';
 import { burst, reach } from './threat.js';
@@ -42,14 +42,20 @@ export class Bot {
     out.push(this.act(world, me, snap));
     return out;
   }
+  /**
+   * Work through the build in order: buy the next item when its price (after owned components) is affordable,
+   * otherwise its most expensive affordable component, as players do.
+   */
   shop(world, me, out) {
     if (!canShop(me) || world.tick - this.lastBuyTick < 15) return;
     const build = this.build || world.registry.heroes[me.heroKey].build || [];
     for (const key of build) {
       if (me.items.includes(key)) continue;
-      const it = world.registry.items[key];
-      if (it && me.gold >= it.cost && me.items.length < 6) { out.push(buyCmd(this.p, key)); this.lastBuyTick = world.tick; }
-      return; // buy strictly in order
+      const plan = purchasePlan(world, me, key);
+      if (plan.reason === 'owned' || plan.reason === 'group' || plan.reason === 'unknown') continue; // e.g. other boots already
+      const pick = plan.ok ? key : plan.reason === 'gold' ? componentToBuy(world, me, key) : null;
+      if (pick) { out.push(buyCmd(this.p, pick)); this.lastBuyTick = world.tick; }
+      return; // strictly in order
     }
   }
   decide(world, snap) {
@@ -128,6 +134,20 @@ export class Bot {
   }
 }
 const EMPTY = [];
+/** The most expensive component of `key` the bot can buy now and does not already hold (walking down the build tree). */
+function componentToBuy(world, me, key) {
+  const items = world.registry.items, free = me.items.map(() => true);
+  const claim = (k) => { for (let i = 0; i < me.items.length; i++) if (free[i] && me.items[i] === k) { free[i] = false; return true; } return false; };
+  let best = null, bestPrice = 0;
+  const visit = (k) => {
+    if (claim(k)) return;
+    const p = purchasePlan(world, me, k);
+    if (p.ok && p.price > bestPrice) { best = k; bestPrice = p.price; }
+    for (const c of items[k].from) visit(c);
+  };
+  for (const c of items[key].from) visit(c);
+  return best;
+}
 const anyWithin = (list, me, r) => { for (const e of list) if (d(e, me) < r) return true; return false; };
 const nearestDist = (list, me) => { let b = Infinity; for (const e of list) { const v = d(e, me); if (v < b) b = v; } return b; };
 /**

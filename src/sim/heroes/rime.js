@@ -26,7 +26,7 @@ export const chillOf = (world, e, u) => { const c = e.heroState.chill.get(u.id);
 export default {
   key: 'rime', name: 'Rime Holloway', title: 'the Frostwright', role: 'Control mage', resource: 'mana', difficulty: 'Medium',
   rankOrder: ['Q', 'E', 'W'],
-  build: ['stormglass-orb', 'kelp-crown', 'quickcurrent-boots', 'lanternfish-lens', 'borrowed-seconds', 'cloudwool-cloak'], // recommended items: shop highlights and bot purchase order
+  build: ['kelp-crown', 'stormstep-sandals', 'lanternfish-lens', 'deepwater-codex', 'borrowed-seconds', 'stillwater-pendant'], // recommended items: shop highlights and bot purchase order
   base: { hp: 560, hpL: 92, ad: 50, adL: 3, armor: 24, armorL: 4.2, mr: 30, mrL: 1.3, as: 0.64, asL: 0.018, range: 520, speed: 330, mana: 400, manaL: 48, manaRegen: 3, projectile: 1500, radius: 32 },
   passive: { name: 'Deep Chill', desc: 'His spells chill enemy heroes (up to 3, 4 s; each slows 8%). The third chill freezes them for 0.8 s; frozen heroes cannot freeze again for 6 s.' },
   init(world, e) { e.heroState = { chill: new Map() }; },

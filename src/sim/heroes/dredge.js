@@ -13,7 +13,7 @@ const R_VAL = { label: 'Physical damage', type: 'phys', base: [150, 250, 350], r
 export default {
   key: 'dredge', name: 'Dredge Harrow', title: 'the Anchorhand', role: 'Juggernaut', resource: 'none', difficulty: 'Easy',
   rankOrder: ['Q', 'W', 'E'],
-  build: ['iron-fin', 'tidal-heart', 'magnet-boots', 'barnacle-plate', 'harpoon-chain', 'whalehide-vest'], // recommended items: shop highlights and bot purchase order
+  build: ['storm-cutlass', 'anchor-boots', 'barnacle-plate', 'leviathans-maw', 'molted-shell', 'stillwater-pendant'], // recommended items: shop highlights and bot purchase order
   base: { hp: 650, hpL: 104, ad: 64, adL: 3.8, armor: 32, armorL: 4.4, mr: 32, mrL: 1.6, as: 0.64, asL: 0.022, range: 180, speed: 335, radius: 38 },
   passive: { name: 'Heavy Chain', desc: 'Takes up to 20% less damage the lower his health: 1% for every 4% missing.' },
   init(world, e) { e.heroState = { breachUntil: 0, breachRank: 1 }; },

@@ -14,7 +14,7 @@ const R_VAL = { label: 'Physical damage (+40% below half health)', type: 'phys',
 export default {
   key: 'kestrel', name: 'Kestrel Vane', title: 'the Harpooner', role: 'Marksman', resource: 'mana', difficulty: 'Medium',
   rankOrder: ['Q', 'E', 'W'],
-  build: ['iron-fin', 'harpoon-chain', 'quickcurrent-boots', 'cursed-coin', 'borrowed-seconds', 'whalehide-vest'], // recommended items: shop highlights and bot purchase order
+  build: ['harpoon-chain', 'swiftfin-treads', 'squall-bell', 'reefbreaker', 'leviathans-maw', 'borrowed-seconds'], // recommended items: shop highlights and bot purchase order
   base: { hp: 560, hpL: 92, ad: 56, adL: 3.4, armor: 24, armorL: 4.2, mr: 30, mrL: 1.3, as: 0.68, asL: 0.03, range: 560, speed: 330, mana: 320, manaL: 38, manaRegen: 2.6, projectile: 2200, radius: 32 },
   passive: { name: 'Deadeye', desc: 'Every fourth attack deals bonus damage and slows 25% for 1 s.', values: [P_VAL] },
   init(world, e) { e.heroState = { shots: 0, rollUntil: 0, rollRank: 1 }; },

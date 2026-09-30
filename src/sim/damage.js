@@ -42,7 +42,8 @@ export function dealDamage(world, src, target, amount, type = DMG.PHYS, opts = E
   if (target.ampUntil > t) amt *= 1 + target.ampPct;
   if (world.state.suddenDeath) amt *= 1 + RULES.SUDDEN_DEATH_DMG_BONUS;
   if (type !== DMG.TRUE) {
-    const res = type === DMG.PHYS ? target.armor : target.mr;
+    let res = type === DMG.PHYS ? target.armor : target.mr;
+    if (res > 0 && attacker && attacker.kind === KIND.HERO) res *= 1 - (type === DMG.PHYS ? attacker.pen : attacker.mpen);
     amt *= res >= 0 ? 100 / (100 + res) : 2 - 100 / (100 - res);
   }
   // target-side hooks (can reduce, delay, trigger shields)
@@ -115,18 +116,19 @@ export function addShield(world, target, amount, durationSec, src = null) {
 }
 
 // ---- crowd control ---------------------------------------------------------
-const tenacity = (e) => (e.kind === KIND.HERO ? 1 : 1);
+/** Crowd-control duration after tenacity (heroes only). */
+const tenacity = (e) => (e.kind === KIND.HERO ? 1 - e.tenacity : 1);
 export function stun(world, e, s, src = null) {
   if (!e.alive || e.invulnUntil > world.tick || isStructure(e.kind)) return;
   e.stunUntil = Math.max(e.stunUntil, world.tick + sec(s * tenacity(e)));
   e.windup = 0; e.channelUntil = 0;
   world.events.push(EV.STUN, world.tick, e.id, CC.STUN, e.x, e.y, s, '', sid(src));
 }
-export function root(world, e, s, src = null) { if (!isStructure(e.kind) && e.invulnUntil <= world.tick) { e.rootUntil = Math.max(e.rootUntil, world.tick + sec(s)); world.events.push(EV.STUN, world.tick, e.id, CC.ROOT, e.x, e.y, s, '', sid(src)); } }
+export function root(world, e, s, src = null) { if (!isStructure(e.kind) && e.invulnUntil <= world.tick) { e.rootUntil = Math.max(e.rootUntil, world.tick + sec(s * tenacity(e))); world.events.push(EV.STUN, world.tick, e.id, CC.ROOT, e.x, e.y, s, '', sid(src)); } }
 export function slow(world, e, pct, s, src = null) {
   if (isStructure(e.kind) || e.invulnUntil > world.tick) return;
   const t = world.tick;
-  if (e.slowUntil <= t || pct >= e.slowPct) { e.slowPct = pct; e.slowUntil = Math.max(e.slowUntil, t + sec(s)); }
+  if (e.slowUntil <= t || pct >= e.slowPct) { e.slowPct = pct; e.slowUntil = Math.max(e.slowUntil, t + sec(s * tenacity(e))); }
   world.events.push(EV.SLOW, t, e.id, sid(src), e.x, e.y, s, '', pct);
 }
 export function haste(world, e, pct, s) { const t = world.tick; if (e.hasteUntil <= t || pct >= e.hastePct) { e.hastePct = pct; e.hasteUntil = t + sec(s); } }
@@ -139,7 +141,7 @@ export function knock(world, e, dirX, dirY, distance, s, airborne = false, src =
   if (airborne) e.airborneUntil = world.tick + ticks;
   world.events.push(EV.STUN, world.tick, e.id, airborne ? CC.AIRBORNE : CC.DISPLACE, e.x, e.y, s, '', sid(src));
 }
-export function knockUp(world, e, s, src = null) { if (!isStructure(e.kind) && e.invulnUntil <= world.tick) { e.airborneUntil = Math.max(e.airborneUntil, world.tick + sec(s)); e.windup = 0; e.channelUntil = 0; world.events.push(EV.STUN, world.tick, e.id, CC.AIRBORNE, e.x, e.y, s, '', sid(src)); } }
+export function knockUp(world, e, s, src = null) { if (!isStructure(e.kind) && e.invulnUntil <= world.tick) { e.airborneUntil = Math.max(e.airborneUntil, world.tick + sec(s * tenacity(e))); e.windup = 0; e.channelUntil = 0; world.events.push(EV.STUN, world.tick, e.id, CC.AIRBORNE, e.x, e.y, s, '', sid(src)); } }
 
 // ---- death -----------------------------------------------------------------
 export function kill(world, victim, killer) {

@@ -13,7 +13,7 @@ const E_VAL1 = { label: 'Magic damage', type: 'magic', base: [60, 90, 120, 150, 
 export default {
   key: 'auctioneer', name: 'The Auctioneer', short: 'Auctioneer', title: 'Everything Has a Price', role: 'Utility mage', resource: 'gold', difficulty: 'Medium',
   rankOrder: ['Q', 'W', 'E'],
-  build: ['stormglass-orb', 'lanternfish-lens', 'magnet-boots', 'kelp-crown', 'borrowed-seconds', 'cloudwool-cloak'], // recommended items: shop highlights and bot purchase order
+  build: ['lanternfish-lens', 'stormstep-sandals', 'kelp-crown', 'deepwater-codex', 'borrowed-seconds', 'stillwater-pendant'], // recommended items: shop highlights and bot purchase order
   passive: { name: 'Everything Has a Price', desc: 'Abilities cost gold instead of mana. Unspent gold earns interest (0.5% per second, up to 6 gold/s) and every assist pays 25 bonus gold.' },
   base: { hp: 560, hpL: 90, ad: 50, adL: 3, armor: 24, armorL: 4.2, mr: 30, mrL: 1.3, as: 0.65, asL: 0.02, range: 500, speed: 335, projectile: 1500, radius: 34 },
   init(world, e) { e.heroState = { repo: null }; },

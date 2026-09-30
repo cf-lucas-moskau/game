@@ -38,7 +38,7 @@ const sprouted = (world, z) => world.tick - z.born >= sec(SPROUT);
 export default {
   key: 'thorne', name: 'Old Thorne', short: 'Thorne', title: 'the Skygardener', role: 'Zone mage', resource: 'mana', difficulty: 'Medium',
   rankOrder: ['Q', 'W', 'E'],
-  build: ['stormglass-orb', 'kelp-crown', 'quickcurrent-boots', 'tidal-heart', 'lanternfish-lens', 'cloudwool-cloak'], // recommended items: shop highlights and bot purchase order
+  build: ['kelp-crown', 'stormstep-sandals', 'tidewatch-hourglass', 'lanternfish-lens', 'molted-shell', 'stillwater-pendant'], // recommended items: shop highlights and bot purchase order
   base: { hp: 580, hpL: 94, ad: 48, adL: 3, armor: 26, armorL: 4.2, mr: 30, mrL: 1.3, as: 0.62, asL: 0.018, range: 500, speed: 325, mana: 400, manaL: 46, manaRegen: 3.2, projectile: 1300, radius: 34 },
   passive: { name: 'Green Thumb', desc: 'Up to three thornbushes grow at once; each shoots thorns at the nearest enemy, heroes first.' },
   init(world, e) { e.heroState = {}; },

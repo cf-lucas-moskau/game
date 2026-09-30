@@ -21,7 +21,7 @@ const empower = (world, e) => { if (!onBeat(world, e)) return 1; fx(world, e, 'c
 export default {
   key: 'cantor', name: 'Cantor Brightbell', title: 'the Songkeeper', role: 'Battle bard', resource: 'mana', difficulty: 'Hard',
   rankOrder: ['Q', 'W', 'E'],
-  build: ['stormglass-orb', 'stormcallers-horn', 'quickcurrent-boots', 'kelp-crown', 'molted-shell', 'whalehide-vest'], // recommended items: shop highlights and bot purchase order
+  build: ['stormcallers-horn', 'stormstep-sandals', 'coral-aegis', 'kelp-crown', 'molted-shell', 'stillwater-pendant'], // recommended items: shop highlights and bot purchase order
   base: { hp: 610, hpL: 100, ad: 54, adL: 3.2, armor: 30, armorL: 4.6, mr: 30, mrL: 1.5, as: 0.66, asL: 0.02, range: 480, speed: 335, mana: 360, manaL: 44, manaRegen: 3, projectile: 1500, radius: 32 },
   passive: { name: 'Tempo', desc: 'He keeps a beat, once a second. Spells cast within 0.2 s of the beat are 40% stronger and gain a bonus.' },
   init(world, e) { e.heroState = { beat0: world.tick, beat: BEAT, window: WINDOW }; }, // beat length and window are read by the presentation too

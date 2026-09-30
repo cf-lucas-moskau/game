@@ -8,6 +8,9 @@ const STAT = {
   ad: ['Attack damage', (v) => `+${v}`], ap: ['Ability power', (v) => `+${v}`], armor: ['Armor', (v) => `+${v}`],
   mr: ['Magic resist', (v) => `+${v}`], hp: ['Health', (v) => `+${v}`], ms: ['Move speed', (v) => `+${v}`],
   as: ['Attack speed', (v) => `+${Math.round(v * 100)}%`], cdr: ['Cooldown reduction', (v) => `${Math.round(v * 100)}%`],
+  lifesteal: ['Lifesteal', (v) => `${Math.round(v * 100)}%`], mana: ['Mana', (v) => `+${v}`], manaRegen: ['Mana regen', (v) => `+${v}/s`],
+  hpRegen: ['Health regen', (v) => `+${v}/s`], pen: ['Armor penetration', (v) => `${Math.round(v * 100)}%`],
+  mpen: ['Magic penetration', (v) => `${Math.round(v * 100)}%`], tenacity: ['Tenacity', (v) => `${Math.round(v * 100)}%`],
 };
 /** ['+35 Attack damage', ...] */
 export const statLines = (stats = {}) => Object.keys(stats).map((k) => (STAT[k] ? `${STAT[k][1](stats[k])} ${STAT[k][0]}` : `${k} ${stats[k]}`));

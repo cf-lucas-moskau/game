@@ -77,8 +77,10 @@ One frame (`GameSession.frame`):
   `onBasicAttack`, `onDealtDamage`, `onTookDamage`, `modifyDamageIn`, `modifyStats`, `onCast`, `onTakedown`...) and four abilities. Ability
   numbers are **value specs** (`{ base, ratio, stat }`) used both by the cast and by tooltips, so the UI never
   duplicates a number.
-- `items/index.js`: stats summed by `stats.js`, unique effects as hooks (`onBasicHit`, `onDealtDamage`, `onLethal`, `onTick`, ...), and
-  `BUILDS` recommendations used by bots and the shop.
+- `items/index.js`: a build tree of 40 items (`from` recipes; tiers 1-3 follow from it; `group` for boots): stats summed by
+  `stats.js` (including cooldown reduction, penetration, tenacity, regeneration), unique effects as hooks (`onBasicHit`,
+  `onDealtDamage`, `onAbilityCast`, `onLethal`, `onTick`, ...). `match.js#purchasePlan` prices a purchase after the
+  components it uses up; the shop and the bots both use it. Recommended builds live in the hero modules (`build`).
 - `constants.js`: lane geometry, tick rate, rules (tower HP, gold, respawn, sudden death).
 
 ## Presentation
