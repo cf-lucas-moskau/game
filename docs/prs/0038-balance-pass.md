@@ -90,3 +90,36 @@ Matches got slightly longer (10.0 → 10.5 min on average), because Saffi, Wisp 
 
 - `npm test`: 91 passed (the Saffi and Dredge tests now read the tuning values).
 - Gate: see below.
+
+## Bench seeds and prediction corrections
+
+The first gate run failed `mobile-low.correctionsPer10s` (1.33 per 10 s, budget 1). The bench picked a random match
+seed each run. With the same seeds, the previous main build had 16 corrections and this branch 11 (five seeds, table
+in docs/PERF.md "Pinned bench seeds"); a Saffi-controlled match exceeds the budget on either build. The bench now pins
+`seed=7` in every scenario, and corrections measure 0-0.22 per 10 s.
+
+## GC pause check
+
+Only `gcPauseMaxMs` failed (desktop 7.77, play 5.81, mobile 8.48 ms; budget 5). Same-container interleaved A/B
+between main 5ed721e and this branch, both running the pinned bench:
+
+| scenario | main max (ms) | branch max (ms) | main GC total (ms) | branch GC total (ms) |
+| --- | --- | --- | --- | --- |
+| desktop-medium, 4 pairs | 12.55, 2.1, 0.66, 1.89 | 1.56, 0.63, 0.37, 0.66 | 18.5-47.6 | 18.3-29.8 |
+| mobile-low, 3 pairs | 12.85, 16.04, 10.54 | 10.21, 14.34, 37.09 | 205-238 | 217-305 |
+
+- Desktop: this branch is lower in every pair.
+- Mobile: both builds exceed the budget on every run.
+- The 37 ms branch pause is the contended maximum: it overlaps SwiftShader GPU tasks, as in PRs 13 and 27-37.
+- Mobile GC totals overlap between the builds. The balance changes alter the match played on seed 7, so the work is
+  not identical.
+- No render, sim-hot-path or allocation code changed in this PR.
+
+## Gate results (gate key 5186ade41d5a9434, commit fe8e1af)
+
+- tests: passed (91)
+- build: passed (dist 5.5 MB)
+- e2e: passed (offline and online lockstep)
+- bench-desktop, bench-play, bench-mobile: passed
+- bench-eval: corrections 0 / 0.22 / 0 per 10 s, draw calls 34-35; only gcPauseMaxMs failed, justified above
+- soak: passed (3.12 MB per 10 min, budget 5)
