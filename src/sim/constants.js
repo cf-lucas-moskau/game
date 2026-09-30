@@ -34,8 +34,9 @@ export const RULES = {
   FOUNTAIN_HEAL_PCT: 0.12, FOUNTAIN_DPS: 1200,
   MAX_ITEMS: 6, SELL_RATIO: 0.7,
 };
-/** xp needed to go from level L to L+1 */
-export const xpToNext = (lvl) => 180 + 100 * (lvl - 1);
+/** xp needed to go from level L to L+1: cheap up to level 6 (the ultimate arrives in about a minute and a half), then
+ *  the old curve (3 -> 6 costs 780 xp instead of 1440) */
+export const xpToNext = (lvl) => (lvl < 6 ? 100 + 40 * lvl : 180 + 100 * (lvl - 1));
 
 export const MINION = {
   [KIND.MELEE]:  { hp: 480, ad: 20, armor: 10, mr: 0, as: 1.0, range: 110, speed: 330, radius: 34, gold: 21, xp: 60, projectile: 0, growth: 0.05 },
