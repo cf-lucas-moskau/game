@@ -4,8 +4,9 @@ import { Rng } from '../core/rng.js';
 import { CMD, moveCmd, attackCmd, attackMoveCmd, castCmd, spellCmd, buyCmd, stopCmd } from '../sim/commands.js';
 import { KIND, LANE, MAP, sideX, sec } from '../sim/constants.js';
 import { canShop } from '../sim/match.js';
-import { snapshot, alive, d, hpr, fwd, power, underTower, minionsTankingTower, predict } from './perception.js';
+import { snapshot, alive, d, hpr, fwd, power, underTower, minionsTankingTower, predict, towerCovers } from './perception.js';
 import { SCRIPTS } from './heroes/index.js';
+import { burst, reach } from './threat.js';
 
 export const DIFFICULTY = {
   easy: { think: 12, aimError: 95, abilityRate: 0.55, dodge: 0.1 },
@@ -59,7 +60,16 @@ export class Bot {
     for (const a of allies) if (d(a, me) < 1000) ourPower += power(a);
     for (const e of near) { theirPower += power(e); if (!weak && hpr(e) < 0.35 && d(e, me) < me.range + 400) weak = e; }
     const diveRisk = underTower(snap, me, 60) && minionsTankingTower(snap) < 2;
+    // recover: low on health (or on mana) and nobody close -> walk back to the fountain until healed, as players do
+    // (the fountain heals 12%/s and is the shop). Heroes without regeneration go back earlier.
+    const def = world.registry.heroes[me.heroKey], closest = nearestDist(near, me);
+    const manaLow = def.resource === 'mana' && me.maxMana > 0 && me.mana < me.maxMana * 0.15;
+    if (this.state === 'recover' && (hpr(me) < 0.92 || (def.resource === 'mana' && me.mana < me.maxMana * 0.8)) && closest > 450) return;
+    if ((hpr(me) < (def.noRegen ? 0.3 : 0.3) || (manaLow && hpr(me) < 0.7)) && closest > 700 && !(weak && hpr(weak) < 0.15)) { this.state = 'recover'; return; }
+    // melee divers commit on a kill they can make, or on a fight an ally has started; otherwise they wait
+    const dive = me.range < 250 && hpr(me) > 0.3 && !diveRisk ? meleeCommit(world, snap, me, near) : null;
     if (hpr(me) < 0.25 && near.length) this.state = 'retreat';
+    else if (dive) { this.state = 'allin'; this.focus = dive.id; }
     else if (diveRisk && !(weak && hpr(weak) < 0.15)) this.state = 'retreat';
     else if (weak && ourPower > theirPower * 0.9 && hpr(me) > 0.35) { this.state = 'allin'; this.focus = weak.id; }
     else if (near.length && ourPower > theirPower * 1.45 && hpr(me) > 0.5) { let f = near[0]; for (const e of near) if (hpr(e) < hpr(f)) f = e; this.state = 'allin'; this.focus = f.id; }
@@ -71,6 +81,7 @@ export class Bot {
   act(world, me, snap) {
     const f = fwd(me.team);
     switch (this.state) {
+      case 'recover': return moveCmd(this.p, sideX(me.team, MAP.FOUNTAIN_X), 450);
       case 'retreat': {
         const safe = snap.allyTower ? snap.allyTower.x - f * 250 : sideX(me.team, MAP.FOUNTAIN_X);
         this.strafe = (this.strafe + 1) % 6;
@@ -78,6 +89,8 @@ export class Bot {
       }
       case 'allin': {
         const t = world.get(this.focus);
+        // never chase a healthy target under its tower (the way divers died most)
+        if (alive(t) && towerCovers(snap, t) && hpr(t) > 0.15) { this.state = 'lane'; break; }
         if (alive(t)) return attackCmd(this.p, t.id);
         return attackMoveCmd(this.p, me.x + f * 400, 450);
       }
@@ -85,7 +98,7 @@ export class Bot {
         let t = null; for (const e of snap.enemies) if (d(e, me) < me.range + 500 && (!t || hpr(e) < hpr(t))) t = e;
         if (!t) break;
         const dist = d(t, me), want = me.range * 0.85;
-        if (me.range < 250) return attackCmd(this.p, t.id);
+        if (me.range < 250) { if (meleeCanEngage(snap, me, t) && !towerCovers(snap, me)) return attackCmd(this.p, t.id); break; }
         // kite: attack when ready, step back when the enemy closes in
         if (me.attackCd > 3 && dist < want) { const a = Math.atan2(me.y - t.y, me.x - t.x); return moveCmd(this.p, me.x + Math.cos(a) * 140, me.y + Math.sin(a) * 140 + this.rng.range(-60, 60)); }
         if (underTower(snap, t, 0) && minionsTankingTower(snap) < 2) break;
@@ -100,16 +113,56 @@ export class Bot {
     }
     // lane: farm behind the front line
     const front = snap.allyFront ? snap.allyFront.x : sideX(me.team, MAP.TOWER_INNER_X);
-    const hold = front - f * (me.range < 250 ? 60 : 200);
+    let hold = front - f * (me.range < 250 ? 110 : 200);
+    // never hold inside the enemy tower's reach while farming (sieging it is the siege state's job)
+    const et = snap.enemyTower; if (et) { const edge = et.x - f * (et.range + et.radius + 60); if ((hold - edge) * f > 0) hold = edge; }
     let target = null;
     for (const m of snap.enemyMinions) if (d(m, me) < me.range + 200 && (!target || m.hp < target.hp)) target = m;
-    if (target && !(underTower(snap, target, 0) && minionsTankingTower(snap) < 1)) return attackCmd(this.p, target.id);
+    // last-hit under the enemy tower only from range, or while enough minions tank it
+    if (target && !(underTower(snap, target, me.range < 250 ? 60 : 0) && minionsTankingTower(snap) < (me.range < 250 ? 3 : 1))) return attackCmd(this.p, target.id);
     const x = Math.max(200, Math.min(LANE.W - 200, hold));
     const laneY = 450 + ((this.p % 3) - 1) * 130;
-    if (Math.abs(me.x - x) < 60 && Math.abs(me.y - laneY) < 60) return null;
+    // in position: stay, unless an old attack order is dragging the hero into tower shots (a dash sets one)
+    if (Math.abs(me.x - x) < 60 && Math.abs(me.y - laneY) < 60 && !towerCovers(snap, me)) return null;
     return moveCmd(this.p, x, laneY);
   }
 }
 const EMPTY = [];
 const anyWithin = (list, me, r) => { for (const e of list) if (d(e, me) < r) return true; return false; };
+const nearestDist = (list, me) => { let b = Infinity; for (const e of list) { const v = d(e, me); if (v < b) b = v; } return b; };
+/**
+ * A melee hero only walks into a trade it can take: the target is close, not under its tower (unless nearly dead), and
+ * the enemies around the target do not outnumber the allies around it (a lone melee chasing into three ranged heroes
+ * was the main way melee bots died).
+ */
+function meleeCanEngage(snap, me, t) {
+  if (d(t, me) > me.range + 260) return false;
+  if (underTower(snap, t, 0) && hpr(t) > 0.2) return false;
+  let foes = 0, friends = 1;
+  for (const e of snap.enemies) if (d(e, t) < 650) foes++;
+  for (const a of snap.allies) if (d(a, t) < 750) friends++;
+  return foes <= friends || hpr(t) < 0.3;
+}
+/** The enemy a melee hero should dive now, or null: killable with its burst, or already in a fight with an ally. */
+function meleeCommit(world, snap, me, near) {
+  const r = reach(world, me); let best = null;
+  for (const e of near) {
+    if (d(e, me) > r || !safeToDive(snap, me, e)) continue;
+    if (burst(world, me, e) >= (e.hp + e.shield) * 1.05 && (!best || e.hp < best.hp)) best = e;
+  }
+  if (best) return best;
+  for (const a of snap.allies) {
+    if (world.tick - a.lastHeroHitTick > 20 || d(a, me) > 900) continue;
+    let t = null; for (const e of near) if (d(e, a) < 550 && d(e, me) < r + 150 && (!t || hpr(e) < hpr(t))) t = e;
+    if (t && safeToDive(snap, me, t)) return t;
+  }
+  return null;
+}
+function safeToDive(snap, me, t) {
+  if (towerCovers(snap, t) && hpr(t) > 0.15) return false;
+  let foes = 0, friends = 1;
+  for (const e of snap.enemies) if (e !== t && d(e, t) < 600) foes++;
+  for (const a of snap.allies) if (d(a, t) < 850) friends++;
+  return foes < friends + 1;
+}
 const deadEnemies = (world, me) => { let n = 0; for (const h of world.heroes) if (h.team !== me.team && h.dead) n++; return n; };

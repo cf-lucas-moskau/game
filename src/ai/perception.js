@@ -46,5 +46,7 @@ export function minionsTankingTower(snap) {
   let n = 0; for (const m of snap.allyMinions) if (Math.sqrt((m.x - t.x) ** 2 + (m.y - t.y) ** 2) < t.range + t.radius) n++;
   return n;
 }
+/** Going to `pt` means taking tower shots: inside the enemy tower's range with fewer than two allied minions tanking it. */
+export const towerCovers = (snap, pt, margin = 0) => underTower(snap, pt, margin) && minionsTankingTower(snap) < 2;
 export const isHero = (e) => e && e.kind === KIND.HERO;
 export const structureTarget = (s) => s && isStructure(s.kind);
