@@ -9,7 +9,7 @@ export function createEntity() {
     hp: 0, maxHp: 0, mana: 0, maxMana: 0, resource: 0, maxResource: 0,
     // derived stats (recomputed by stats.js)
     ad: 0, ap: 0, armor: 0, mr: 0, as: 0, range: 0, speed: 0, hpRegen: 0, manaRegen: 0,
-    cdr: 0, lifesteal: 0, dmgAmp: 0,
+    cdr: 0, lifesteal: 0, dmgAmp: 0, pen: 0, mpen: 0, tenacity: 0,
     // base (unit-type) stats for non-heroes
     baseAd: 0, baseArmor: 0, baseMr: 0, baseAs: 0, baseRange: 0, baseSpeed: 0, baseHp: 0,
     // orders + combat

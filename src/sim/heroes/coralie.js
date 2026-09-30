@@ -18,7 +18,7 @@ function grow(world, e, n) { const s = e.heroState; s.reef = Math.min(MAX_REEF, 
 export default {
   key: 'coralie', name: 'Coralie Brine', title: 'the Reefwarden', role: 'Tank', resource: 'mana', difficulty: 'Easy',
   rankOrder: ['Q', 'W', 'E'],
-  build: ['tidal-heart', 'barnacle-plate', 'magnet-boots', 'molted-shell', 'cloudwool-cloak', 'whalehide-vest'], // recommended items: shop highlights and bot purchase order
+  build: ['barnacle-plate', 'anchor-boots', 'molted-shell', 'coral-aegis', 'stillwater-pendant', 'borrowed-seconds'], // recommended items: shop highlights and bot purchase order
   base: { hp: 640, hpL: 104, ad: 58, adL: 3.4, armor: 34, armorL: 4.6, mr: 32, mrL: 1.8, as: 0.63, asL: 0.02, range: 175, speed: 335, mana: 320, manaL: 40, manaRegen: 2.6, radius: 38 },
   passive: { name: 'Living Reef', desc: 'Hits from heroes grow reef on her (up to 6 stacks): each gives 2 armor and magic resist. Out of combat the reef recedes.' },
   init(world, e) { e.heroState = { reef: 0, lastGrow: -999, shieldUntil: 0, shieldRank: 1 }; },

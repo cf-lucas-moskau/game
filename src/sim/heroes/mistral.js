@@ -14,7 +14,7 @@ const R_VAL = { label: 'Shield per second inside', type: 'shield', base: [30, 45
 export default {
   key: 'mistral', name: 'Mistral Aveline', title: 'the Windcaller', role: 'Enchanter', resource: 'mana', difficulty: 'Easy',
   rankOrder: ['E', 'Q', 'W'],
-  build: ['stormglass-orb', 'stormcallers-horn', 'quickcurrent-boots', 'kelp-crown', 'molted-shell', 'cloudwool-cloak'], // recommended items: shop highlights and bot purchase order
+  build: ['stormcallers-horn', 'stormstep-sandals', 'coral-aegis', 'tidewatch-hourglass', 'kelp-crown', 'stillwater-pendant'], // recommended items: shop highlights and bot purchase order
   base: { hp: 540, hpL: 88, ad: 46, adL: 2.8, armor: 24, armorL: 4, mr: 30, mrL: 1.3, as: 0.64, asL: 0.018, range: 540, speed: 340, mana: 380, manaL: 45, manaRegen: 3.2, projectile: 1500, radius: 30 },
   passive: { name: 'Tailwind', desc: 'Every 2 s, allies near her (and she) gain 10% move speed for 2.5 s.' },
   init(world, e) { e.heroState = {}; },

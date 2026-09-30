@@ -29,12 +29,14 @@ export const RULES = {
   WHALE_FIRST: 120, WHALE_INTERVAL: 90, WHALE_WARN: 3, WHALE_DURATION: 4, WHALE_SLIDE: 120, WHALE_EDGE_DPS: 90,
   SUDDEN_DEATH: 600, SUDDEN_DEATH_DMG_BONUS: 0.5, SUDDEN_DEATH_HEART_DECAY: 0.012,
   KILL_GOLD: 300, ASSIST_GOLD: 150, KILL_XP: 280, ASSIST_WINDOW: 10,
+  KILL_CREDIT_WINDOW: 15, // a tower, minion or the whale finishing a hero credits the last enemy hero who hit them within this
   XP_SHARE_RADIUS: 1200, TOWER_GOLD: 150,
   FOUNTAIN_HEAL_PCT: 0.12, FOUNTAIN_DPS: 1200,
   MAX_ITEMS: 6, SELL_RATIO: 0.7,
 };
-/** xp needed to go from level L to L+1 */
-export const xpToNext = (lvl) => 180 + 100 * (lvl - 1);
+/** xp needed to go from level L to L+1: cheap up to level 6 (the ultimate arrives in about a minute and a half), then
+ *  the old curve (3 -> 6 costs 780 xp instead of 1440) */
+export const xpToNext = (lvl) => (lvl < 6 ? 100 + 40 * lvl : 180 + 100 * (lvl - 1));
 
 export const MINION = {
   [KIND.MELEE]:  { hp: 480, ad: 20, armor: 10, mr: 0, as: 1.0, range: 110, speed: 330, radius: 34, gold: 21, xp: 60, projectile: 0, growth: 0.05 },

@@ -1,5 +1,6 @@
 // The numbers players reason with, computed from the same declarations the sim uses
 // (ability value specs, item stats, stat growth). Presentation only: never mutates the world.
+import { purchasePlan } from '../sim/match.js';
 import { recomputeHero } from '../sim/stats.js';
 import { amount } from '../sim/heroes/kit.js';
 
@@ -37,7 +38,9 @@ export const effectiveHp = (s) => ({ phys: s.maxHp * (1 + s.armor / 100), magic:
  * [{ label, from, to, delta }] for ability values, auto damage/DPS, health and effective health.
  */
 export function itemImpact(world, e, itemKey) {
-  const after = statsWith(world, e, [...e.items, itemKey]), before = statsWith(world, e, e.items);
+  // components the purchase uses up leave the inventory (their stats are part of the new item)
+  const used = new Set(purchasePlan(world, e, itemKey).consume);
+  const after = statsWith(world, e, [...e.items.filter((_, i) => !used.has(i)), itemKey]), before = statsWith(world, e, e.items);
   const out = [], add = (label, from, to, unit = '') => { const d = to - from; if (Math.abs(d) >= 0.5) out.push({ label, from, to, delta: d, unit }); };
   const A = abilityNumbers(world, e, before), B = abilityNumbers(world, e, after);
   A.forEach((ab, i) => ab.rows.forEach((row, j) => add(`${ab.key} ${ab.name}${ab.rows.length > 1 ? ` (${row.label.replace(/ damage.*/i, '').toLowerCase()})` : ''}`, row.value, B[i].rows[j].value)));

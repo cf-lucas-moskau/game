@@ -4,7 +4,7 @@ Read this first. It is the state of the project and how to keep working on it.
 
 ## What this is
 **Leviathan Lane**: an original browser 3v3 single-lane arena brawler (ARAM-like), 5 to 10 minute
-matches, fought on the back of a giant sky-whale. Sixteen original heroes (with skins), 15 items, bots, desktop
+matches, fought on the back of a giant sky-whale. Sixteen original heroes (with skins), 40 items in a build tree (components, upgrades, finished), bots, desktop
 (mouse + keyboard) and mobile (touch) controls. 3D with three.js on a fixed angled camera, gameplay on
 a 2D plane. Everything must be original (no League of Legends IP).
 

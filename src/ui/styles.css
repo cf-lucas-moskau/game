@@ -420,3 +420,16 @@ table.sb .chip { font-size: 10px; padding: 2px 5px; border-radius: 5px; backgrou
   .online .code-row .code { font-size: 32px; }
   .online-card { padding: 16px; } .online-card h2 { font-size: 28px; }
 }
+
+/* shop build tree */
+.shop-filter { margin-bottom: 8px; flex-wrap: wrap; max-width: 100%; }
+.shop-filter button { padding: 6px 12px; min-height: 32px; font-size: 13px; }
+.shop-cat h4 small { margin-left: 8px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--muted); opacity: 0.8; }
+.card.t1 { background: rgba(30, 34, 76, 0.7); }
+.card.t3 { border-color: rgba(242, 193, 78, 0.35); }
+.card .cost s { color: var(--muted); font-weight: 600; margin-right: 6px; font-size: 12px; }
+.card .recipe { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--muted); }
+.card .recipe .lbl { font-weight: 650; }
+.card .recipe .part { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--panel-edge); opacity: 0.55; }
+.card .recipe .part.have { opacity: 1; border-color: var(--heal); background: rgba(126, 224, 122, 0.14); }
+.card .recipe .part .ico { width: 16px; height: 16px; }

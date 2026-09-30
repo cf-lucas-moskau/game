@@ -4,7 +4,7 @@ import { moveCmd, attackMoveCmd, surrenderCmd, validCommand } from '../src/sim/c
 import { EV } from '../src/core/events.js';
 import { KIND, sec, RULES, TICK_HZ } from '../src/sim/constants.js';
 import { testContent, roster3v3 } from './helpers.js';
-import { kill as killFn } from '../src/sim/damage.js';
+import { kill as killFn, dealDamage, DMG } from '../src/sim/damage.js';
 
 function run(seed, seconds, scripted = true) {
   const w = createMatch({ seed, roster: roster3v3(), content: testContent });
@@ -114,5 +114,39 @@ describe('sudden death', () => {
     const outcomes = new Set([1, 2, 3, 4, 5, 6, 7, 8].map(coin));
     expect(outcomes.size).toBe(2); // both sides win some perfect ties
     expect(coin(5)).toBe(coin(5));
+  });
+});
+
+describe('kill credit', () => {
+  const setup = () => {
+    const w = createMatch({ seed: 5, roster: roster3v3(), content: testContent });
+    const [a, b] = w.heroes.filter((h) => h.team === 0), victim = w.heroes.find((h) => h.team === 1);
+    const tower = w.structures.find((s) => s.kind === KIND.TOWER && s.team === 0);
+    const kills = []; const grab = () => w.events.drain((e) => { if (e.type === EV.KILL) kills.push({ ...e }); });
+    return { w, a, b, victim, tower, kills, grab };
+  };
+  const wait = (w, s) => { w.tick += sec(s); };
+  it('a tower finishing a hero credits the last enemy hero who hit them within 15 s, with the full bounty', () => {
+    const { w, a, victim, tower, kills, grab } = setup();
+    dealDamage(w, a, victim, 50, DMG.TRUE);
+    wait(w, 12);
+    const g0 = a.gold; killFn(w, victim, tower); grab();
+    expect(a.kills).toBe(1);
+    expect(a.gold - g0).toBe(RULES.KILL_GOLD);
+    expect(kills[0].b).toBe(a.id); expect(kills[0].c).toBe(RULES.KILL_GOLD);
+  });
+  it('after 15 s nobody gets the kill: the gold is shared as before', () => {
+    const { w, a, victim, tower, grab } = setup();
+    dealDamage(w, a, victim, 50, DMG.TRUE);
+    wait(w, 16);
+    const g0 = a.gold; killFn(w, victim, tower); grab();
+    expect(a.kills).toBe(0); expect(a.gold - g0).toBe(RULES.ASSIST_GOLD);
+  });
+  it('the latest damager gets the kill, the earlier one the assist', () => {
+    const { w, a, b, victim, tower } = setup();
+    dealDamage(w, a, victim, 50, DMG.TRUE); wait(w, 2);
+    dealDamage(w, b, victim, 50, DMG.TRUE); wait(w, 2);
+    killFn(w, victim, tower);
+    expect([a.kills, a.assists, b.kills, b.assists]).toEqual([0, 1, 1, 0]);
   });
 });

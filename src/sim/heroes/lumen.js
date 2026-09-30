@@ -34,7 +34,7 @@ const costOf = (base) => (world, e, rank) => (e.heroState.freeUntil > world.tick
 export default {
   key: 'lumen', name: 'Lumen Vey', title: 'the Starcartographer', role: 'Burst mage', resource: 'mana', difficulty: 'Hard',
   rankOrder: ['Q', 'W', 'E'],
-  build: ['stormglass-orb', 'lanternfish-lens', 'quickcurrent-boots', 'kelp-crown', 'borrowed-seconds', 'cloudwool-cloak'], // recommended items: shop highlights and bot purchase order
+  build: ['lanternfish-lens', 'stormstep-sandals', 'deepwater-codex', 'kelp-crown', 'tidewatch-hourglass', 'borrowed-seconds'], // recommended items: shop highlights and bot purchase order
   base: { hp: 545, hpL: 88, ad: 48, adL: 3, armor: 22, armorL: 4, mr: 30, mrL: 1.3, as: 0.64, asL: 0.018, range: 530, speed: 330, mana: 420, manaL: 50, manaRegen: 3.2, projectile: 1600, radius: 31 },
   passive: { name: 'Constellation', desc: 'Her spells chart stars on enemy heroes (6 s). The third star completes a constellation: a burst of magic damage (plus 4% of their max health) and a 40% slow.', values: [P_VAL] },
   init(world, e) { e.heroState = { stars: new Map(), freeUntil: 0 }; },

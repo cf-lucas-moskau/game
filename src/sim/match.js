@@ -91,13 +91,37 @@ function commandSystem(w, commands) {
     }
   }
 }
+/**
+ * What buying `key` takes right now: components already owned (anywhere down the build tree) are used up and knock
+ * their cost off the price. Returns { price, consume: inventory indices, ok, reason } without changing anything;
+ * `reason` is one of 'unknown' | 'owned' | 'group' | 'full' | 'gold' | '' (shop, bots and buy() all use this).
+ */
+export function purchasePlan(w, e, key) {
+  const items = w.registry.items, it = items[key];
+  if (!it) return { price: 0, consume: [], ok: false, reason: 'unknown' };
+  const free = e.items.map(() => true), consume = [];
+  const take = (k) => { // claim an owned copy of k, else claim its components
+    for (let i = 0; i < e.items.length; i++) if (free[i] && e.items[i] === k) { free[i] = false; consume.push(i); return items[k].cost; }
+    let saved = 0; for (const c of items[k].from) saved += take(c); return saved;
+  };
+  let saved = 0; for (const c of it.from) saved += take(c);
+  const price = it.cost - saved;
+  const kept = e.items.filter((_, i) => free[i]);
+  const reason = it.unique && kept.includes(key) ? 'owned'
+    : it.group && kept.some((k) => items[k].group === it.group) ? 'group'
+    : kept.length >= RULES.MAX_ITEMS ? 'full'
+    : e.gold < price ? 'gold' : '';
+  return { price, consume, ok: !reason, reason };
+}
 export function buy(w, e, key) {
-  const it = w.registry.items[key];
-  if (!it || !canShop(e) || e.items.length >= RULES.MAX_ITEMS || e.gold < it.cost) return false;
-  if (it.unique && e.items.includes(key)) return false;
-  e.gold -= it.cost; e.items.push(key); e.statsDirty = true;
+  if (!canShop(e)) return false;
+  const plan = purchasePlan(w, e, key); if (!plan.ok) return false;
+  const items = w.registry.items, it = items[key];
+  // components are used up (their sell effects run, then the new item's buy effect)
+  for (const i of [...plan.consume].sort((a, b) => b - a)) { const used = items[e.items[i]]; e.items.splice(i, 1); if (used.onSell) used.onSell(w, e); }
+  e.gold -= plan.price; e.items.push(key); e.statsDirty = true;
   if (it.onBuy) it.onBuy(w, e);
-  w.events.push(EV.ITEM_BOUGHT, w.tick, e.id, 0, e.x, e.y, it.cost, key);
+  w.events.push(EV.ITEM_BOUGHT, w.tick, e.id, 0, e.x, e.y, plan.price, key);
   recomputeHero(w, e);
   return true;
 }

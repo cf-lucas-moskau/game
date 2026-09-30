@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { createMatch, buy } from '../src/sim/match.js';
+import { createMatch, buy, purchasePlan } from '../src/sim/match.js';
 import { castCmd, buyCmd, moveCmd } from '../src/sim/commands.js';
 import { CONTENT } from '../src/sim/content.js';
 import { ITEMS } from '../src/sim/items/index.js';
-import { dealDamage, DMG } from '../src/sim/damage.js';
+import { dealDamage, DMG, stun } from '../src/sim/damage.js';
 import { sec } from '../src/sim/constants.js';
 
 const duel = (a, b) => createMatch({ seed: 3, content: CONTENT, roster: [{ playerId: 0, heroKey: a, team: 0 }, { playerId: 1, heroKey: b, team: 1 }] });
@@ -46,15 +46,58 @@ describe('items', () => {
   });
   it('Auctioneer Repossess takes the priciest item for 8 s and returns it', () => {
     const w = duel('auctioneer', 'saffi'); const a = w.heroes[0], s = w.heroes[1]; a.ranks.R = 1; a.gold = 5000; s.gold = 1e4;
-    buy(w, s, 'iron-fin'); buy(w, s, 'cursed-coin');
+    buy(w, s, 'tidal-heart'); buy(w, s, 'cursed-coin');
     place(a, 2000, 450); place(s, 2300, 450);
     steps(w, 1, () => [castCmd(0, 3, 2300, 450)]);
-    expect(s.items).toEqual(['iron-fin']); expect(a.items).toContain('cursed-coin');
+    expect(s.items).toEqual(['tidal-heart']); expect(a.items).toContain('cursed-coin');
     steps(w, sec(8.2));
-    expect(s.items).toEqual(['iron-fin', 'cursed-coin']); expect(a.items).not.toContain('cursed-coin');
+    expect(s.items).toEqual(['tidal-heart', 'cursed-coin']); expect(a.items).not.toContain('cursed-coin');
   });
-  it('every item has a name, cost and stats; shop has 15 items', () => {
-    expect(Object.keys(ITEMS).length).toBe(15);
-    for (const it of Object.values(ITEMS)) { expect(it.name).toBeTruthy(); expect(it.cost).toBeGreaterThan(0); expect(it.stats).toBeTruthy(); }
+  it('every item has a name, cost and stats; recipes cost more than their parts; tiers follow the tree', () => {
+    expect(Object.keys(ITEMS).length).toBe(40);
+    for (const it of Object.values(ITEMS)) {
+      expect(it.name).toBeTruthy(); expect(it.cost).toBeGreaterThan(0); expect(it.stats).toBeTruthy();
+      for (const c of it.from) { expect(ITEMS[c]).toBeTruthy(); expect(ITEMS[c].into).toContain(it.key); }
+      if (it.from.length) expect(it.cost).toBeGreaterThan(it.from.reduce((s, c) => s + ITEMS[c].cost, 0));
+      expect(it.tier).toBe(it.from.length ? Math.min(3, 1 + Math.max(...it.from.map((c) => ITEMS[c].tier))) : 1);
+    }
+    for (const h of Object.values(CONTENT.heroes)) for (const k of h.build) expect(ITEMS[k]).toBeTruthy();
+  });
+  it('components you own are used up and knock their cost off, all the way down the tree', () => {
+    const w = duel('saffi', 'morrow'); const s = w.heroes[0]; s.gold = 1e4;
+    buy(w, s, 'shark-tooth'); buy(w, s, 'shark-tooth'); buy(w, s, 'kelp-wrap');
+    const plan = purchasePlan(w, s, 'cursed-coin'); // iron-fin (two teeth) + a third tooth
+    expect(plan.price).toBe(2400 - 700); expect(plan.consume.length).toBe(2);
+    const g0 = s.gold; expect(buy(w, s, 'cursed-coin')).toBe(true);
+    expect(g0 - s.gold).toBe(1700); expect(s.items).toEqual(['kelp-wrap', 'cursed-coin']);
+  });
+  it('a full inventory can still combine components into an item', () => {
+    const w = duel('saffi', 'morrow'); const s = w.heroes[0]; s.gold = 1e4;
+    for (const k of ['shark-tooth', 'shark-tooth', 'kelp-wrap', 'kelp-wrap', 'sea-glass', 'sea-glass']) buy(w, s, k);
+    expect(purchasePlan(w, s, 'pearl-shard').reason).toBe('full');
+    expect(buy(w, s, 'iron-fin')).toBe(true); expect(s.items.length).toBe(5);
+  });
+  it('one pair of boots; boots upgrade from Driftwood Boots', () => {
+    const w = duel('saffi', 'morrow'); const s = w.heroes[0]; s.gold = 1e4;
+    buy(w, s, 'driftwood-boots'); expect(purchasePlan(w, s, 'swiftfin-treads').price).toBe(700);
+    buy(w, s, 'swiftfin-treads'); expect(s.items).toEqual(['swiftfin-treads']);
+    expect(purchasePlan(w, s, 'anchor-boots').reason).toBe('group'); expect(buy(w, s, 'magnet-boots')).toBe(false);
+  });
+  it('penetration ignores armor; tenacity shortens crowd control; cooldown reduction shortens cooldowns', () => {
+    const w = duel('saffi', 'gus'); const s = w.heroes[0], g = w.heroes[1];
+    const hit = () => { const hp = g.hp; dealDamage(w, s, g, 200, DMG.PHYS); const d = hp - g.hp; g.hp = g.maxHp; return d; };
+    const plain = hit(); s.gold = 1e4; buy(w, s, 'reefbreaker'); const pierced = hit();
+    expect(pierced).toBeGreaterThan(plain);
+    stun(w, g, 1); const full = g.stunUntil - w.tick; g.stunUntil = 0;
+    g.gold = 1e4; buy(w, g, 'stillwater-pendant'); stun(w, g, 1); expect(g.stunUntil - w.tick).toBeLessThan(full);
+    expect(g.tenacity).toBeCloseTo(0.3);
+    s.gold = 1e4; buy(w, s, 'tide-charm'); expect(s.cdr).toBeCloseTo(0.1);
+  });
+  it('Storm Cutlass empowers the next attack after a cast; Squall Bell adds magic on hit', () => {
+    const w = duel('saffi', 'gus'); const s = w.heroes[0], g = w.heroes[1]; s.gold = 1e4; buy(w, s, 'storm-cutlass');
+    const it = ITEMS['storm-cutlass']; it.onAbilityCast(w, s, 0);
+    const hp = g.hp; it.onBasicHit(w, s, g); expect(g.hp).toBeLessThan(hp);
+    const hp2 = g.hp; it.onBasicHit(w, s, g); expect(g.hp).toBe(hp2); // used up
+    const hp3 = g.hp; ITEMS['squall-bell'].onBasicHit(w, s, g); expect(g.hp).toBeLessThan(hp3);
   });
 });

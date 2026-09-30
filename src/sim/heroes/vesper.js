@@ -23,7 +23,7 @@ const lashCost = (world, e, pts) => (masterpiece(world, e) ? 0 : Math.round(8 + 
 export default {
   key: 'vesper', name: 'Vesper', title: 'the Ink Sage', role: 'Control mage', resource: 'ink', difficulty: 'Hard',
   rankOrder: ['Q', 'W', 'E'],
-  build: ['stormglass-orb', 'kelp-crown', 'quickcurrent-boots', 'lanternfish-lens', 'borrowed-seconds', 'cloudwool-cloak'], // recommended items: shop highlights and bot purchase order
+  build: ['kelp-crown', 'stormstep-sandals', 'lanternfish-lens', 'deepwater-codex', 'borrowed-seconds', 'stillwater-pendant'], // recommended items: shop highlights and bot purchase order
   passive: { name: 'Ink', desc: 'Her spells are drawn: Q and E are strokes you paint, W is a closed loop. Drawing spends ink by length; ink refills when she stops drawing.' },
   base: { hp: 540, hpL: 88, ad: 50, adL: 3, armor: 22, armorL: 4, mr: 30, mrL: 1.3, as: 0.64, asL: 0.02, range: 550, speed: 330, projectile: 1500, radius: 32 },
   init(world, e) { e.resource = INK_MAX; e.maxResource = INK_MAX; e.heroState = { mpUntil: 0, lastDraw: -999 }; },

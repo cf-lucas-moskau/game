@@ -27,7 +27,7 @@ const heroHit = (world, e, u) => { if (u.kind === KIND.HERO) charge(world, e); }
 export default {
   key: 'nimbus', name: 'Nimbus Kettle', title: 'the Stormherd', role: 'Burst mage', resource: 'mana', difficulty: 'Medium',
   rankOrder: ['Q', 'W', 'E'],
-  build: ['stormglass-orb', 'lanternfish-lens', 'quickcurrent-boots', 'kelp-crown', 'borrowed-seconds', 'cloudwool-cloak'], // recommended items: shop highlights and bot purchase order
+  build: ['lanternfish-lens', 'stormstep-sandals', 'deepwater-codex', 'tidewatch-hourglass', 'borrowed-seconds', 'stillwater-pendant'], // recommended items: shop highlights and bot purchase order
   base: { hp: 555, hpL: 90, ad: 50, adL: 3, armor: 22, armorL: 4, mr: 30, mrL: 1.3, as: 0.64, asL: 0.018, range: 520, speed: 330, mana: 400, manaL: 48, manaRegen: 3.2, projectile: 1700, radius: 32 },
   passive: { name: 'Static Build', desc: 'Ability hits on heroes add static (up to 3, 6 s). At 3, his next attack chains lightning to 3 more enemies.', values: [P_VAL] },
   init(world, e) { e.heroState = { static: 0, staticUntil: 0 }; },

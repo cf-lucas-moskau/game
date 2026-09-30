@@ -65,7 +65,8 @@ describe('simulation lab', () => {
     for (const h of a.heroes) {
       expect(h.dmgHeroesPhys + h.dmgHeroesMagic + h.dmgHeroesTrue).toBeCloseTo(h.dmgHeroes, 0);
       expect(h.dmgHeroesBasic + h.dmgHeroesAbility + h.dmgHeroesOther).toBeCloseTo(h.dmgHeroes, 0);
-      expect(h.goldSpent).toBe(h.items.reduce((s, it) => s + CONTENT.items[it.key].cost, 0));
+      expect(h.goldSpent).toBe(h.items.reduce((s, it) => s + it.price, 0));
+      for (const it of h.items) expect(it.price).toBeLessThanOrEqual(CONTENT.items[it.key].cost);
     }
     if (a.winner !== null) expect(a.heroes.filter((h) => h.win).every((h) => h.team === a.winner)).toBe(true);
     // aggregation over the pair
