@@ -22,7 +22,7 @@ function star(world, e, u, n = 1) {
   if (c.n >= MAX_STARS) {
     c.n = 0; c.until = 0;
     const burst = amount(e, P_VAL, 1) + 0.04 * u.maxHp;
-    dealDamage(world, e, u, burst, DMG.MAGIC, { ability: true }); slow(world, u, 0.4, 1.5);
+    dealDamage(world, e, u, burst, DMG.MAGIC, { ability: true }); slow(world, u, 0.4, 1.5, e);
     fx(world, e, 'lumen-constellation', u.x, u.y, 0, u.id);
   } else fx(world, e, 'lumen-star', u.x, u.y, c.n, u.id);
 }
@@ -59,7 +59,7 @@ export default {
             if (w.tick === z.born) return;
             dealDamage(w, e, u, amount(e, W_VAL, rank) / 2, DMG.MAGIC, { ability: true, dot: true });
           },
-          onEnd: (w, z) => { const u = w.get(z.data.target); if (u && !u.dead && !e.dead && Math.hypot(u.x - e.x, u.y - e.y) <= 900) { star(w, e, u); root(w, u, 0.75); } } });
+          onEnd: (w, z) => { const u = w.get(z.data.target); if (u && !u.dead && !e.dead && Math.hypot(u.x - e.x, u.y - e.y) <= 900) { star(w, e, u); root(w, u, 0.75, e); } } });
       } },
     E: { name: 'Wayfinder', cd: [16, 15, 14, 13, 12], cost: 50, range: 380,
       desc: 'Blinks 380 along her chart; her next spell within 4 s costs no mana.',

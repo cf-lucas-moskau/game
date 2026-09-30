@@ -76,7 +76,7 @@ export const ITEMS = {
     desc: 'Every 4th attack tethers the target, slowing 25% for 1.5 s.',
     onBasicHit(w, e, t) {
       e.itemState.harpoon = ((e.itemState.harpoon || 0) + 1) % 4;
-      if (e.itemState.harpoon === 0) { slow(w, t, 0.25, 1.5); w.events.push(EV.FX, w.tick, e.id, t.id, t.x, t.y, 0, 'harpoon'); }
+      if (e.itemState.harpoon === 0) { slow(w, t, 0.25, 1.5, e); w.events.push(EV.FX, w.tick, e.id, t.id, t.x, t.y, 0, 'harpoon'); }
     } },
 
   'kelp-crown': { name: 'Kelp Crown', cost: 2300, stats: { ap: 60, cdr: 0.2 }, unique: true, tags: ['magic'],
@@ -99,7 +99,7 @@ export const ITEMS = {
       s.shellLog.push(t, dmg);
       while (s.shellLog.length && s.shellLog[0] < t - sec(2)) s.shellLog.splice(0, 2);
       let sum = 0; for (let i = 1; i < s.shellLog.length; i += 2) sum += s.shellLog[i];
-      if (sum > e.maxHp * 0.4 && cdReady(w, e, 'shell:cd')) { addShield(w, e, 300, 3); s['shell:cd'] = t + sec(45); s.shellLog.length = 0; fx(w, e, 'molted-shell'); }
+      if (sum > e.maxHp * 0.4 && cdReady(w, e, 'shell:cd')) { addShield(w, e, 300, 3, e); s['shell:cd'] = t + sec(45); s.shellLog.length = 0; fx(w, e, 'molted-shell'); }
     } },
 };
 for (const [k, v] of Object.entries(ITEMS)) v.key = k;

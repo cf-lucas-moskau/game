@@ -61,7 +61,7 @@ export default {
         const rank = c.rank;
         if (e.heroState.mounted) {
           const a = Math.atan2(c.y - e.y, c.x - e.x), cx = e.x + Math.cos(a) * 140, cy = clampY(e.y + Math.sin(a) * 140);
-          aoe(world, e.team, cx, cy, 190, (u) => { knockUp(world, u, 0.75); dealDamage(world, e, u, amount(e, Q_VAL1, rank), DMG.PHYS, { ability: true }); });
+          aoe(world, e.team, cx, cy, 190, (u) => { knockUp(world, u, 0.75, e); dealDamage(world, e, u, amount(e, Q_VAL1, rank), DMG.PHYS, { ability: true }); });
           fx(world, e, 'gus-slam', cx, cy);
         } else {
           const x = c.x, y = c.y;
@@ -100,7 +100,7 @@ export default {
           aoe(w, r.team, r.x, r.y, r.radius + 30, (u) => {
             if (hitIds.includes(u.id)) return; hitIds.push(u.id);
             const side = ((u.x - r.x) * -Math.sin(a) + (u.y - r.y) * Math.cos(a)) >= 0 ? 1 : -1;
-            knock(w, u, -Math.sin(a) * side, Math.cos(a) * side, 180, 0.3, true);
+            knock(w, u, -Math.sin(a) * side, Math.cos(a) * side, 180, 0.3, true, e);
             dealDamage(w, e, u, amount(e, E_VAL1, rank), DMG.MAGIC, { ability: true });
           });
         }, null, 'pebble-roll');
@@ -115,7 +115,7 @@ export default {
         e.untargetableUntil = t + sec(0.8);
         fx(world, e, 'gus-avalanche-warn', x, y, 0.8);
         dash(world, e, x, y, 0.8, null, (w) => {
-          aoe(w, e.team, x, y, 300, (u) => { stun(w, u, 1.25); dealDamage(w, e, u, amount(e, R_VAL1, rank), DMG.MAGIC, { ability: true }); });
+          aoe(w, e.team, x, y, 300, (u) => { stun(w, u, 1.25, e); dealDamage(w, e, u, amount(e, R_VAL1, rank), DMG.MAGIC, { ability: true }); });
           fx(w, e, 'gus-avalanche', x, y);
         }, 'gus-leap');
         e.airborneUntil = t + sec(0.8);

@@ -2,6 +2,11 @@ import { EV } from '../core/events.js';
 import { KIND, RULES, sec, isMinion, isStructure, TEAM } from './constants.js';
 
 export const DMG = { PHYS: 0, MAGIC: 1, TRUE: 2 };
+/** What caused a hit, carried on EV.DAMAGE as `c` (statistics, e.g. the simulation lab). */
+export const CAUSE = { OTHER: 0, BASIC: 1, ABILITY: 2 };
+/** Crowd-control kinds carried on EV.STUN as `b`; the source unit's id is `c` (-1 when unknown). */
+export const CC = { STUN: 0, ROOT: 1, AIRBORNE: 2, DISPLACE: 3 };
+const sid = (src) => (src ? src.id : -1);
 
 function heroHooks(world, e) { return e.kind === KIND.HERO ? world.registry.heroes[e.heroKey] : null; }
 function itemHooks(world, e, name, ...args) {
@@ -66,7 +71,7 @@ export function dealDamage(world, src, target, amount, type = DMG.PHYS, opts = E
   }
   if (th && th.onTookDamage) th.onTookDamage(world, target, hpDmg, attacker, type, opts);
   itemHooks(world, target, 'onTookDamage', hpDmg, attacker, type, opts);
-  world.events.push(EV.DAMAGE, t, target.id, attacker ? attacker.id : -1, target.x, target.y, amt, type === DMG.PHYS ? 'p' : type === DMG.MAGIC ? 'm' : 't');
+  world.events.push(EV.DAMAGE, t, target.id, attacker ? attacker.id : -1, target.x, target.y, amt, type === DMG.PHYS ? 'p' : type === DMG.MAGIC ? 'm' : 't', opts.basic ? CAUSE.BASIC : opts.ability ? CAUSE.ABILITY : CAUSE.OTHER);
   if (target.hp <= 0) kill(world, target, attacker);
   return amt;
 }
@@ -79,46 +84,52 @@ function recordDamager(world, target, attacker) {
   d.push(attacker.id, t);
 }
 
+/** Heal target by amount (capped at max HP); src is the healer or null (regeneration, fountain). Returns the amount healed. */
 export function heal(world, src, target, amount, silent = false) {
   if (!target || !target.alive || target.dead || amount <= 0) return 0;
   if (src && src !== target && target.kind === KIND.HERO && world.registry.heroes[target.heroKey].selfHealOnly) return 0;
   const before = target.hp;
   target.hp = Math.min(target.maxHp, target.hp + amount);
   const h = target.hp - before;
-  if (h >= 1 && !silent) world.events.push(EV.HEAL, world.tick, target.id, src ? src.id : -1, target.x, target.y, Math.round(h));
+  // silent heals (lifesteal, heal-over-time) are still reported for statistics, flagged quiet (c = 1) so presentation
+  // skips them; heals without a source (regeneration, fountain) are not reported
+  if (!silent) { if (h >= 1) world.events.push(EV.HEAL, world.tick, target.id, src ? src.id : -1, target.x, target.y, Math.round(h)); }
+  else if (src && h > 0) world.events.push(EV.HEAL, world.tick, target.id, src.id, target.x, target.y, h, '', 1);
   return h;
 }
-export function addShield(world, target, amount, durationSec) {
+export function addShield(world, target, amount, durationSec, src = null) {
   const t = world.tick;
   if (target.shieldUntil <= t) target.shield = 0;
   target.shield += amount; target.shieldUntil = Math.max(target.shieldUntil, t + sec(durationSec));
-  world.events.push(EV.SHIELD, t, target.id, -1, target.x, target.y, amount);
+  world.events.push(EV.SHIELD, t, target.id, sid(src), target.x, target.y, amount);
 }
 
 // ---- crowd control ---------------------------------------------------------
 const tenacity = (e) => (e.kind === KIND.HERO ? 1 : 1);
-export function stun(world, e, s) {
+export function stun(world, e, s, src = null) {
   if (!e.alive || e.invulnUntil > world.tick || isStructure(e.kind)) return;
   e.stunUntil = Math.max(e.stunUntil, world.tick + sec(s * tenacity(e)));
   e.windup = 0; e.channelUntil = 0;
-  world.events.push(EV.STUN, world.tick, e.id, 0, e.x, e.y, s);
+  world.events.push(EV.STUN, world.tick, e.id, CC.STUN, e.x, e.y, s, '', sid(src));
 }
-export function root(world, e, s) { if (!isStructure(e.kind) && e.invulnUntil <= world.tick) { e.rootUntil = Math.max(e.rootUntil, world.tick + sec(s)); world.events.push(EV.STUN, world.tick, e.id, 1, e.x, e.y, s); } }
-export function slow(world, e, pct, s) {
+export function root(world, e, s, src = null) { if (!isStructure(e.kind) && e.invulnUntil <= world.tick) { e.rootUntil = Math.max(e.rootUntil, world.tick + sec(s)); world.events.push(EV.STUN, world.tick, e.id, CC.ROOT, e.x, e.y, s, '', sid(src)); } }
+export function slow(world, e, pct, s, src = null) {
   if (isStructure(e.kind) || e.invulnUntil > world.tick) return;
   const t = world.tick;
   if (e.slowUntil <= t || pct >= e.slowPct) { e.slowPct = pct; e.slowUntil = Math.max(e.slowUntil, t + sec(s)); }
+  world.events.push(EV.SLOW, t, e.id, sid(src), e.x, e.y, s, '', pct);
 }
 export function haste(world, e, pct, s) { const t = world.tick; if (e.hasteUntil <= t || pct >= e.hastePct) { e.hastePct = pct; e.hasteUntil = t + sec(s); } }
 /** Knock a unit toward/away with a short forced movement. */
-export function knock(world, e, dirX, dirY, distance, s, airborne = false) {
+export function knock(world, e, dirX, dirY, distance, s, airborne = false, src = null) {
   if (isStructure(e.kind) || e.invulnUntil > world.tick) return;
   const len = Math.hypot(dirX, dirY) || 1; const ticks = Math.max(1, sec(s));
   e.knockVx = (dirX / len) * distance / ticks; e.knockVy = (dirY / len) * distance / ticks;
   e.knockUntil = world.tick + ticks; e.windup = 0; e.channelUntil = 0;
-  if (airborne) { e.airborneUntil = world.tick + ticks; world.events.push(EV.STUN, world.tick, e.id, 2, e.x, e.y, s); }
+  if (airborne) e.airborneUntil = world.tick + ticks;
+  world.events.push(EV.STUN, world.tick, e.id, airborne ? CC.AIRBORNE : CC.DISPLACE, e.x, e.y, s, '', sid(src));
 }
-export function knockUp(world, e, s) { if (!isStructure(e.kind) && e.invulnUntil <= world.tick) { e.airborneUntil = Math.max(e.airborneUntil, world.tick + sec(s)); e.windup = 0; e.channelUntil = 0; world.events.push(EV.STUN, world.tick, e.id, 2, e.x, e.y, s); } }
+export function knockUp(world, e, s, src = null) { if (!isStructure(e.kind) && e.invulnUntil <= world.tick) { e.airborneUntil = Math.max(e.airborneUntil, world.tick + sec(s)); e.windup = 0; e.channelUntil = 0; world.events.push(EV.STUN, world.tick, e.id, CC.AIRBORNE, e.x, e.y, s, '', sid(src)); } }
 
 // ---- death -----------------------------------------------------------------
 export function kill(world, victim, killer) {

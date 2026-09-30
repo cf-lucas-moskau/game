@@ -14,8 +14,9 @@ export const DIFFICULTY = {
 };
 
 export class Bot {
-  constructor(playerId, difficulty = 'medium', seed = 1) {
-    this.p = playerId; this.cfg = DIFFICULTY[difficulty] || DIFFICULTY.medium;
+  /** opts.build: item keys to buy in order instead of the hero's recommended build. */
+  constructor(playerId, difficulty = 'medium', seed = 1, opts = {}) {
+    this.p = playerId; this.build = opts.build || null; this.cfg = DIFFICULTY[difficulty] || DIFFICULTY.medium;
     this.rng = new Rng(seed * 7919 + playerId * 104729);
     this.state = 'lane'; this.phase = playerId % this.cfg.think; this.lastBuyTick = 0; this.strafe = 0;
   }
@@ -42,7 +43,7 @@ export class Bot {
   }
   shop(world, me, out) {
     if (!canShop(me) || world.tick - this.lastBuyTick < 15) return;
-    const build = world.registry.heroes[me.heroKey].build || [];
+    const build = this.build || world.registry.heroes[me.heroKey].build || [];
     for (const key of build) {
       if (me.items.includes(key)) continue;
       const it = world.registry.items[key];

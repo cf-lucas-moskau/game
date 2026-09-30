@@ -57,7 +57,7 @@ export default {
         const rank = c.rank;
         world.forEachInRadius(cx, cy, r, e.team, 'enemy', (u) => {
           if (isStructure(u.kind) || !pointInPoly(u.x, u.y, poly, n)) return;
-          root(world, u, 1.2); dealDamage(world, e, u, amount(e, W_VAL1, rank) * amp, DMG.MAGIC, { ability: true });
+          root(world, u, 1.2, e); dealDamage(world, e, u, amount(e, W_VAL1, rank) * amp, DMG.MAGIC, { ability: true });
         });
         spawnZone(world, { kind: 'vesper-loop', team: e.team, owner: e.id, x: cx, y: cy, r, duration: 1.2, data: { pts: poly } });
       } },

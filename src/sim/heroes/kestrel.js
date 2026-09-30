@@ -21,7 +21,7 @@ export default {
   onBasicAttack(world, e, target, dmg) {
     const s = e.heroState, t = world.tick;
     if (s.rollUntil > t) { s.rollUntil = 0; dmg += amount(e, E_VAL, s.rollRank); fx(world, e, 'kestrel-roll-shot', target.x, target.y); }
-    if (++s.shots >= 4) { s.shots = 0; dmg += amount(e, P_VAL, 1); slow(world, target, 0.25, 1); fx(world, e, 'kestrel-deadeye', target.x, target.y); }
+    if (++s.shots >= 4) { s.shots = 0; dmg += amount(e, P_VAL, 1); slow(world, target, 0.25, 1, e); fx(world, e, 'kestrel-deadeye', target.x, target.y); }
     return dmg;
   },
   abilities: {
@@ -41,7 +41,7 @@ export default {
       cast(world, e, c) {
         const x = c.x, y = c.y;
         spawnZone(world, { kind: 'kestrel-net', team: e.team, owner: e.id, x, y, r: 170, duration: 0.5 });
-        world.schedule(sec(0.5), (w) => { aoe(w, e.team, x, y, 170, (u) => root(w, u, 1.1)); fx(w, e, 'kestrel-net', x, y); });
+        world.schedule(sec(0.5), (w) => { aoe(w, e.team, x, y, 170, (u) => root(w, u, 1.1, e)); fx(w, e, 'kestrel-net', x, y); });
       } },
     E: { values: [E_VAL], name: 'Updraft Roll', cd: [11, 10, 9, 8, 7], cost: 40, range: 320,
       desc: 'Rolls 320 on a gust; her next attack within 3 s deals bonus damage.',

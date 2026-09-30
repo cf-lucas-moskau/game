@@ -27,7 +27,7 @@ export default {
         const rank = c.rank;
         skillshot(world, e, c.x, c.y, { kind: 'auctioneer-gavel', speed: 1650, range: 900, radius: 45,
           onHit: (w, p, u) => {
-            stun(w, u, 0.6);
+            stun(w, u, 0.6, e);
             dealDamage(w, e, u, amount(e, Q_VAL1, rank), DMG.MAGIC, { ability: true });
             if (u.kind === KIND.HERO) { e.gold += 40; fx(w, e, 'auctioneer-refund', u.x, u.y, 40); }
           } });
@@ -47,7 +47,7 @@ export default {
         const t = pickTarget(world, e, c.rawX, c.rawY, 720, false, c.targetId);
         if (!t) return false;
         const d = Math.hypot(e.x - t.x, e.y - t.y), pull = Math.max(0, Math.min(380, d - 160));
-        knock(world, t, e.x - t.x, e.y - t.y, pull, 0.25, true);
+        knock(world, t, e.x - t.x, e.y - t.y, pull, 0.25, true, e);
         dealDamage(world, e, t, amount(e, E_VAL1, c.rank), DMG.MAGIC, { ability: true });
         fx(world, e, 'auctioneer-hook', t.x, t.y);
       } },

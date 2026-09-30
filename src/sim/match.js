@@ -177,7 +177,7 @@ function heroSystem(w) {
     if (e.dead) continue;
     if (t % TICK_HZ === 0) {
       const outOfCombat = t - e.lastCombatTick > sec(5);
-      if (!def.noRegen) heal(w, e, e, e.hpRegen * (outOfCombat ? 2.5 : 1), true);
+      if (!def.noRegen) heal(w, null, e, e.hpRegen * (outOfCombat ? 2.5 : 1), true);
       e.mana = Math.min(e.maxMana, e.mana + e.manaRegen);
     }
     for (let k = 0; k < e.items.length; k++) { const it = w.registry.items[e.items[k]]; if (it && it.onTick) it.onTick(w, e); }

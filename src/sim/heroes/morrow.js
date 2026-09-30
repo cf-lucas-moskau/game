@@ -43,7 +43,7 @@ export default {
       } },
     W: { values: [W_VAL1], name: 'Wind-Up', cd: [12, 11, 10, 9, 8], cost: 60,
       desc: 'Shield for 2 s. If it breaks, gain 40% move speed.',
-      cast(world, e, c) { addEcho(world, e); addShield(world, e, amount(e, W_VAL1, c.rank), 2); e.heroState.windupShield = 1; } },
+      cast(world, e, c) { addEcho(world, e); addShield(world, e, amount(e, W_VAL1, c.rank), 2, e); e.heroState.windupShield = 1; } },
     E: { values: [E_VAL1], name: 'Step Through', cd: [14, 13, 12, 11, 10], cost: 70,
       desc: 'Teleport to your most recent echo, damaging enemies along the path.',
       cast(world, e, c) {

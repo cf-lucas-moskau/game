@@ -57,7 +57,7 @@ export default {
         aoe(world, e.team, e.x, e.y, 420, (u) => {
           let a = Math.atan2(u.y - e.y, u.x - e.x) - dir; a = Math.atan2(Math.sin(a), Math.cos(a));
           if (Math.abs(a) > half) return;
-          slow(world, u, 0.4, 1.5); u.markUntil = world.tick + sec(3); u.markBy = e.id;
+          slow(world, u, 0.4, 1.5, e); u.markUntil = world.tick + sec(3); u.markBy = e.id;
           dealDamage(world, e, u, amount(e, W_VAL1, c.rank), DMG.PHYS, { ability: true, dot: true });
         });
         fx(world, e, 'saffi-wax', e.x, e.y, dir);

@@ -74,7 +74,7 @@ export default {
           let a = Math.atan2(u.y - e.y, u.x - e.x) - dir; a = Math.atan2(Math.sin(a), Math.cos(a));
           if (Math.abs(a) > half) return;
           dealDamage(world, e, u, amount(e, E_VAL, c.rank), DMG.MAGIC, { ability: true }); heroHit(world, e, u);
-          knock(world, u, u.x - e.x, u.y - e.y, 260, 0.25); slow(world, u, 0.3, 1.25);
+          knock(world, u, u.x - e.x, u.y - e.y, 260, 0.25, false, e); slow(world, u, 0.3, 1.25, e);
         });
         fx(world, e, 'nimbus-gale', e.x, e.y, dir);
       } },
@@ -86,7 +86,7 @@ export default {
           onTick: (w, z) => {
             if (e.dead) { z.until = w.tick; return; }
             z.x = e.x; z.y = e.y;
-            aoe(w, z.team, z.x, z.y, z.r, (u) => slow(w, u, 0.2, 0.5));
+            aoe(w, z.team, z.x, z.y, z.r, (u) => slow(w, u, 0.2, 0.5, e));
             const list = nearest(w, e, z.x, z.y, z.r, 3, []); if (!list.length) return;
             const u = list[(w.tick / 12 | 0) % list.length]; // rotate between the nearest three
             fx(w, e, 'nimbus-strike', u.x, u.y, 1);

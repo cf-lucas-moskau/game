@@ -7,3 +7,4 @@ perf-results/*.json
 .gate/
 .shots/
 release/
+simlab-results/

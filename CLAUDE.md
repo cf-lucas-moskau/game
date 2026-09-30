@@ -25,7 +25,8 @@ npx playwright install chromium        # needed by e2e, bench, soak (or set PW_P
 npm run dev                            # play: http://localhost:5173/ (hero select), or ?hero=vesper&ping=100 to skip it
 npm test                               # vitest: sim, heroes, items, bots, transport, predictor
 npm run build                          # single self-contained dist/index.html (assets inlined), must stay < 16 MB
-node tools/simulate.mjs 10             # headless bot-vs-bot matches: length, win rates, sim cost
+node tools/simlab.mjs run --matches 960           # simulation lab: bot matches -> balance statistics (docs/SIMLAB.md)
+node tools/simlab.mjs run --focus saffi --set heroes.saffi.base.ad=x1.1 --ab   # try a balance change, A/B
 node tools/bench.mjs                   # performance benchmark (see docs/PERF.md)
 node tools/soak.mjs 4                  # leak check: retained-heap slope
 node tools/shot.mjs "?quality=medium&skip=150" out.png 15 1280 720   # screenshot helper
@@ -129,6 +130,8 @@ input path), `skip=<seconds>` (fast-forward the sim), `seed=`, `touch=1`, `cpu=1
 - `src/audio/`: Web Audio engine, synth voices, sounds, sfx director (sim events -> sounds), music director.
 - `src/app/app.js`: application flow and lifecycle.
 - `src/perf/`: telemetry (`window.__perf`) and budgets.
+- `src/stats/`: simulation lab core (match statistics collector from events, match plans, patches, aggregation,
+  reports); CLI `tools/simlab.mjs`, guide `docs/SIMLAB.md`.
 
 ## Lessons learned (keep these)
 - Declare every entity field in `createEntity()`. Adding properties later put V8 objects in dictionary mode
@@ -144,6 +147,7 @@ input path), `skip=<seconds>` (fast-forward the sim), `seed=`, `touch=1`, `cpu=1
   is wrong. Measure what is drawn (the portrait studio renders a small silhouette) instead of trusting bind data.
 - `mergeSkinned` must keep each part's mesh world and bind matrices when re-binding (dropping them sank heads).
 - Pick units in screen space (`intent.screenPick`), not by projecting the cursor onto the ground.
-- Balance by bot matches needs 480-960 matches per round (a hero's win rate has ~3% standard error at ~350 games).
+- Balance by bot matches needs 480-960 matches per round (a hero's win rate has ~3% standard error at ~350 games). Use the
+  simulation lab (`tools/simlab.mjs`): an `--ab` run diverges chaotically from its baseline, so judge only the patched hero's z.
 - Kenney rigs face +z at yaw 0 (`faceToRotY = PI/2 - a`); verified by close-up, don't "fix" it.
 - Background processes do not survive between tool calls in some environments; keep each gate step short.

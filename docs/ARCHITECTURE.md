@@ -134,7 +134,14 @@ shapes shared with the indicators. Both dispatch `ll-toggle` events for UI panel
 page and simulates ping, jitter and loss; each command rides in several packets and is deduplicated by
 sequence number. A `NetTransport` (WebSocket to a Node.js authoritative server running the same `sim/`) will
 implement the same `send(cmd, now)` / `receive(now, out)` interface; the sim is already deterministic and
-headless (`tools/simulate.mjs` runs it in Node).
+headless (the simulation lab, `tools/simlab.mjs`, runs it in Node).
+
+## Statistics and the simulation lab (`src/stats/`, `docs/SIMLAB.md`)
+
+`match-stats.js` builds per-hero and per-match statistics from the event stream alone (damage events carry their
+cause, crowd control, slows and shields their source). `simlab.js` plans reproducible bot matches (rosters, sides,
+builds, seeds from the run seed and match index) and applies balance patches; `aggregate.js` and `report.js` turn
+records into tables. `tools/simlab.mjs` runs matches on worker threads.
 
 ## Performance (`src/perf/`, `tools/`, `docs/PERF.md`)
 

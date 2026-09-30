@@ -58,7 +58,7 @@ export class FX {
         if (ent.id === r.focusId && e.v > ent.maxHp * 0.08) r.shake(0.25);
         break;
       }
-      case EV.HEAL: if (e.v > 15) this.burst(x, z, 0.3, 6, 0.6, COL.heal, 0.9, 0.14, 0.04, { up: 1.6, drag: 1, spread: 0.3 }); break;
+      case EV.HEAL: if (e.v > 15 && e.c !== 1) this.burst(x, z, 0.3, 6, 0.6, COL.heal, 0.9, 0.14, 0.04, { up: 1.6, drag: 1, spread: 0.3 }); break;
       case EV.SHIELD: this.ring(x, z, 0.8, 14, 0.55, COL.shield, 0.5, 0.1, 0.4); break;
       case EV.DEATH: {
         const hero = e.v === 1;

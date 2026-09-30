@@ -36,7 +36,7 @@ export default {
         const rank = c.rank;
         skillshot(world, e, c.x, c.y, { kind: 'wisp-moths', speed: 1400, range: 650, radius: 55,
           onHit: (w, p, u) => {
-            dealDamage(w, e, u, amount(e, Q_VAL, rank), DMG.MAGIC, { ability: true }); slow(w, u, 0.25, 1.25);
+            dealDamage(w, e, u, amount(e, Q_VAL, rank), DMG.MAGIC, { ability: true }); slow(w, u, 0.25, 1.25, e);
             if (u.kind === KIND.HERO) { e.heroState.marks.set(u.id, w.tick + sec(MARK_SEC)); fx(w, e, 'wisp-mark', u.x, u.y, MARK_SEC, u.id); }
           } });
       } },

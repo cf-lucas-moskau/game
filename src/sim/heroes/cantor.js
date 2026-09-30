@@ -31,7 +31,7 @@ export default {
         const k = empower(world, e), dir = Math.atan2(c.y - e.y, c.x - e.x), half = Math.PI / 4;
         aoe(world, e.team, e.x, e.y, 480, (u) => {
           let a = Math.atan2(u.y - e.y, u.x - e.x) - dir; a = Math.atan2(Math.sin(a), Math.cos(a)); if (Math.abs(a) > half) return;
-          dealDamage(world, e, u, amount(e, Q_VAL, c.rank) * k, DMG.MAGIC, { ability: true }); slow(world, u, k > 1 ? 0.45 : 0.25, 1.5);
+          dealDamage(world, e, u, amount(e, Q_VAL, c.rank) * k, DMG.MAGIC, { ability: true }); slow(world, u, k > 1 ? 0.45 : 0.25, 1.5, e);
         });
         fx(world, e, 'cantor-crescendo', e.x, e.y, dir, k > 1 ? 1 : 0);
       } },
@@ -47,7 +47,7 @@ export default {
       cast(world, e, c) {
         const k = empower(world, e), rank = c.rank, a = Math.atan2(c.y - e.y, c.x - e.x);
         dash(world, e, e.x + Math.cos(a) * 380, clampY(e.y + Math.sin(a) * 380), 0.25, null, (w) => {
-          aoe(w, e.team, e.x, e.y, 200, (u) => { dealDamage(w, e, u, amount(e, E_VAL, rank), DMG.MAGIC, { ability: true }); if (k > 1) stun(w, u, 0.6); });
+          aoe(w, e.team, e.x, e.y, 200, (u) => { dealDamage(w, e, u, amount(e, E_VAL, rank), DMG.MAGIC, { ability: true }); if (k > 1) stun(w, u, 0.6, e); });
           fx(w, e, 'cantor-staccato', e.x, e.y, 0, k > 1 ? 1 : 0);
         }, 'cantor-leap');
       } },

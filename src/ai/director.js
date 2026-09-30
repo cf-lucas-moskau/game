@@ -1,8 +1,14 @@
 // Runs all bots for a match and returns their commands for the current tick.
 import { Bot } from './bot.js';
 export class BotDirector {
-  constructor(world, difficulty = 'medium') {
-    this.bots = world.heroes.filter((h) => h.isBot).map((h) => new Bot(h.playerId, difficulty, world.seed));
+  /**
+   * @param difficulty 'easy' | 'medium' | 'hard', or (playerId) => one of those (e.g. a harder red team)
+   * @param opts       { builds: { [playerId]: itemKey[] } } item builds replacing the heroes' recommended ones
+   */
+  constructor(world, difficulty = 'medium', opts = {}) {
+    const diff = typeof difficulty === 'function' ? difficulty : () => difficulty;
+    const builds = opts.builds || {};
+    this.bots = world.heroes.filter((h) => h.isBot).map((h) => new Bot(h.playerId, diff(h.playerId), world.seed, { build: builds[h.playerId] }));
   }
   commands(world, out = []) {
     out.length = 0;
