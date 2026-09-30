@@ -10,7 +10,10 @@ import { Rng } from '../core/rng.js';
 import { pickSkin } from '../assets/skins.js';
 
 export function startSpectate({ canvas, lib, seed = 1, quality = 'medium', telemetry, heroes = null, difficulty = 'medium', timeScale = 1, skipSeconds = 0, fixedBuffer = null }) {
-  const roster = (heroes || [...HERO_KEYS]).map((k, p) => ({ playerId: p, heroKey: k, team: p < 3 ? 0 : 1, isBot: true }));
+  // six heroes: the given ones, or six different ones drawn from the seed (the whole roster would be 3 against 13)
+  const draw = new Rng(seed ^ 0x6e70), pool = [...HERO_KEYS], six = [];
+  while (six.length < 6 && pool.length) six.push(pool.splice(draw.int(0, pool.length - 1), 1)[0]);
+  const roster = (heroes || six).slice(0, 6).map((k, p) => ({ playerId: p, heroKey: k, team: p < 3 ? 0 : 1, isBot: true }));
   const world = createMatch({ seed, roster, content: CONTENT });
   const dir = new BotDirector(world, difficulty); const cmds = [];
   while (world.tick < skipSeconds * TICK_HZ && !world.state.over) { dir.commands(world, cmds); world.step(cmds); }

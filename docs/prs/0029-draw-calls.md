@@ -35,3 +35,13 @@ gate counts separately. Remaining costs per frame: six skinned heroes, about eig
 quad engine for the effect layers.
 
 Visual check: a zone-heavy match at 3:26 shows health bars, minions, bees, zones and tower rings as before.
+
+## The 16-hero benchmark (found while checking the gate)
+
+The gate's `desktop-medium` run still read 45 draw calls (mean 42.8). Attributing that scenario (the spectate bench)
+showed 13 hero meshes per frame. `startSpectate` built its roster from all hero keys when none were given: six
+heroes before PR #24, 3 against 13 since. The desktop benchmark and the menu backdrop have run 16-hero matches
+since then, which inflated the draw calls (45), triangles (78k) and garbage collection in those runs.
+
+Fix: six different heroes drawn from the seed. Spectate scenario after: scene draws p50 30, p95 33, max 34
+(before: 43, 45, 45). Gate results before this PR for `desktop-medium` are not comparable (docs/PERF.md).

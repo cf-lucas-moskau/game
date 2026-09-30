@@ -134,3 +134,9 @@ attack constantly), per swipe and per tracked projectile; `for..of` over a Map (
 `BufferAttribute.setXYZ` calls in the swipe ribbons, which box each double argument when not inlined
 (~40 KB/s). Records are now pooled, the Map is swept with a stored `forEach` callback, and ribbons write the
 typed arrays directly: desktop play 39.9 ms, phone 236.5 ms. Draw calls with all effects: 36-41 (budget 50).
+
+## Spectate scenario roster (PR #29)
+From PR #24 to PR #29 the `desktop-medium` scenario (spectate, bots only) ran a 3-against-13 match: `startSpectate`
+took every hero key as the roster, which had been six before PR #24 added ten heroes. Its draw calls (45), triangles
+(78k) and GC numbers in that period measured 16 heroes. The scenario is six heroes again (drawn from the seed);
+compare `desktop-medium` results only within one side of this change.
