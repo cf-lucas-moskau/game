@@ -81,7 +81,18 @@ One frame (`GameSession.frame`):
   `stats.js` (including cooldown reduction, penetration, tenacity, regeneration), unique effects as hooks (`onBasicHit`,
   `onDealtDamage`, `onAbilityCast`, `onLethal`, `onTick`, ...). `match.js#purchasePlan` prices a purchase after the
   components it uses up; the shop and the bots both use it. Recommended builds live in the hero modules (`build`).
-- `constants.js`: lane geometry, tick rate, rules (tower HP, gold, respawn, sudden death).
+- `constants.js`: lane geometry, tick rate, rules (tower HP, gold, respawn, sudden death), map feature spots (`MAP.CAMPS`,
+  `PEARL`, `SHRINES`, `RELICS`: every one on the centre or in pairs symmetric through it or mirrored per side).
+- Map features, each one module with a `setup*` and a system in `createMatch`:
+  - `camps.js`: Barnacle Crab camps (`TEAM.NEUTRAL`, `KIND.CRAB`, `NEUTRAL` specs): spawn, chase-and-leash, rewards.
+  - `pearl.js`: the Sky Pearl objective (announce, surface, capture by holding the circle, Pearl Golem waves).
+  - `pickups.js`: health relics and whale-roll loot (pickup kinds).
+  - `shrines.js`: Gale Shrines (channel for Tailwind).
+  - `buffs.js`: data-driven timed buffs (`BUFFS`), folded into hero stats by `stats.js`, expired in hero upkeep.
+  - Comeback bounties live in `damage.js#kill` (`streak`, `shutdownGold`).
+  - Events: `EV.BUFF`, `EV.OBJECTIVE` (s names what happened), `EV.PICKUP`. Bots: `src/ai/objectives.js`; render:
+    `render/map-features.js` (crabs, Pearl, coins, bounty stars, shrine cairns) and disc kinds in `render/zones.js`;
+    UI: `ui/objectives.js` (buff chips, Pearl bar, banners, feed).
 
 ## Presentation
 
