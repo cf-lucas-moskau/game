@@ -73,6 +73,13 @@ export class LaneStrip {
     }
     // relics
     if (world.pickups.length) { ctx.beginPath(); for (const p of world.pickups) { const x = this.sx(p.x), y = this.sy(p.y); ctx.moveTo(x + mr * 1.4, y); ctx.arc(x, y, mr * 1.4, 0, Math.PI * 2); } ctx.fillStyle = '#7ee07a'; ctx.fill(); }
+    // neutral camps: a gold diamond while the crab is up, a faint ring while it is down
+    const camps = world.state.camps;
+    if (camps) for (const c of camps) {
+      const x = this.sx(c.x), y = this.sy(c.y), r = mr * 1.9;
+      ctx.beginPath(); ctx.moveTo(x, y - r); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r); ctx.lineTo(x - r, y); ctx.closePath();
+      if (c.crabId >= 0) { ctx.fillStyle = '#f2c14e'; ctx.fill(); } else { ctx.strokeStyle = 'rgba(242,193,78,.45)'; ctx.lineWidth = 1; ctx.stroke(); }
+    }
     // heroes
     const hr = Math.max(3, h * 0.13); ctx.lineWidth = Math.max(1, h * 0.04);
     for (const e of world.heroes) {

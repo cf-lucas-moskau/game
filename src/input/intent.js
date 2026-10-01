@@ -3,9 +3,9 @@ import { KIND, LANE } from '../sim/constants.js';
 
 const alive = (e) => e && e.alive && !e.dead;
 // Visual height of each kind of unit (render units), for picking what is drawn rather than the ground under it.
-const BODY = { [KIND.HERO]: 1.4, [KIND.PEBBLE]: 1.3, [KIND.MELEE]: 1, [KIND.RANGED]: 1, [KIND.SIEGE]: 1.1, [KIND.TOWER]: 5, [KIND.HEART]: 2.6 };
+const BODY = { [KIND.HERO]: 1.4, [KIND.PEBBLE]: 1.3, [KIND.MELEE]: 1, [KIND.RANGED]: 1, [KIND.SIEGE]: 1.1, [KIND.TOWER]: 5, [KIND.HEART]: 2.6, [KIND.CRAB]: 0.9 };
 // when a click falls inside several silhouettes, the smaller, more specific unit wins (a hero in front of a tower)
-const RANK = { [KIND.HERO]: 0, [KIND.PEBBLE]: 1, [KIND.MELEE]: 2, [KIND.RANGED]: 2, [KIND.SIEGE]: 2, [KIND.TOWER]: 3, [KIND.HEART]: 3 };
+const RANK = { [KIND.HERO]: 0, [KIND.PEBBLE]: 1, [KIND.MELEE]: 2, [KIND.RANGED]: 2, [KIND.SIEGE]: 2, [KIND.CRAB]: 2, [KIND.TOWER]: 3, [KIND.HEART]: 3 };
 const _a = { x: 0, y: 0, visible: false }, _b = { x: 0, y: 0, visible: false }, _c = { x: 0, y: 0, visible: false };
 /**
  * Unit under a screen point, picked in screen space: each unit is a vertical segment from its feet to the top of

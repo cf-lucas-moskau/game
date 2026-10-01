@@ -29,6 +29,10 @@ export const SOUNDS = {
   whaleRoll: (e, b, t) => noise(e, b, { type: 'lowpass', f0: 180, f1: 90, t, dur: 3.6, gain: 0.35, attack: 0.5, curve: 'lin' }),
   respawn: (e, b, t) => tone(e, b, { type: 'triangle', f0: mtof(degree(0, 62)), f1: mtof(degree(7, 62)), t, dur: 0.6, gain: 0.08, attack: 0.1 }),
   suddenDeath: (e, b, t) => [0, 0.5].forEach((dt) => tone(e, b, { type: 'sawtooth', f0: mtof(degree(0, 38)), t: t + dt, dur: 1.2, gain: 0.12, filter: 600, attack: 0.05 })),
+  // map features
+  campUp: (e, b, t, p, g) => [0, 0.09, 0.2].forEach((dt, i) => tone(e, b, { type: 'sine', f0: 300 + i * 140, f1: 520 + i * 160, t: t + dt, dur: 0.12, gain: 0.05 * g, pan: p })), // bubbles
+  campSlain: (e, b, t, p, g) => { noise(e, b, { type: 'bandpass', f0: 2600, f1: 900, t, dur: 0.18, gain: 0.22 * g, q: 2, pan: p }); tone(e, b, { type: 'triangle', f0: 160, f1: 60, t, dur: 0.35, gain: 0.2 * g, pan: p }); [0, 4, 7].forEach((d, i) => tone(e, b, { f0: mtof(degree(d, 69)), t: t + 0.12 + i * 0.06, dur: 0.25, gain: 0.05 * g, pan: p })); },
+  buff: (e, b, t) => [0, 7, 12].forEach((d, i) => tone(e, b, { type: 'triangle', f0: mtof(degree(d, 72)), t: t + i * 0.04, dur: 0.4, gain: 0.06, attack: 0.02 })),
   ui: (e, b, t) => tone(e, b, { type: 'triangle', f0: 1100, f1: 900, t, dur: 0.05, gain: 0.05 }),
   victory: (e, b, t) => [[0, 2, 4], [3, 5, 7], [4, 6, 8], [7, 9, 11]].forEach((c, i) => c.forEach((d) => tone(e, b, { type: 'triangle', f0: mtof(degree(d, 62)), t: t + i * 0.28, dur: i === 3 ? 1.8 : 0.5, gain: 0.08, attack: 0.02 }))),
   defeat: (e, b, t) => [[4, 6, 8], [3, 5, 7], [1, 3, 5], [0, 2, 4]].forEach((c, i) => c.forEach((d) => tone(e, b, { type: 'sine', f0: mtof(degree(d, 55)), t: t + i * 0.42, dur: i === 3 ? 2 : 0.7, gain: 0.08, attack: 0.05, filter: 1500 }))),

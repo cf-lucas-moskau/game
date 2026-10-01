@@ -12,6 +12,8 @@ import { projectileSystem } from './projectile.js';
 import { zoneSystem } from './zones.js';
 import { StateHasher } from '../core/hash.js';
 import { sq } from '../core/dmath.js';
+import { expireBuffs } from './buffs.js';
+import { setupCamps, campSystem } from './camps.js';
 
 /**
  * Build a ready-to-run match.
@@ -29,8 +31,9 @@ export function createMatch({ seed = 1, roster, content }) {
   w.state.nextWave = sec(RULES.FIRST_WAVE);
   w.state.nextRelic = sec(20);
   setupStructures(w);
+  setupCamps(w);
   roster.forEach((r, i) => spawnHero(w, r, i));
-  w.systems = [commandSystem, clockSystem, heroSystem, movementSystem, combatSystem, projectileSystem, zoneSystem, economySystem, winSystem];
+  w.systems = [commandSystem, clockSystem, campSystem, heroSystem, movementSystem, combatSystem, projectileSystem, zoneSystem, economySystem, winSystem];
   return w;
 }
 
@@ -55,7 +58,7 @@ export function spawnHero(w, r, index) {
   const e = w.spawn(KIND.HERO, r.team, sideX(r.team, MAP.FOUNTAIN_X + 40), 330 + slot * 120);
   e.heroKey = r.heroKey; e.playerId = r.playerId; e.isBot = !!r.isBot;
   e.items = []; e.itemState = {}; e.cds = [0, 0, 0, 0]; e.spellCds = [0, 0]; e.spells = ['dash', 'heal'];
-  e.damagers = []; e.level = RULES.START_LEVEL; e.gold = RULES.START_GOLD; e.radius = def.base.radius || 36;
+  e.damagers = []; e.buffs = []; e.level = RULES.START_LEVEL; e.gold = RULES.START_GOLD; e.radius = def.base.radius || 36;
   e.projectileSpeed = def.base.projectile || 0; e.ranks = ranksForLevel(e.level, def.rankOrder);
   e.heroState = {};
   if (def.init) def.init(w, e);
@@ -225,6 +228,7 @@ function heroSystem(w) {
     const i = t & 1 ? nh - 1 - k : k, e = w.heroes[i]; // alternate the order every tick (team-neutral)
     const def = w.registry.heroes[e.heroKey];
     for (let s = 0; s < 4; s++) if (e.cds[s] > 0) e.cds[s]--;
+    expireBuffs(w, e);
     if (e.spellCds[0] > 0) e.spellCds[0]--; if (e.spellCds[1] > 0) e.spellCds[1]--;
     if (e.dead) continue;
     if (t % TICK_HZ === 0) {

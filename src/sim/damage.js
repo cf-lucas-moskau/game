@@ -40,6 +40,8 @@ export function dealDamage(world, src, target, amount, type = DMG.PHYS, opts = E
     const h = heroHooks(world, attacker); if (h && h.modifyDamageOut) amt = h.modifyDamageOut(world, attacker, amt, target, type, opts);
   }
   if (target.ampUntil > t) amt *= 1 + target.ampPct;
+  if (target.dmgTaken) amt *= 1 + target.dmgTaken; // buffs that trade safety for power (Tailwind)
+  if (src && target.team === TEAM.NEUTRAL) target.aggroId = src.id; // camp monsters chase whoever hit them last
   if (world.state.suddenDeath) amt *= 1 + RULES.SUDDEN_DEATH_DMG_BONUS;
   if (type !== DMG.TRUE) {
     let res = type === DMG.PHYS ? target.armor : target.mr;
@@ -191,6 +193,7 @@ export function kill(world, victim, killer) {
     world.onStructureDown(victim);
   }
   if (victim.kind === KIND.PEBBLE) { const def = world.registry.heroes.gus; def.onPebbleDeath(world, victim); }
+  if (victim.team === TEAM.NEUTRAL && world.onNeutralDown) world.onNeutralDown(victim, killer && killer.kind === KIND.HERO ? killer : null);
   world.events.push(EV.DEATH, t, victim.id, killer ? killer.id : -1, victim.x, victim.y, 0, String(victim.kind));
   world.despawn(victim);
 }

@@ -7,6 +7,7 @@ import { canShop, purchasePlan } from '../sim/match.js';
 import { snapshot, alive, d, hpr, fwd, power, underTower, minionsTankingTower, predict, towerCovers } from './perception.js';
 import { SCRIPTS } from './heroes/index.js';
 import { burst, reach } from './threat.js';
+import { objectiveIntent, newIntent } from './objectives.js';
 
 export const DIFFICULTY = {
   easy: { think: 12, aimError: 95, abilityRate: 0.55, dodge: 0.1 },
@@ -86,6 +87,7 @@ export class Bot {
     else if (near.length && anyWithin(near, me, me.range + 350)) this.state = 'trade';
     else if (snap.enemyTower && minionsTankingTower(snap) >= 1 && (!near.length || ourPower > theirPower * 1.3)) this.state = 'siege';
     else if (snap.enemyTower && deadEnemies(world, me) >= 2 && hpr(me) > 0.45) this.state = 'siege';
+    else if (objectiveIntent(world, me, snap, this.intent || (this.intent = newIntent()))) this.state = 'objective';
     else this.state = 'lane';
   }
   act(world, me, snap) {
@@ -113,6 +115,11 @@ export class Bot {
         if (me.attackCd > 3 && dist < want) { const a = Math.atan2(me.y - t.y, me.x - t.x); return moveCmd(this.p, me.x + Math.cos(a) * 140, me.y + Math.sin(a) * 140 + this.rng.range(-60, 60)); }
         if (underTower(snap, t, 0) && minionsTankingTower(snap) < 2) break;
         return attackCmd(this.p, t.id);
+      }
+      case 'objective': {
+        const it = this.intent;
+        if (it.kind === 'camp') { const crab = world.get(it.id); if (alive(crab)) return attackCmd(this.p, crab.id); }
+        break;
       }
       case 'siege': {
         const t = snap.enemyTower;
