@@ -11,6 +11,13 @@ describe('bots', () => {
     const reach = STRUCT.TOWER.range + STRUCT.TOWER.radius;
     expect(LANE.W - 2 * (MAP.TOWER_OUTER_X + reach)).toBeGreaterThanOrEqual(500); // 560 at lane 4800 (700 between the range circles)
   });
+  it('the map is mirror-symmetric (relics, towers, fountains)', () => {
+    const xs = MAP.RELICS.map(([x]) => x).sort((a, b) => a - b);
+    for (let i = 0; i < xs.length; i++) expect(xs[i] + xs[xs.length - 1 - i]).toBe(LANE.W);
+    const w = createMatch({ seed: 1, roster, content: CONTENT });
+    const pos = (team) => w.structures.filter((s) => s.team === team).map((s) => team === 0 ? s.x : LANE.W - s.x).sort((a, b) => a - b);
+    expect(pos(1)).toEqual(pos(0));
+  });
   it('between waves, bots wait near the middle instead of at their base', () => {
     const w = createMatch({ seed: 5, roster, content: CONTENT });
     const dir = new BotDirector(w, 'medium'); const cmds = [];
