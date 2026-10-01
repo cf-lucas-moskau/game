@@ -41,3 +41,14 @@ A residual of about 1.5 points remains. It is at the edge of significance and li
 
 - `npm test`: 94 passed (new: mirror-symmetric map).
 - Gate: see below.
+
+## Gate results (gate key 747abe000f9c1b77, commit 99bc8a6)
+
+- tests: passed (94)
+- build: passed
+- e2e: passed
+- bench-desktop, bench-play, bench-mobile: passed
+- bench-eval: sim tick p95 0.1-0.7 ms, draw calls 32-33, corrections 0-0.33 per 10 s, desktop and play GC within
+  budget. Only mobile gcPauseMaxMs failed (10.94 ms). That is below every main-build mobile run in the PR #39 A/B, taken
+  one PR earlier in the same container (18.15-55.31 ms). This PR changes loop order only: no allocation, no render code.
+- soak: passed (3.30 MB per 10 min, budget 5)
