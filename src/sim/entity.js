@@ -29,6 +29,9 @@ export function createEntity() {
     // declared up front so every record shares one hidden class (no dictionary mode, no boxed doubles)
     vulnerable: false, tier: 0, laneOffset: 0, aiControlled: false, moving: false, onDashTick: null,
     lastHeroHitTick: -9999, lensUntil: 0, lensBy: -1,
+    // map features: timed buffs (heroes: [{ key, until }]), damage taken multiplier from buffs, kill streak,
+    // camp monsters' home and the unit they chase, empowered (Sky Pearl) minions
+    buffs: null, dmgTaken: 0, streak: 0, homeX: 0, homeY: 0, aggroId: -1, empowered: 0,
   };
 }
 export function resetEntity(e) {

@@ -30,5 +30,5 @@ export const DECAL = { DISC: 0, RING: 1, CONE: 2, LINE: 3 };
 export const DECAL_STYLES = ['clock', 'flame', 'ink', 'stone', 'honey', 'gold', 'storm', 'coral', 'sight', 'wind', 'frost', 'vine', 'sound', 'star', 'iron', 'shadow'];
 /** Zone-layer primitives (render/zones.js). */
 export const RIBBON = { INK: 0, WALL: 1, FIRE: 2 };
-export const DISC = { HONEY: 0, ECHO: 1, TELEGRAPH: 2, RELIC: 3 };
+export const DISC = { HONEY: 0, ECHO: 1, TELEGRAPH: 2, RELIC: 3, CAMP: 4, PEARL: 5, LOOT: 6, SHRINE: 7 };
 export const rnd = (a, b) => a + Math.random() * (b - a);

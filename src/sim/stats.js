@@ -1,4 +1,5 @@
 import { KIND } from './constants.js';
+import { buffStat } from './buffs.js';
 
 // LoL-style level growth: stat = base + growth * (lvl-1) * (0.7025 + 0.0175 * (lvl-1))
 const growthFactor = (lvl) => (lvl - 1) * (0.7025 + 0.0175 * (lvl - 1));
@@ -20,6 +21,8 @@ export function recomputeHero(world, e) {
     if (s.mana) maxMana += s.mana; if (s.manaRegen) manaRegen += s.manaRegen; if (s.hpRegen) hpRegen += s.hpRegen;
     if (s.pen) pen += s.pen; if (s.mpen) mpen += s.mpen; if (s.tenacity) tenacity += s.tenacity;
   }
+  // timed buffs from map features (camps, Sky Pearl, shrines)
+  if (e.buffs && e.buffs.length) { ad += buffStat(e, 'ad'); armor += buffStat(e, 'armor'); mr += buffStat(e, 'mr'); asBonus += buffStat(e, 'asPct'); speed *= 1 + buffStat(e, 'msPct'); dmgAmp += buffStat(e, 'dmgAmp'); }
   // dynamic item/passive bonuses
   if (e.itemState.barnacle) { armor += e.itemState.barnacle; mr += e.itemState.barnacle; }
   let range = b.range;
@@ -34,7 +37,7 @@ export function recomputeHero(world, e) {
   e.maxHp = Math.round(maxHp); e.ad = ad; e.ap = ap; e.armor = armor; e.mr = mr;
   e.as = Math.min(2.5, b.as * (1 + asBonus)); e.speed = speed; e.range = range;
   e.maxMana = Math.round(maxMana); e.hpRegen = hpRegen + e.level * 0.35; e.manaRegen = manaRegen + e.level * 0.25;
-  e.cdr = Math.min(0.4, cdr); e.lifesteal = lifesteal; e.dmgAmp = dmgAmp;
+  e.cdr = Math.min(0.4, cdr); e.lifesteal = lifesteal; e.dmgAmp = dmgAmp; e.dmgTaken = e.buffs ? buffStat(e, 'dmgTaken') : 0;
   // penetration ignores a share of the target's armor / magic resist; tenacity shortens crowd control (caps keep both sane)
   e.pen = Math.min(0.45, pen); e.mpen = Math.min(0.45, mpen); e.tenacity = Math.min(0.5, tenacity);
   e.hp = Math.max(1, Math.min(e.maxHp, Math.round(hpRatio * e.maxHp)));

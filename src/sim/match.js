@@ -12,6 +12,11 @@ import { projectileSystem } from './projectile.js';
 import { zoneSystem } from './zones.js';
 import { StateHasher } from '../core/hash.js';
 import { sq } from '../core/dmath.js';
+import { expireBuffs } from './buffs.js';
+import { setupCamps, campSystem } from './camps.js';
+import { setupPearl, pearlSystem } from './pearl.js';
+import { pickupSystem, spawnRollLoot } from './pickups.js';
+import { setupShrines, shrineSystem } from './shrines.js';
 
 /**
  * Build a ready-to-run match.
@@ -29,8 +34,11 @@ export function createMatch({ seed = 1, roster, content }) {
   w.state.nextWave = sec(RULES.FIRST_WAVE);
   w.state.nextRelic = sec(20);
   setupStructures(w);
+  setupCamps(w);
+  setupPearl(w);
+  setupShrines(w);
   roster.forEach((r, i) => spawnHero(w, r, i));
-  w.systems = [commandSystem, clockSystem, heroSystem, movementSystem, combatSystem, projectileSystem, zoneSystem, economySystem, winSystem];
+  w.systems = [commandSystem, clockSystem, campSystem, pearlSystem, shrineSystem, heroSystem, movementSystem, combatSystem, projectileSystem, zoneSystem, economySystem, winSystem];
   return w;
 }
 
@@ -55,7 +63,7 @@ export function spawnHero(w, r, index) {
   const e = w.spawn(KIND.HERO, r.team, sideX(r.team, MAP.FOUNTAIN_X + 40), 330 + slot * 120);
   e.heroKey = r.heroKey; e.playerId = r.playerId; e.isBot = !!r.isBot;
   e.items = []; e.itemState = {}; e.cds = [0, 0, 0, 0]; e.spellCds = [0, 0]; e.spells = ['dash', 'heal'];
-  e.damagers = []; e.level = RULES.START_LEVEL; e.gold = RULES.START_GOLD; e.radius = def.base.radius || 36;
+  e.damagers = []; e.buffs = []; e.level = RULES.START_LEVEL; e.gold = RULES.START_GOLD; e.radius = def.base.radius || 36;
   e.projectileSpeed = def.base.projectile || 0; e.ranks = ranksForLevel(e.level, def.rankOrder);
   e.heroState = {};
   if (def.init) def.init(w, e);
@@ -144,6 +152,7 @@ function clockSystem(w) {
     w.events.push(EV.WHALE_WARN, t, 0, 0, 0, 0, wh.dir);
   } else if (wh.phase === 'warn' && t >= wh.until) {
     wh.phase = 'roll'; wh.until = t + sec(RULES.WHALE_DURATION); w.events.push(EV.WHALE_ROLL, t, 0, 0, 0, 0, wh.dir);
+    spawnRollLoot(w, wh.dir); // treasure washes up on the edge it rolls toward
   } else if (wh.phase === 'roll') {
     if (t % 6 === 0) for (const e of w.entities) {
       if (!e.alive || e.dead || e.kind === KIND.TOWER || e.kind === KIND.HEART) continue;
@@ -151,23 +160,7 @@ function clockSystem(w) {
     }
     if (t >= wh.until) { wh.phase = 'idle'; wh.next = t + sec(RULES.WHALE_INTERVAL); w.events.push(EV.WHALE_END, t); }
   }
-  // health relics
-  if (t >= st.nextRelic) {
-    for (const [x, y] of MAP.RELICS) if (!w.pickups.some((p) => p.x === x && p.y === y)) w.pickups.push({ id: t * 10 + w.pickups.length, x, y, born: t });
-    st.nextRelic = t + sec(RULES.RELIC_INTERVAL);
-    w.events.push(EV.RELIC, t, 0, 0, 0, 0, 1);
-  }
-  for (let i = w.pickups.length - 1; i >= 0; i--) {
-    const p = w.pickups[i], nh = w.heroes.length;
-    for (let k = 0; k < nh; k++) {
-      const h = w.heroes[t & 1 ? nh - 1 - k : k]; // alternate who reaches a contested relic first
-      if (h.dead) continue;
-      if (sq(h.x - p.x) + sq(h.y - p.y) <= sq(RULES.RELIC_RADIUS + h.radius)) {
-        heal(w, h, h, h.maxHp * RULES.RELIC_HEAL); h.mana = Math.min(h.maxMana, h.mana + h.maxMana * 0.15);
-        w.events.push(EV.RELIC, t, h.id, 0, p.x, p.y, 0); w.pickups.splice(i, 1); break;
-      }
-    }
-  }
+  pickupSystem(w); // health relics and whale-roll loot
   if (!st.suddenDeath && t >= sec(RULES.SUDDEN_DEATH)) { st.suddenDeath = true; w.events.push(EV.FX, t, 0, 0, 0, 0, 0, 'sudden-death'); }
   // sudden death: both Heartstones crack and lose health every second, so every match ends
   if (st.suddenDeath && t % TICK_HZ === 0) suddenDeathDecay(w, t);
@@ -207,16 +200,22 @@ function spawnWave(w) {
   const kinds = [KIND.MELEE, KIND.MELEE, KIND.MELEE, KIND.RANGED, KIND.RANGED, KIND.RANGED];
   if (st.waveCount % RULES.SIEGE_EVERY === 0) kinds.splice(3, 0, KIND.SIEGE);
   for (const team of (st.waveCount & 1 ? WAVE_ORDER_A : WAVE_ORDER_B)) { // alternate which side spawns (and gets ids) first
-    kinds.forEach((kind, i) => {
-      const spec = MINION[kind]; const g = 1 + spec.growth * minutes;
-      const row = kind === KIND.MELEE ? 0 : kind === KIND.SIEGE ? 1 : 2;
-      const col = i % 3;
-      const e = w.spawn(kind, team, sideX(team, MAP.SPAWN_X - row * 70), 360 + col * 90);
-      e.maxHp = e.hp = Math.round(spec.hp * g); e.baseAd = spec.ad * g; e.armor = e.baseArmor = spec.armor; e.mr = spec.mr;
-      e.baseAs = spec.as; e.range = spec.range; e.baseSpeed = spec.speed; e.radius = spec.radius; e.projectileSpeed = spec.projectile;
-      e.laneOffset = (col - 1) * 70; e.order = ORDER.MOVE; e.moveX = sideX(team, LANE.W - 300); e.moveY = 450;
-    });
+    const golem = st.pearlWaves && st.pearlWaves[team] > 0; if (golem) st.pearlWaves[team]--;
+    if (golem) spawnMinion(w, team, KIND.SIEGE, 4, 1, minutes, true); // the Pearl Golem walks in the middle of the siege row
+    kinds.forEach((kind, i) => spawnMinion(w, team, kind, i, kind === KIND.MELEE ? 0 : kind === KIND.SIEGE ? 1 : 2, minutes, false));
   }
+}
+
+/** One wave minion in formation slot i of row `row`; empowered = the Pearl Golem (Sky Pearl reward). */
+function spawnMinion(w, team, kind, i, row, minutes, empowered) {
+  const spec = MINION[kind]; const g = 1 + spec.growth * minutes;
+  const col = i % 3;
+  const e = w.spawn(kind, team, sideX(team, MAP.SPAWN_X - row * 70), 360 + col * 90);
+  e.maxHp = e.hp = Math.round(spec.hp * g * (empowered ? RULES.PEARL_GOLEM_HP : 1)); e.baseAd = spec.ad * g * (empowered ? RULES.PEARL_GOLEM_AD : 1);
+  e.armor = e.baseArmor = spec.armor; e.mr = spec.mr;
+  e.baseAs = spec.as; e.range = spec.range; e.baseSpeed = spec.speed; e.radius = spec.radius * (empowered ? 1.25 : 1); e.projectileSpeed = spec.projectile;
+  e.laneOffset = (col - 1) * 70; e.order = ORDER.MOVE; e.moveX = sideX(team, LANE.W - 300); e.moveY = 450; e.empowered = empowered ? 1 : 0;
+  return e;
 }
 
 function heroSystem(w) {
@@ -225,6 +224,7 @@ function heroSystem(w) {
     const i = t & 1 ? nh - 1 - k : k, e = w.heroes[i]; // alternate the order every tick (team-neutral)
     const def = w.registry.heroes[e.heroKey];
     for (let s = 0; s < 4; s++) if (e.cds[s] > 0) e.cds[s]--;
+    expireBuffs(w, e);
     if (e.spellCds[0] > 0) e.spellCds[0]--; if (e.spellCds[1] > 0) e.spellCds[1]--;
     if (e.dead) continue;
     if (t % TICK_HZ === 0) {

@@ -1,8 +1,8 @@
 // Instanced overlays: health bars (1 draw), ground shadows + team rings (1 draw), projectiles (1 draw).
 import * as THREE from 'three';
 import { PROJECTILE_STYLES, DEFAULT_PROJECTILE } from './attack-styles.js';
-import { S, TEAM_COLORS, TEAM_RGB, SELF_RGB } from './palette.js';
-import { KIND, isStructure } from '../sim/constants.js';
+import { S, TEAM_COLORS, TEAM_RGB, SELF_RGB, NEUTRAL_RGB } from './palette.js';
+import { KIND, TEAM, isStructure } from '../sim/constants.js';
 import { rx, ry } from './interp.js';
 
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -43,11 +43,11 @@ export class HealthBars {
       if (!e.alive || e.dead || n >= this.cap) continue;
       if (isStructure(e.kind) && e.hp >= e.maxHp && !e.vulnerable) continue;
       const hero = e.kind === KIND.HERO, h = e.kind === KIND.HERO ? 2.0 : e.kind === KIND.TOWER ? 6.6 : e.kind === KIND.HEART ? 3.6 : e.kind === KIND.PEBBLE ? 1.9 : 1.35;
-      const w = hero ? 1.25 : isStructure(e.kind) ? 2.2 : e.kind === KIND.PEBBLE ? 1.2 : e.kind === KIND.SIEGE ? 0.95 : 0.7;
+      const w = hero ? 1.25 : isStructure(e.kind) ? 2.2 : e.kind === KIND.PEBBLE ? 1.2 : e.kind === KIND.SIEGE || e.kind === KIND.CRAB ? 0.95 : 0.7;
       this.iPos.setXYZ(n, rx(e) * S, h + (hero && e.heroKey === 'gus' && e.heroState.mounted ? 0.75 : 0), ry(e) * S);
       const shield = e.shieldUntil > world.tick ? e.shield / e.maxHp : 0;
       this.iData.setXYZW(n, Math.max(0, e.hp / e.maxHp), shield, w, hero ? e.maxHp : 0);
-      const c = e.id === myId ? SELF_RGB : TEAM_RGB[e.team === myTeam ? 0 : 1];
+      const c = e.id === myId ? SELF_RGB : e.team === TEAM.NEUTRAL ? NEUTRAL_RGB : TEAM_RGB[e.team === myTeam ? 0 : 1];
       this.iCol.setXYZW(n, c.r, c.g, c.b, hero ? 1 : 0);
       n++;
     }
@@ -82,7 +82,7 @@ export class GroundDecals {
       if (!e.alive || e.dead || n >= this.cap || e.kind === KIND.TOWER || e.kind === KIND.HEART) continue;
       const ring = e.kind === KIND.HERO ? 1 : 0.5;
       this.iPos.setXYZW(n, rx(e) * S, ry(e) * S, e.radius * S * (e.kind === KIND.HERO ? 1.25 : 1), ring);
-      const c = e.id === myId ? SELF_RGB : TEAM_RGB[e.team === myTeam ? 0 : 1];
+      const c = e.id === myId ? SELF_RGB : e.team === TEAM.NEUTRAL ? NEUTRAL_RGB : TEAM_RGB[e.team === myTeam ? 0 : 1];
       this.iCol.setXYZ(n, c.r, c.g, c.b); n++;
     }
     this.mesh.geometry.instanceCount = n; this.mesh.visible = n > 0; this.iPos.needsUpdate = this.iCol.needsUpdate = true;

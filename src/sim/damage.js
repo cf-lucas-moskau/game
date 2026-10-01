@@ -40,6 +40,8 @@ export function dealDamage(world, src, target, amount, type = DMG.PHYS, opts = E
     const h = heroHooks(world, attacker); if (h && h.modifyDamageOut) amt = h.modifyDamageOut(world, attacker, amt, target, type, opts);
   }
   if (target.ampUntil > t) amt *= 1 + target.ampPct;
+  if (target.dmgTaken) amt *= 1 + target.dmgTaken; // buffs that trade safety for power (Tailwind)
+  if (src && target.team === TEAM.NEUTRAL) target.aggroId = src.id; // camp monsters chase whoever hit them last
   if (world.state.suddenDeath) amt *= 1 + RULES.SUDDEN_DEATH_DMG_BONUS;
   if (type !== DMG.TRUE) {
     let res = type === DMG.PHYS ? target.armor : target.mr;
@@ -162,8 +164,15 @@ export function kill(world, victim, killer) {
       if (h && h !== k && t - victim.damagers[i + 1] <= sec(RULES.ASSIST_WINDOW) && h.team !== victim.team) assisters.push(h);
     }
     victim.damagers.length = 0;
+    // comeback bounty: ending a streak pays the shutdown on top of the kill gold
+    const shutdown = shutdownGold(victim.streak);
+    victim.streak = 0;
     let bounty = 0;
-    if (k) { k.kills++; bounty = RULES.KILL_GOLD + 20 * Math.max(0, victim.level - k.level); giveGold(world, k, bounty); giveXp(world, k, RULES.KILL_XP); }
+    if (k) {
+      k.kills++; k.streak++;
+      bounty = RULES.KILL_GOLD + 20 * Math.max(0, victim.level - k.level) + shutdown; giveGold(world, k, bounty); giveXp(world, k, RULES.KILL_XP);
+      if (RULES.STREAK_CALLS.includes(k.streak)) world.events.push(EV.OBJECTIVE, t, k.id, k.team, k.x, k.y, k.streak, 'streak', shutdownGold(k.streak));
+    }
     for (const a of assisters) { a.assists++; giveGold(world, a, RULES.ASSIST_GOLD); giveXp(world, a, RULES.KILL_XP * 0.5); itemsOnAssist(world, a); }
     // takedown hook (kill or assist): resets and stacks that pay off on hero kills
     if (k) takedown(world, k, victim);
@@ -174,7 +183,8 @@ export function kill(world, victim, killer) {
     }
     world.events.push(EV.DEATH, t, victim.id, killer ? killer.id : -1, victim.x, victim.y, 1, victim.heroKey);
     // KILL: a = victim, b = credited hero (or the unit that struck), v = assists, c = the killer's bounty; one ASSIST per helper
-    world.events.push(EV.KILL, t, victim.id, k ? k.id : (killer ? killer.id : -1), victim.x, victim.y, assisters.length, '', bounty);
+    // s = 'shutdown' when the victim's streak paid out
+    world.events.push(EV.KILL, t, victim.id, k ? k.id : (killer ? killer.id : -1), victim.x, victim.y, assisters.length, k && shutdown ? 'shutdown' : '', bounty);
     for (const a of assisters) world.events.push(EV.ASSIST, t, a.id, victim.id, victim.x, victim.y, RULES.ASSIST_GOLD);
     return;
   }
@@ -191,8 +201,13 @@ export function kill(world, victim, killer) {
     world.onStructureDown(victim);
   }
   if (victim.kind === KIND.PEBBLE) { const def = world.registry.heroes.gus; def.onPebbleDeath(world, victim); }
+  if (victim.team === TEAM.NEUTRAL && world.onNeutralDown) world.onNeutralDown(victim, killer && killer.kind === KIND.HERO ? killer : null);
   world.events.push(EV.DEATH, t, victim.id, killer ? killer.id : -1, victim.x, victim.y, 0, String(victim.kind));
   world.despawn(victim);
+}
+/** Extra gold for ending a kill streak of `streak` kills (0 below SHUTDOWN_FROM). */
+export function shutdownGold(streak) {
+  return streak >= RULES.SHUTDOWN_FROM ? Math.min(RULES.SHUTDOWN_MAX, RULES.SHUTDOWN_BASE + RULES.SHUTDOWN_PER * (streak - RULES.SHUTDOWN_FROM)) : 0;
 }
 function takedown(world, h, victim) { const d = world.registry.heroes[h.heroKey]; if (d.onTakedown) d.onTakedown(world, h, victim); }
 function itemsOnAssist(world, h) { for (const k of h.items) { const it = world.registry.items[k]; if (it && it.onAssist) it.onAssist(world, h); } const d = world.registry.heroes[h.heroKey]; if (d.onAssist) d.onAssist(world, h); }

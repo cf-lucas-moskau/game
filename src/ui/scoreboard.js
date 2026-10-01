@@ -1,4 +1,5 @@
 // Scoreboard (Tab): both teams with level, K/D/A, minions, items. Also used by the end screen.
+import { shutdownGold } from '../sim/damage.js';
 import { h, clear } from './dom.js';
 import { emblem } from './menu.js';
 import { itemIcon } from './identity.js';
@@ -14,7 +15,7 @@ export function teamTables(world, me, onPick = null, skinOf = () => 'classic') {
         h('tbody', {}, world.heroes.filter((x) => x.team === team).map((x) => {
           const def = world.registry.heroes[x.heroKey];
           return h('tr', { class: `${x === me ? 'me' : ''}${x.dead ? ' dead' : ''}`, 'data-id': onPick ? String(x.id) : null, onclick: onPick ? () => onPick(x.id) : null },
-            h('td', {}, h('div', { class: 'hero' }, emblem(x.heroKey, '', skinOf(x)), h('div', {}, def.name, h('div', { class: 'who' }, x === me ? 'You' : `Bot${x.dead ? ' · respawning' : ''}`)))),
+            h('td', {}, h('div', { class: 'hero' }, emblem(x.heroKey, '', skinOf(x)), h('div', {}, def.name, h('div', { class: 'who' }, `${x === me ? 'You' : `Bot${x.dead ? ' · respawning' : ''}`}${shutdownGold(x.streak) ? ` · bounty ${shutdownGold(x.streak)}` : ''}`)))),
             h('td', {}, String(x.level)), h('td', { class: 'kda' }, `${x.kills} / ${x.deaths} / ${x.assists}`), h('td', {}, String(x.cs)),
             h('td', {}, h('div', { class: 'chips' }, x.items.map((k) => h('span', { class: 'chip', title: items[k].name }, itemIcon(k, items[k]), h('span', { class: 'nm' }, items[k].name))))));
         }))));

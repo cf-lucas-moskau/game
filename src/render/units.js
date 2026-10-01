@@ -364,10 +364,10 @@ class MinionBatch {
   }
   begin() { this.count = 0; }
   /** clip: 'idle'|'walk'|'attack'|'shoot'|'die'; t: seconds into clip; loop */
-  push(x, z, yaw, clip, t, loop, tint, flash, sink = 0) {
+  push(x, z, yaw, clip, t, loop, tint, flash, sink = 0, scale = 1) {
     if (this.count >= this.cap) return;
     const i = this.count++;
-    tmpObj.position.set(x, -sink, z); tmpObj.rotation.set(0, yaw, 0); tmpObj.scale.setScalar(1); tmpObj.updateMatrix();
+    tmpObj.position.set(x, -sink, z); tmpObj.rotation.set(0, yaw, 0); tmpObj.scale.setScalar(scale); tmpObj.updateMatrix();
     this.mesh.setMatrixAt(i, tmpObj.matrix);
     if (this.static) { tmpColor.copy(tint).lerp(WHITE_RGB, 0.5 + flash * 0.5); this.mesh.setColorAt(i, tmpColor); return; }
     const c = this.vat.clips[CLIPS[clip]] || this.vat.clips[CLIPS.idle];
@@ -471,6 +471,7 @@ class BeeSwarm {
 }
 
 // ---------------------------------------------------------------- manager
+const GOLEM_RGB = TEAM_RGB.map((c) => c.clone().lerp(new THREE.Color('#f2c14e'), 0.6));
 const BATCH_KEYS = [0, 1].map((t) => ({ [KIND.MELEE]: `${t}:melee`, [KIND.RANGED]: `${t}:ranged`, [KIND.SIEGE]: `${t}:siege` }));
 export class UnitRenderer {
   constructor(lib, world, parent) {
@@ -523,7 +524,8 @@ export class UnitRenderer {
       if ((a.clip === 'attack' || a.clip === 'shoot') && now - a.start < 0.6) clip = a.clip; else a.clip = clip;
       const fl = this.flashes.get(e.id) || 0; if (fl) this.flashes.set(e.id, Math.max(0, fl - dt * 6));
       const t = clip === a.clip && (clip === 'attack' || clip === 'shoot') ? now - a.start : now + e.id * 0.37;
-      this.batchFor(e.team, e.kind).push(rx(e) * S, ry(e) * S, faceToRotY(e.facing), clip, t, clip === 'walk' || clip === 'idle', TEAM_RGB[e.team], fl);
+      // the Pearl Golem (Sky Pearl reward): bigger, gilded
+      this.batchFor(e.team, e.kind).push(rx(e) * S, ry(e) * S, faceToRotY(e.facing), clip, t, clip === 'walk' || clip === 'idle', e.empowered ? GOLEM_RGB[e.team] : TEAM_RGB[e.team], e.empowered ? Math.max(fl, 0.35) : fl, 0, e.empowered ? 1.3 : 1);
     }
     // corpses: play die clip, then sink into the whale
     let w = 0;

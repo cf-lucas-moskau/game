@@ -26,6 +26,7 @@ export function summaryText(run, agg, md = false) {
     ['First blood', `${s.firstBloodMin} min; its team wins ${pct(s.firstBloodWinRate)}`],
     ['First tower', `${s.firstTowerMin} min; its team wins ${pct(s.firstTowerWinRate)}`],
     ['Sudden death reached', pct(s.suddenDeathRate)],
+    ['Map objectives', `camps ${s.camps} (more camps wins ${pct(s.campsWinRate)}), pearls ${s.pearls} (more pearls wins ${pct(s.pearlsWinRate)}), loot ${s.lootGold} gold, shrines ${s.shrines}, shutdowns ${s.shutdowns}`],
     ['Swapped pairs', `${s.pairsSplit} split, ${s.pairsSweep} won by the same roster on both sides`],
     ['Sim time per match', `${s.simMsPerMatch} ms`],
   ];

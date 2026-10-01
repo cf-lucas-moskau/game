@@ -10,4 +10,6 @@ import { Color } from 'three';
 /** Pre-parsed colours for per-frame use (Color.set(string) parses and allocates). */
 export const TEAM_RGB = TEAM_COLORS.map((c) => new Color(c));
 export const SELF_RGB = new Color('#7ee07a');
+export const NEUTRAL_COLOR = '#f2c14e'; // camp monsters: gold, neither team's colour
+export const NEUTRAL_RGB = new Color(NEUTRAL_COLOR);
 export const WHITE_RGB = new Color('#ffffff');

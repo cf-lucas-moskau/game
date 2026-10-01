@@ -3,7 +3,7 @@
 // by the presentation packs through render/hero-fx.js (hook in update); relics and telegraphs are drawn here.
 import * as THREE from 'three';
 import { S } from './palette.js';
-import { TICK_HZ } from '../sim/constants.js';
+import { TICK_HZ, RULES } from '../sim/constants.js';
 
 const RIBBON_CAP = 6000; // vertices
 import { DISC } from '../presentation/kit.js';
@@ -60,8 +60,25 @@ export class ZoneViews {
             vec3 tc = vB.z > 0.5 ? vec3(1., .3, .42) : vec3(.35, .8, 1.);
             float edge = smoothstep(0.05, 0., abs(r - 0.97)); float fill = step(r, prog) * 0.28 + smoothstep(0.04, 0., abs(r - prog)) * 0.5;
             c = tc * 1.4; al = a * (edge * 0.9 + fill);
-          } else { // relic: soft green glow
+          } else if (k < 3.5) { // relic: soft green glow
             float pulse = 0.6 + 0.4 * sin(uTime * 3. + vB.w * 5.); c = vec3(.45, 1., .5) * 1.5; al = a * smoothstep(1., 0.1, r) * 0.5 * pulse;
+          } else if (k < 4.5) { // camp nest: barnacle-studded sand ring; while the camp is down, a gold arc fills toward its return
+            float ang = atan(vUv.y, vUv.x) / 6.2832 + 0.5;
+            float ring = smoothstep(0.07, 0., abs(r - 0.86)) * (0.55 + 0.45 * step(0.5, fract(ang * 18.)));
+            float dots = step(0.82, fract(sin(floor(ang * 26.) * 12.9) * 43758.5)) * smoothstep(0.1, 0., abs(r - 0.72));
+            c = vec3(.91, .86, .77); al = a * (ring * 0.45 + dots * 0.5 + smoothstep(1., 0.2, r) * 0.08);
+            if (prog < 0.999) { float arc = step(ang, prog) * smoothstep(0.06, 0., abs(r - 0.95)); c = mix(c, vec3(.95, .76, .3) * 1.4, arc); al = max(al, a * arc * 0.9); }
+          } else if (k < 5.5) { // Sky Pearl: shimmering ring; the holding team's colour fills inward with capture progress
+            vec3 tc = vB.z < 0.5 ? vec3(.27, .77, .9) : vB.z < 1.5 ? vec3(.94, .28, .43) : vec3(.9, .95, 1.);
+            float edge = smoothstep(0.035, 0., abs(r - 0.97)); float shimmer = 0.5 + 0.5 * sin(atan(vUv.y, vUv.x) * 8. + uTime * 2. - r * 6.);
+            float fill = step(1. - prog, 1. - r) * 0.22 + smoothstep(0.03, 0., abs(r - (1. - prog))) * 0.6 * step(0.01, prog);
+            c = mix(vec3(.85, .93, 1.), tc, step(0.01, prog)) * 1.5; al = a * (edge * (0.7 + 0.3 * shimmer) + fill + smoothstep(1., 0., r) * 0.06);
+          } else if (k < 6.5) { // whale-roll loot: gold glow with a sparkle
+            float tw = 0.55 + 0.45 * sin(uTime * 7. + vB.w * 4.); c = vec3(1., .82, .35) * 1.7; al = a * smoothstep(1., 0.05, r) * 0.55 * tw;
+          } else { // Gale Shrine: a pale wind spiral; prog = channel progress (a dims it while it recharges)
+            float ang = atan(vUv.y, vUv.x); float sp = 0.5 + 0.5 * sin(ang * 3. + log(r + 0.05) * 6. - uTime * 3.);
+            float ring = smoothstep(0.05, 0., abs(r - 0.92)); float ch = step(0.01, prog) * step(r, prog) * 0.25;
+            c = vec3(.75, .97, .95) * 1.4; al = a * (ring * 0.7 + sp * smoothstep(1., 0.3, r) * 0.25 + ch);
           }
           if (al < 0.01) discard; gl_FragColor = vec4(c, al); }` });
     this.discs = new THREE.Mesh(dg, this.discMat); this.discs.frustumCulled = false; this.discs.renderOrder = 4; parent.add(this.discs);
@@ -124,7 +141,20 @@ export class ZoneViews {
     this.nv = 0; this.nd = 0; this.nDome = 0;
     if (this.hook) this.hook(world, now);
     for (let i = this.nDome; i < this.domes.length; i++) this.domes[i].visible = false;
-    for (const p of world.pickups) this.disc(p.x, p.y, 70, DISC.RELIC, 0, 1, 0, p.id % 5);
+    for (const p of world.pickups) this.disc(p.x, p.y, p.kind === 'loot' ? 75 : 70, p.kind === 'loot' ? DISC.LOOT : DISC.RELIC, 0, p.until ? Math.min(1, (p.until - world.tick) / 30) : 1, 0, p.id % 5);
+    // Sky Pearl circle: faint while announced; while up it fills with the holding team's colour
+    const pearl = world.state.pearl;
+    if (pearl && pearl.phase !== 'idle') this.disc(pearl.x, pearl.y, RULES.PEARL_RADIUS, DISC.PEARL, pearl.phase === 'up' ? pearl.prog : 0, pearl.phase === 'up' ? 1 : 0.45, pearl.holder < 0 ? 2 : pearl.holder, 0);
+    // Gale Shrines: bright when ready (channel progress fills it), dim while recharging
+    const shrines = world.state.shrines;
+    if (shrines) for (let i = 0; i < shrines.length; i++) { const s = shrines[i], ready = world.tick >= s.readyAt; this.disc(s.x, s.y, RULES.SHRINE_RADIUS, DISC.SHRINE, s.prog, ready ? 1 : 0.3, 0, i); }
+    // camp nests; a downed camp shows its return as a filling arc during the last 15 seconds
+    const camps = world.state.camps;
+    if (camps) for (let i = 0; i < camps.length; i++) {
+      const c = camps[i], wait = (c.respawnAt - world.tick) / TICK_HZ;
+      if (c.crabId >= 0) this.disc(c.x, c.y, 130, DISC.CAMP, 1, 0.9, 0, i);
+      else if (wait < 15) this.disc(c.x, c.y, 130, DISC.CAMP, 1 - Math.max(0, wait) / 15, 0.9, 0, i);
+    }
     let w = 0;
     for (const tg of this.telegraphs) { const k = (now - tg.start) / tg.dur; if (k > 1.1) continue; this.telegraphs[w++] = tg; this.disc(tg.x, tg.y, tg.r, DISC.TELEGRAPH, Math.min(1, k), 1 - Math.max(0, k - 1) * 10, tg.team, 0); }
     this.telegraphs.length = w;

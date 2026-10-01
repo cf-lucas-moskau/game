@@ -13,6 +13,7 @@ import { poolAmount } from '../sim/resources.js';
 import { canShop } from '../sim/match.js';
 import { itemActiveCmd } from '../sim/commands.js';
 import { abilityNumbers } from './numbers.js';
+import { ObjectiveHud } from './objectives.js';
 
 const KEYS = ['Q', 'W', 'E', 'R'];
 const RES_COLOR = { mana: 'linear-gradient(180deg,#7aa2ff,#4a6fe0)', ink: 'linear-gradient(180deg,#a99cff,#7564e8)', flame: 'linear-gradient(180deg,#ffc27a,#f07a3a)', swarm: 'linear-gradient(180deg,#ffe07a,#e0a82e)', energy: 'linear-gradient(180deg,#b7f5c4,#4fc98a)' };
@@ -30,6 +31,7 @@ export class Hud {
     this.s = session; this.tip = tooltip; this.touch = touch;
     const w = session.world, me = session.me, def = w.registry.heroes[me.heroKey];
     this.def = def;
+    this.objectives = new ObjectiveHud(this); // map features: buff chips (dock), Sky Pearl bar (top bar), banners
     // ---- top
     this.blue = h('div', { class: 'score blue', title: 'Blue team kills' }, '0');
     this.red = h('div', { class: 'score red', title: 'Red team kills' }, '0');
@@ -61,7 +63,7 @@ export class Hud {
     this.gold = h('span', {}, '0');
     this.goldBtn = h('button', { class: 'gold-btn interactive', onclick: onShop, 'aria-label': 'Open shop', 'data-act': 'shop' }, h('i', { class: 'coin' }), this.gold);
     this.dock = h('div', { class: 'dock' }, portrait,
-      h('div', { class: 'mid' },
+      h('div', { class: 'mid' }, this.objectives.buffs,
         h('div', { class: 'abilities' }, this.slots.map((s) => s.el), h('div', { class: 'gap' }), this.spells.map((s) => s.el)),
         h('div', { class: 'bars' }, h('div', { class: 'bar' }, this.hpLag, this.hpFill, this.shield, this.hpText), this.resBar)),
       h('div', { class: 'side' }, itemsEl, this.goldBtn));
@@ -69,7 +71,7 @@ export class Hud {
       h('button', { onclick: onScoreboard, 'aria-label': 'Scoreboard', 'data-act': 'score' }, touch ? 'Score' : 'Tab'),
       h('button', { onclick: onMenu, 'aria-label': 'Menu', 'data-act': 'menu' }, touch ? 'Menu' : 'Esc'));
     this.el = h('div', { class: 'hud' },
-      h('div', { class: 'topbar' }, this.blue, h('div', { class: 'strip-wrap' }, canvas, this.clock), this.red),
+      h('div', { class: 'topbar' }, this.blue, h('div', { class: 'strip-wrap' }, canvas, this.clock), this.red, this.objectives.bar),
       this.lock, this.feed, this.banner, this.respawn, this.dock, quick);
     root.append(this.el);
     this.cdTotal = [1, 1, 1, 1]; this.prevCd = [0, 0, 0, 0]; this.prevRanks = { Q: -1, W: -1, E: -1, R: -1 }; this.prevLevel = me.level;
@@ -105,6 +107,7 @@ export class Hud {
   heroName(id) { const e = this.s.world.entities[id]; return e && e.kind === KIND.HERO ? this.s.world.registry.heroes[e.heroKey].name.replace(/^The /, '') : null; }
   onEvent(e) {
     const w = this.s.world, me = this.s.me;
+    this.objectives.onEvent(e);
     switch (e.type) {
       case EV.KILL: {
         const victim = w.entities[e.a], killer = e.b >= 0 ? w.entities[e.b] : null;
@@ -112,10 +115,9 @@ export class Hud {
         const kn = killer && killer.kind === KIND.HERO ? this.heroName(killer.id) : null;
         const row = h('div', { class: `k${victim === me || killer === me ? ' me' : ''}` },
           kn ? h('span', { class: `t${killer.team}` }, kn) : h('span', { class: 'x' }, killer && killer.kind === KIND.TOWER ? 'Tower' : 'Executed'),
-          h('span', { class: 'x' }, '⟶'), h('span', { class: `t${victim.team}` }, this.heroName(victim.id)));
-        this.feed.prepend(row); this.feedItems.push({ row, until: performance.now() + 7000 });
-        while (this.feedItems.length > 5) this.feedItems.shift().row.remove();
-        if (killer === me) this.showBanner(`You slew ${this.heroName(victim.id)}`, `+${e.c} gold`, 'good', 1800);
+          h('span', { class: 'x' }, '⟶'), h('span', { class: `t${victim.team}` }, this.heroName(victim.id)), e.s === 'shutdown' ? h('span', { class: 'neutral' }, 'shutdown') : null);
+        this.addFeed(row);
+        if (killer === me) this.showBanner(e.s === 'shutdown' ? 'Shutdown!' : `You slew ${this.heroName(victim.id)}`, e.s === 'shutdown' ? `You ended ${this.heroName(victim.id)}'s streak · +${e.c} gold` : `+${e.c} gold`, 'good', e.s === 'shutdown' ? 2400 : 1800);
         break;
       }
       case EV.ASSIST: if (e.a === me.id) this.showBanner(`Assist on ${this.heroName(e.b)}`, `+${e.v} gold`, 'good', 1400); break;
@@ -125,6 +127,12 @@ export class Hud {
       case EV.LEVEL_UP: if (e.a === me.id) { this.dock.querySelector('.portrait').animate([{ transform: 'scale(1.18)' }, { transform: 'scale(1)' }], { duration: 380, easing: 'ease-out' }); } break;
     }
   }
+  addFeed(row) {
+    this.feed.prepend(row); this.feedItems.push({ row, until: performance.now() + 7000 });
+    while (this.feedItems.length > 5) this.feedItems.shift().row.remove();
+  }
+  /** A kill-feed line built from spans (map features: camps, objectives). */
+  feedLine(parts, mine = false) { this.addFeed(h('div', { class: `k${mine ? ' me' : ''}` }, parts)); }
   showBanner(title, sub, kind, ms) {
     const now = performance.now();
     if (now < this.bannerUntil && this.bannerQueue.length < 3) { this.bannerQueue.push([title, sub, kind, ms]); return; }
@@ -139,6 +147,7 @@ export class Hud {
     setNum(this.blue, k0); setNum(this.red, k1);
     setNum(this.clock, Math.floor(t / TICK_HZ), fmtClock); toggle(this.clock, 'sd', !!w.state.suddenDeath);
     this.strip.update(w, me, s.renderer, now);
+    this.objectives.update(now);
     // banners + feed expiry
     if (this.bannerUntil && now > this.bannerUntil) { if (this.bannerQueue.length) { this.bannerUntil = 0; this.showBanner(...this.bannerQueue.shift()); } else { this.bannerUntil = 0; this.banner.classList.add('hidden'); } }
     while (this.feedItems.length && this.feedItems[0].until < now) this.feedItems.shift().row.remove();

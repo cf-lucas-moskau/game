@@ -1,5 +1,5 @@
 import { EV } from '../../core/events.js';
-import { KIND, TICK_HZ, sec, isMinion, isStructure, STRUCT, LANE, RULES } from '../constants.js';
+import { KIND, TICK_HZ, sec, isMinion, isStructure, STRUCT, LANE, RULES, TEAM } from '../constants.js';
 import { ORDER, isTargetable } from '../entity.js';
 import { dealDamage, DMG } from '../damage.js';
 import { canAct } from '../stats.js';
@@ -78,6 +78,9 @@ export function combatSystem(world) {
 // ---- unit AI --------------------------------------------------------------------
 const attackable = (u) => !isStructure(u.kind) || u.vulnerable;
 const notFortified = (u) => u.kind !== KIND.HEART && u.kind !== KIND.TOWER;
+/** Pebble leaves camp monsters alone unless one is already fighting it or Gus (PEB: the Pebble asking; no closure per call). */
+let PEB = null;
+const pebbleMay = (u) => notFortified(u) && (u.team !== TEAM.NEUTRAL || u.aggroId === PEB.id || u.aggroId === PEB.ownerId);
 const Q = [];
 function minionThink(world, e) {
   const t = world.tick;
@@ -90,7 +93,7 @@ function minionThink(world, e) {
     world.query(e.x, e.y, 520, e.team, 1, Q);
     for (let i = 0; i < Q.length; i++) {
       const u = Q[i];
-      if (isStructure(u.kind) && !u.vulnerable) continue;
+      if ((isStructure(u.kind) && !u.vulnerable) || u.team === TEAM.NEUTRAL) continue; // minions leave camps alone
       let score = sq(u.x - e.x) + sq(u.y - e.y);
       if (u.kind === KIND.HERO) score += (t - (u.lastHeroHitTick || -9999) < sec(2)) ? -200000 : 400000;
       if (isStructure(u.kind)) score += 150000;
@@ -123,7 +126,7 @@ function towerThink(world, e) {
   let best = null, bd = Infinity;
   world.query(e.x, e.y, e.range, e.team, 1, Q);
   for (let i = 0; i < Q.length; i++) {
-    const u = Q[i]; if (u.kind === KIND.HEART) continue;
+    const u = Q[i]; if (u.kind === KIND.HEART || u.team === TEAM.NEUTRAL) continue;
     let d = sq(u.x - e.x) + sq(u.y - e.y); if (u.kind === KIND.HERO || u.kind === KIND.PEBBLE) d += 1e7;
     if (d < bd || (d === bd && u.id < best.id)) { bd = d; best = u; }
   }
@@ -135,7 +138,7 @@ function pebbleThink(world, e) {
   if ((t + e.id) % 4) return;
   const tg = world.get(e.targetId);
   if (tg && isTargetable(tg, t) && inRange(e, tg, 150)) return;
-  const n = world.nearestEnemy(e.x, e.y, 420, e.team, notFortified);
+  PEB = e; const n = world.nearestEnemy(e.x, e.y, 420, e.team, pebbleMay);
   if (n) { e.targetId = n.id; e.order = ORDER.ATTACK; }
   else if (owner && !owner.dead) {
     e.targetId = -1;

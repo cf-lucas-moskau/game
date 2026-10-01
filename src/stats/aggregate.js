@@ -21,7 +21,7 @@ const r1 = (v) => Math.round(v * 10) / 10, r2 = (v) => Math.round(v * 100) / 100
 export const HERO_FIELDS = ['kills', 'deaths', 'assists', 'level', 'cs', 'goldEarned', 'goldSpent', 'dmgHeroes', 'dmgHeroesPhys', 'dmgHeroesMagic',
   'dmgHeroesTrue', 'dmgHeroesBasic', 'dmgHeroesAbility', 'dmgHeroesOther', 'dmgMinions', 'dmgStructures', 'taken', 'takenHeroes', 'takenMinions',
   'takenStructures', 'healSelf', 'healAllies', 'shieldSelf', 'shieldAllies', 'healed', 'ccStun', 'ccRoot', 'ccAirborne', 'displaces', 'slowSec',
-  'slowWeighted', 'ccTaken', 'slowTaken', 'secondsDead'];
+  'slowWeighted', 'ccTaken', 'slowTaken', 'secondsDead', 'camps', 'dmgNeutral', 'pearls', 'lootGold', 'shrines', 'shutdowns', 'bestStreak'];
 const PER_MIN = ['dmgHeroes', 'taken', 'dmgStructures', 'goldEarned', 'cs'];
 
 export function aggregate(run) {
@@ -44,6 +44,14 @@ export function aggregate(run) {
     firstTowerWinRate: r3(rate(matches.filter((m) => m.firstTowerTeam !== null), (m) => m.firstTowerTeam === m.winner)),
     suddenDeathRate: r3(rate(run.matches, (m) => m.suddenDeathMin !== null)),
     pairsSplit, pairsSweep,
+    // map features: per match, and how often the team that took more of them won
+    camps: r2(mean(matches.map((m) => (m.camps || [0, 0])[0] + (m.camps || [0, 0])[1]))),
+    campsWinRate: r3(rate(matches.filter((m) => m.camps && m.camps[0] !== m.camps[1]), (m) => (m.camps[0] > m.camps[1] ? 0 : 1) === m.winner)),
+    pearls: r2(mean(matches.map((m) => (m.pearls || [0, 0])[0] + (m.pearls || [0, 0])[1]))),
+    pearlsWinRate: r3(rate(matches.filter((m) => m.pearls && m.pearls[0] !== m.pearls[1]), (m) => (m.pearls[0] > m.pearls[1] ? 0 : 1) === m.winner)),
+    lootGold: r1(mean(matches.map((m) => (m.lootGold || [0, 0])[0] + (m.lootGold || [0, 0])[1]))),
+    shrines: r2(mean(matches.map((m) => (m.shrines || [0, 0])[0] + (m.shrines || [0, 0])[1]))),
+    shutdowns: r2(mean(matches.map((m) => (m.shutdowns || [0, 0])[0] + (m.shutdowns || [0, 0])[1]))),
     simMsPerMatch: r1(mean(run.matches.map((m) => m.simMs || 0))),
   };
   // ---- heroes

@@ -12,6 +12,7 @@ import { view, rx, ry } from './interp.js';
 import { Indicators } from './indicators.js';
 import { FX } from './fx.js';
 import { ZoneViews } from './zones.js';
+import { MapFeatureViews } from './map-features.js';
 import { GlowLights } from './glow-lights.js';
 import { CombatFX } from './combat-fx.js';
 import { AbilityFX } from './ability-fx.js';
@@ -41,7 +42,8 @@ export class GameRenderer {
     this.zones = new ZoneViews(this.env.root); this.fx = new FX(this.env.root, this.q);
     this.indicators = new Indicators(this.env.root); this.combat = new CombatFX(this.env.root); this.abilities = new AbilityFX(this.env.root);
     this.heroFx = new HeroFx(this); // presentation packs: events here, per-frame work in the engines' hooks
-    this.extra.push(this.heroFx, this.zones, this.abilities, this.fx, this.combat, this.indicators);
+    this.features = new MapFeatureViews(lib, world, this.env.root);
+    this.extra.push(this.heroFx, this.zones, this.features, this.abilities, this.fx, this.combat, this.indicators);
     this.units.fx = this.fx;
     this.glowLights = new GlowLights(this.env.root, this.q.glowLights || 0);
     this.aim = { active: false }; this.hoverId = -1; this.showRange = false;

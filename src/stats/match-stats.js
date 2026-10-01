@@ -15,7 +15,7 @@ const TYPE_KEY = { p: 'dmgHeroesPhys', m: 'dmgHeroesMagic', t: 'dmgHeroesTrue' }
 function heroRecord(h) {
   return {
     player: h.playerId, hero: h.heroKey, team: h.team, win: false,
-    kills: 0, deaths: 0, assists: 0, level: 1, cs: 0,
+    kills: 0, deaths: 0, assists: 0, level: 1, cs: 0, streakNow: 0, // streakNow: kills since the last death (working value)
     goldEarned: 0, goldSpent: 0, items: [], // net gold earned (gold now + spent - starting gold); items: [{ key, min, price }]
     // damage dealt, in final amounts after resistances (shield absorption included)
     dmgHeroes: 0, dmgHeroesPhys: 0, dmgHeroesMagic: 0, dmgHeroesTrue: 0,
@@ -28,6 +28,9 @@ function heroRecord(h) {
     ccStun: 0, ccRoot: 0, ccAirborne: 0, displaces: 0, slowSec: 0, slowWeighted: 0,
     ccTaken: 0, slowTaken: 0,
     casts: [0, 0, 0, 0], secondsDead: 0, firstItemMin: null,
+    // map features: camps slain (killing blow), damage to camp monsters, pearls captured with the team (present),
+    // loot gold picked up, shrine channels completed, shutdowns (streaks ended), longest kill streak
+    camps: 0, dmgNeutral: 0, pearls: 0, lootGold: 0, shrines: 0, shutdowns: 0, bestStreak: 0,
     goldAt: [], // gold earned at the end of each minute
   };
 }
@@ -38,7 +41,8 @@ export class MatchStats {
     this.heroes = world.heroes.map((h) => { const r = heroRecord(h); this.byId.set(h.id, r); return r; });
     this.deadSince = new Map();
     this.match = { firstBloodMin: null, firstBloodTeam: null, firstTowerMin: null, firstTowerTeam: null,
-      towers: [0, 0], kills: [0, 0], whaleRolls: 0, suddenDeathMin: null };
+      towers: [0, 0], kills: [0, 0], whaleRolls: 0, suddenDeathMin: null,
+      camps: [0, 0], pearls: [0, 0], lootGold: [0, 0], shrines: [0, 0], shutdowns: [0, 0] };
     this.world = world;
     this.onEvent = (e) => this.event(e); // stored callback: draining allocates nothing per event
   }
@@ -56,6 +60,7 @@ export class MatchStats {
               if (e.c === CAUSE.BASIC) src.dmgHeroesBasic += v; else if (e.c === CAUSE.ABILITY) src.dmgHeroesAbility += v; else src.dmgHeroesOther += v;
             }
           } else if (isMinion(tk)) src.dmgMinions += v;
+          else if (tk === KIND.CRAB) src.dmgNeutral += v;
           else if (isStructure(tk)) src.dmgStructures += v;
         }
         if (dst) {
@@ -106,6 +111,8 @@ export class MatchStats {
       case EV.KILL: {
         const victim = this.byId.get(e.a); if (!victim) break;
         const team = 1 - victim.team; this.match.kills[team]++;
+        victim.streakNow = 0; const k = this.byId.get(e.b);
+        if (k) { k.streakNow = (k.streakNow || 0) + 1; if (k.streakNow > k.bestStreak) k.bestStreak = k.streakNow; if (e.s === 'shutdown') { k.shutdowns++; this.match.shutdowns[k.team]++; } }
         if (this.match.firstBloodMin === null) { this.match.firstBloodMin = +min.toFixed(2); this.match.firstBloodTeam = team; }
         break;
       }
@@ -116,6 +123,14 @@ export class MatchStats {
         break;
       }
       case EV.WHALE_ROLL: this.match.whaleRolls++; break;
+      case EV.OBJECTIVE: {
+        const r = this.byId.get(e.a);
+        if (e.s === 'camp-slain' && e.b >= 0) { this.match.camps[e.b]++; if (r) r.camps++; }
+        else if (e.s === 'pearl-taken' && e.b >= 0) { this.match.pearls[e.b]++; for (const h of this.heroes) if (h.team === e.b && e.c & (1 << h.player)) h.pearls++; }
+        else if (e.s === 'shrine' && r) { this.match.shrines[r.team]++; r.shrines++; }
+        break;
+      }
+      case EV.PICKUP: { const r = this.byId.get(e.a); if (r && e.s === 'loot') { r.lootGold += e.v; this.match.lootGold[r.team] += e.v; } break; }
       default: break;
     }
   }

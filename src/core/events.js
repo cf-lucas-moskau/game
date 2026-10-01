@@ -6,6 +6,9 @@ export const EV = Object.freeze({
   GOLD: 8, WHALE_WARN: 9, WHALE_ROLL: 10, WHALE_END: 11, STRUCTURE_DOWN: 12, RESPAWN: 13,
   ITEM_BOUGHT: 14, SHIELD: 15, STUN: 16, BLINK: 17, REWIND: 18, MATCH_END: 19, RELIC: 20,
   KILL: 21, AUTO_ATTACK: 22, FX: 23, SLOW: 24, ASSIST: 25,
+  // map features: BUFF a = hero, s = buff key, v = seconds; OBJECTIVE s = what happened ('camp-up', 'camp-slain', ...),
+  // a = credited hero or -1, b = team or -1; PICKUP a = hero, s = kind, v = value
+  BUFF: 26, OBJECTIVE: 27, PICKUP: 28,
 });
 export class EventStream {
   constructor(capacity = 2048) {
