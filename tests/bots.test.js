@@ -2,11 +2,25 @@ import { describe, it, expect } from 'vitest';
 import { createMatch, stateHash } from '../src/sim/match.js';
 import { CONTENT } from '../src/sim/content.js';
 import { BotDirector } from '../src/ai/director.js';
-import { KIND, TICK_HZ } from '../src/sim/constants.js';
+import { KIND, TICK_HZ, LANE, MAP, STRUCT, RULES } from '../src/sim/constants.js';
 
 const roster = ['morrow', 'gus', 'vesper', 'saffi', 'brindle', 'auctioneer'].map((k, p) => ({ playerId: p, heroKey: k, team: p < 3 ? 0 : 1, isBot: true }));
 
 describe('bots', () => {
+  it('the outer towers leave open ground in the middle of the lane', () => {
+    const reach = STRUCT.TOWER.range + STRUCT.TOWER.radius;
+    expect(LANE.W - 2 * (MAP.TOWER_OUTER_X + reach)).toBeGreaterThanOrEqual(500); // 560 at lane 4800 (700 between the range circles)
+  });
+  it('between waves, bots wait near the middle instead of at their base', () => {
+    const w = createMatch({ seed: 5, roster, content: CONTENT });
+    const dir = new BotDirector(w, 'medium'); const cmds = [];
+    while (w.tick < (RULES.FIRST_WAVE - 0.5) * TICK_HZ) { dir.commands(w, cmds); w.step(cmds); } // no minion has spawned yet
+    for (const h of w.heroes) {
+      const fromOwnEnd = h.team === 0 ? h.moveX : LANE.W - h.moveX;
+      expect(fromOwnEnd).toBeGreaterThan(MAP.TOWER_OUTER_X); // heading past the own towers, towards the middle
+      expect(fromOwnEnd).toBeLessThan(LANE.W / 2);
+    }
+  });
   it('play a full match that ends by sudden death at the latest, and a command log replays it exactly', () => {
     const w = createMatch({ seed: 77, roster, content: CONTENT });
     const dir = new BotDirector(w, 'medium'); const log = []; const cmds = [];
