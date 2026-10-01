@@ -20,9 +20,9 @@ function tryMove(world, e, dx, dy) {
 
 export function movementSystem(world) {
   const t = world.tick, es = world.entities, whale = world.state.whale;
-  const rolling = whale.phase === 'roll';
-  for (let i = 0; i < es.length; i++) {
-    const e = es[i];
+  const rolling = whale.phase === 'roll', n = es.length;
+  for (let k = 0; k < n; k++) {
+    const e = es[t & 1 ? n - 1 - k : k]; // alternate the order every tick (team-neutral, see combatSystem)
     if (!e.alive || e.dead || isStructure(e.kind)) continue;
     if (e.dashUntil > t) {
       tryMove(world, e, e.dashVx, e.dashVy);

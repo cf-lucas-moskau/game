@@ -15,11 +15,15 @@ export const DIFFICULTY = {
 };
 
 export class Bot {
-  /** opts.build: item keys to buy in order instead of the hero's recommended build. */
+  /**
+   * opts.build: item keys to buy in order instead of the hero's recommended build.
+   * opts.slot: the hero's seat within its team. Bots think every few ticks; the phase comes from the seat so both
+   * teams think on the same ticks (a phase from the player id let one side react first).
+   */
   constructor(playerId, difficulty = 'medium', seed = 1, opts = {}) {
     this.p = playerId; this.build = opts.build || null; this.cfg = DIFFICULTY[difficulty] || DIFFICULTY.medium;
     this.rng = new Rng(seed * 7919 + playerId * 104729);
-    this.state = 'lane'; this.phase = playerId % this.cfg.think; this.lastBuyTick = 0; this.strafe = 0;
+    this.state = 'lane'; this.phase = ((opts.slot ?? playerId) * 3) % this.cfg.think; this.lastBuyTick = 0; this.strafe = 0;
   }
   aim(pt) { const e = this.cfg.aimError; return { x: pt.x + this.rng.range(-e, e), y: pt.y + this.rng.range(-e, e) }; }
   think(world) {

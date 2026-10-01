@@ -19,8 +19,10 @@ export const MAP = {
   FOUNTAIN_X: 170, FOUNTAIN_R: 260, SHOP_X: 330,
   HEART_X: 420, TOWER_INNER_X: 800, TOWER_OUTER_X: 1350,
   SPAWN_X: 640,
-  RELICS: [[1500, 300], [1500, 600], [2500, 300], [2500, 600]],
+  RELIC_X: 1500, RELIC_Y: [300, 600], // per side: measured from the own end, mirrored for red
 };
+/** Relic spots, mirrored for both sides (absolute x broke the symmetry when the lane grew). */
+MAP.RELICS = [TEAM.BLUE, TEAM.RED].flatMap((t) => MAP.RELIC_Y.map((y) => [sideX(t, MAP.RELIC_X), y]));
 
 export const RULES = {
   START_LEVEL: 3, MAX_LEVEL: 18, START_GOLD: 1400, PASSIVE_GOLD_PER_SEC: 10,
