@@ -36,6 +36,8 @@ export const RULES = {
   WHALE_FIRST: 120, WHALE_INTERVAL: 90, WHALE_WARN: 3, WHALE_DURATION: 4, WHALE_SLIDE: 120, WHALE_EDGE_DPS: 90,
   SUDDEN_DEATH: 600, SUDDEN_DEATH_DMG_BONUS: 0.5, SUDDEN_DEATH_HEART_DECAY: 0.012,
   KILL_GOLD: 300, ASSIST_GOLD: 150, KILL_XP: 280, ASSIST_WINDOW: 10,
+  // comeback bounties: a hero on a kill streak of SHUTDOWN_FROM or more is worth extra gold (shutdown) to whoever ends it
+  SHUTDOWN_FROM: 2, SHUTDOWN_BASE: 100, SHUTDOWN_PER: 75, SHUTDOWN_MAX: 500, STREAK_CALLS: [3, 5, 7],
   KILL_CREDIT_WINDOW: 15, // a tower, minion or the whale finishing a hero credits the last enemy hero who hit them within this
   XP_SHARE_RADIUS: 1200, TOWER_GOLD: 150,
   // basic-attack multipliers of minions against towers and hearts: waves that reach a tower threaten it

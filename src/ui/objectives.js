@@ -65,6 +65,12 @@ export class ObjectiveHud {
         hud.feedLine([h('span', { class: `t${e.b}` }, TEAM_NAME[e.b]), h('span', { class: 'x' }, 'claimed the'), h('span', { class: 'neutral' }, 'Sky Pearl')], ours);
         break;
       }
+      case 'streak': {
+        const who = w.entities[e.a]; if (!who) break;
+        const friend = e.b === me.team, name = who === me ? 'You are' : `${hud.heroName(who.id)} is`;
+        hud.showBanner(`${name} on a ${e.v}-kill streak`, friend ? `Worth ${e.c} extra gold to the enemy. Stay alive.` : `Worth ${e.c} extra gold. End it.`, friend ? 'good' : 'bad', 2600);
+        break;
+      }
       case 'loot-up': if (!this.lootAnnounced) { this.lootAnnounced = true; hud.showBanner('Treasure washed up', 'Grab it from the edge while the whale rolls, if you dare', 'warn', 2600); } break;
       case 'pearl-sank': hud.feedLine([h('span', { class: 'neutral' }, 'Sky Pearl'), h('span', { class: 'x' }, 'sank unclaimed')]); break;
       case 'camp-slain': {

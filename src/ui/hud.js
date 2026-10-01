@@ -115,9 +115,9 @@ export class Hud {
         const kn = killer && killer.kind === KIND.HERO ? this.heroName(killer.id) : null;
         const row = h('div', { class: `k${victim === me || killer === me ? ' me' : ''}` },
           kn ? h('span', { class: `t${killer.team}` }, kn) : h('span', { class: 'x' }, killer && killer.kind === KIND.TOWER ? 'Tower' : 'Executed'),
-          h('span', { class: 'x' }, '⟶'), h('span', { class: `t${victim.team}` }, this.heroName(victim.id)));
+          h('span', { class: 'x' }, '⟶'), h('span', { class: `t${victim.team}` }, this.heroName(victim.id)), e.s === 'shutdown' ? h('span', { class: 'neutral' }, 'shutdown') : null);
         this.addFeed(row);
-        if (killer === me) this.showBanner(`You slew ${this.heroName(victim.id)}`, `+${e.c} gold`, 'good', 1800);
+        if (killer === me) this.showBanner(e.s === 'shutdown' ? 'Shutdown!' : `You slew ${this.heroName(victim.id)}`, e.s === 'shutdown' ? `You ended ${this.heroName(victim.id)}'s streak · +${e.c} gold` : `+${e.c} gold`, 'good', e.s === 'shutdown' ? 2400 : 1800);
         break;
       }
       case EV.ASSIST: if (e.a === me.id) this.showBanner(`Assist on ${this.heroName(e.b)}`, `+${e.v} gold`, 'good', 1400); break;

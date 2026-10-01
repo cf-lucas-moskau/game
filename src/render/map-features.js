@@ -3,7 +3,7 @@
 // Reads world state and events, never writes them. Ground markings (nests, rings) are drawn by render/zones.js.
 import * as THREE from 'three';
 import { S, WHITE_RGB } from './palette.js';
-import { KIND } from '../sim/constants.js';
+import { KIND, RULES } from '../sim/constants.js';
 import { EV } from '../core/events.js';
 import { rx, ry } from './interp.js';
 import * as BGU from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -81,6 +81,10 @@ export class MapFeatureViews {
     const coin = lib.merged('prop-coin', 0.45);
     this.coins = new THREE.InstancedMesh(coin.geometry, new THREE.MeshStandardMaterial({ color: '#f2c14e', emissive: '#7a5410', roughness: 0.25, metalness: 0.7 }), 12);
     this.coins.instanceMatrix.setUsage(THREE.DynamicDrawUsage); this.coins.count = 0; this.coins.frustumCulled = false; this.coins.castShadow = true; parent.add(this.coins);
+    // bounty marker: a gold star turning over every hero worth a shutdown
+    const star = lib.merged('prop-star', 0.42);
+    this.stars = new THREE.InstancedMesh(star.geometry, new THREE.MeshStandardMaterial({ color: '#f2c14e', emissive: '#a8720f', emissiveIntensity: 0.9, roughness: 0.3, metalness: 0.5, flatShading: true }), 6);
+    this.stars.instanceMatrix.setUsage(THREE.DynamicDrawUsage); this.stars.count = 0; this.stars.frustumCulled = false; parent.add(this.stars);
     this.pearlY = -1.2; this.teamTint = [new THREE.Color('#45c4e6'), new THREE.Color('#f0476e')]; this.white = new THREE.Color('#ffffff');
     this.anim = new Map(); // crab id -> { attack: start time, flash, dying }
     this.corpses = [];     // crabs that just died: tip over and sink
@@ -130,6 +134,14 @@ export class MapFeatureViews {
       this.coins.setMatrixAt(n++, tmp.matrix);
     }
     this.coins.count = n; this.coins.visible = n > 0; if (n) this.coins.instanceMatrix.needsUpdate = true;
+    let ns = 0;
+    for (const h of world.heroes) {
+      if (h.dead || h.streak < RULES.SHUTDOWN_FROM || ns >= 6) continue;
+      const big = 0.8 + Math.min(1, (h.streak - RULES.SHUTDOWN_FROM) / 4) * 0.5; // grows with the bounty
+      tmp.position.set(rx(h) * S, 2.55 + (h.heroKey === 'gus' && h.heroState.mounted ? 0.75 : 0) + Math.sin(now * 2.5 + h.id) * 0.05, ry(h) * S);
+      tmp.rotation.set(0, now * 2, 0); tmp.scale.setScalar(big); tmp.updateMatrix(); this.stars.setMatrixAt(ns++, tmp.matrix);
+    }
+    this.stars.count = ns; this.stars.visible = ns > 0; if (ns) this.stars.instanceMatrix.needsUpdate = true;
   }
   /** The pearl rises while announced, floats while up (tinted toward the holding team), sinks when idle. */
   updatePearl(world, dt, now) {

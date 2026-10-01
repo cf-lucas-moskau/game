@@ -5,6 +5,7 @@ import { attackCmd, moveCmd } from '../src/sim/commands.js';
 import { KIND, TEAM, MAP, RULES, LANE, STRUCT, NEUTRAL, sec } from '../src/sim/constants.js';
 import { addBuff, hasBuff, BUFFS } from '../src/sim/buffs.js';
 import { EV } from '../src/core/events.js';
+import { kill, shutdownGold } from '../src/sim/damage.js';
 import { testContent, roster3v3 } from './helpers.js';
 
 const match = () => createMatch({ seed: 3, roster: roster3v3(), content: testContent });
@@ -131,5 +132,23 @@ describe('whale-roll loot', () => {
     expect(w.pickups.filter((p) => p.kind === 'loot')).toHaveLength(loot.length - 1);
     steps(w, sec(RULES.WHALE_DURATION + RULES.LOOT_LINGER), () => { place(h, 300, 450); return []; });
     expect(w.pickups.some((p) => p.kind === 'loot')).toBe(false);
+  });
+});
+
+describe('comeback bounties', () => {
+  it('a kill streak raises the bounty; ending it pays the shutdown and resets the streak', () => {
+    const w = match(), [a, , , x, y, z] = w.heroes; w.events.drain(() => {});
+    expect(shutdownGold(1)).toBe(0); expect(shutdownGold(RULES.SHUTDOWN_FROM)).toBe(RULES.SHUTDOWN_BASE);
+    expect(shutdownGold(99)).toBe(RULES.SHUTDOWN_MAX);
+    for (const v of [x, y, z]) { kill(w, v, a); v.dead = false; v.hp = v.maxHp; }
+    expect(a.streak).toBe(3);
+    expect(events(w, EV.OBJECTIVE).some((e) => e.s === 'streak' && e.a === a.id && e.v === 3)).toBe(true);
+    const g = x.gold, worth = RULES.KILL_GOLD + 20 * Math.max(0, a.level - x.level) + shutdownGold(3); // kill gold + level gap + shutdown
+    kill(w, a, x);
+    const k = events(w, EV.KILL).pop();
+    expect(k.s).toBe('shutdown'); expect(k.c).toBe(worth); expect(x.gold - g).toBe(worth);
+    expect(a.streak).toBe(0); expect(x.streak).toBe(1);
+    // an ordinary kill (no streak) is not a shutdown
+    a.dead = false; a.hp = a.maxHp; kill(w, y, a); expect(events(w, EV.KILL).pop().s).toBe('');
   });
 });
