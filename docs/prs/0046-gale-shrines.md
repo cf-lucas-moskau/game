@@ -33,3 +33,31 @@ Branch: `claude/goal-test-aotoyo` (commits for PR #46)
 Per match: 1.6 camps, 2.2 Pearls, 816 loot gold, 5.1 shrines, 4.7 shutdowns.
 
 Gate: see below.
+
+## GC check for the PR #42-#46 merge
+
+The first gate run failed gcPauseMaxMs on play (6.27 ms) and mobile (16.59 ms). An interleaved A/B against main
+(0d01621) showed play overlapping, but mobile GC totals higher on the branch in two of three pairs (242 vs 195 ms,
+449 vs 270 ms). A review of the new code found three per-frame or per-think allocations (fixed in this merge):
+
+- the buff chips built a key string every frame while a buff was active;
+- the Pearl bot intent built a point object on every think;
+- the camp bot intent created a closure on every think.
+
+After the fix, desktop and play pass (2.99 and 3.74 ms). Mobile, 4 interleaved pairs:
+
+| | main max (ms) | branch max (ms) | main GC total (ms) | branch GC total (ms) |
+| --- | --- | --- | --- | --- |
+| mobile-low | 30.09, 27.75, 26.13, 44.10 | 31.74, 28.32, 20.35, 41.38 | 348, 307, 313, 351 (mean 330) | 308, 367, 343, 302 (mean 330) |
+
+Equal GC work. The remaining maxima are the known contention outliers on both builds.
+
+## Gate results (gate key b455fc9531dfbf4b, commit 04db3ec)
+
+- tests: passed (103)
+- build: passed
+- e2e: passed
+- bench-desktop, bench-play, bench-mobile: passed
+- bench-eval: draw calls 40-41 (budget 50; was 33-35); desktop and play GC within budget; mobile gcPauseMaxMs 38.31 ms,
+  justified above
+- soak: passed (3.90 MB per 10 min, budget 5)
