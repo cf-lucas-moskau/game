@@ -66,3 +66,37 @@ between inner and outer towers is clearly open.
 
 - `npm test`: 93 passed (new: open middle at least 500 units; bots wait mid-lane between waves).
 - Gate: see below.
+
+## Online e2e join timeout (pre-existing)
+
+The first e2e run failed "the guest joins by code" after 30 s, though the guest joined later and every following check
+passed, lockstep hashes included. Join times measured interleaved, 3 runs each:
+
+| build | join times |
+| --- | --- |
+| main fa01777 | 30.0 s (timeout), 1.4 s, 1.3 s |
+| this branch | 1.4 s, 1.2 s, 2.2 s |
+
+This is an existing intermittent problem in online joining, not this PR. The rerun passed. It is listed as a follow-up
+in CLAUDE.md.
+
+## GC pause check
+
+Only `gcPauseMaxMs` failed (desktop 10.11, mobile 25.73 ms). Interleaved A/B against main fa01777 (pinned bench seeds):
+
+| scenario | main max (ms) | branch max (ms) | main GC total (ms) | branch GC total (ms) |
+| --- | --- | --- | --- | --- |
+| desktop-medium, 4 pairs | 2.1, 4.85, 8.2, 1.63 | 12.04, 2.57, 1.59, 3.72 | 26-39 | 26-40 |
+| mobile-low, 3 pairs | 55.31, 18.15, 23.48 | 14.76, 17.84, 21.3 | 248-371 | 287-333 |
+
+The distributions overlap, the largest outlier is on main, and the totals are equal within noise. These are the
+contention outliers recorded since PR #13.
+
+## Gate results (gate key 224b1be39d0cd081, commit 07124ab)
+
+- tests: passed (93)
+- build: passed
+- e2e: passed (rerun; see the join timeout above)
+- bench-desktop, bench-play, bench-mobile: passed
+- bench-eval: sim tick p95 0.1-0.6 ms, draw calls 33-34, corrections 0-0.33 per 10 s; only gcPauseMaxMs failed, justified above
+- soak: passed (2.92 MB per 10 min, budget 5)
