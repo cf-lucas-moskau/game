@@ -10,7 +10,6 @@ export class ObjectiveHud {
   constructor(hud) {
     this.hud = hud; this.s = hud.s;
     this.buffs = h('div', { class: 'buffs', 'aria-label': 'Active buffs' });
-    this.sig = '';
     this.chips = [];
     this.campsAnnounced = false; this.lootAnnounced = false;
     // Sky Pearl bar (a row of the top bar): countdown while announced, capture progress in the holder's colour
@@ -35,9 +34,10 @@ export class ObjectiveHud {
   /** Buff chips: rebuilt when the set of buffs changes, seconds updated in place. */
   update() {
     const me = this.s.me, t = this.s.world.tick, list = me.buffs || [];
-    let sig = ''; for (let i = 0; i < list.length; i++) sig += list[i].key + ',';
-    if (sig !== this.sig) {
-      this.sig = sig; this.chips.length = 0; this.buffs.replaceChildren();
+    // rebuild only when the set of buffs changed (compared in place: no string per frame)
+    let same = list.length === this.chips.length; for (let i = 0; same && i < list.length; i++) same = this.chips[i].b === list[i];
+    if (!same) {
+      this.chips.length = 0; this.buffs.replaceChildren();
       for (const b of list) {
         const spec = BUFFS[b.key], n = h('span', { class: 'n' });
         const chip = h('div', { class: `buff${spec.good ? ' good' : ''}`, title: spec.desc, 'data-buff': b.key }, h('b', {}, spec.name), n);

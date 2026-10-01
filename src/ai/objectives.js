@@ -17,7 +17,7 @@ function campIntent(world, me, snap, out) {
     // enemies near the camp make it a fight, not a camp
     let contested = false; for (const e of snap.enemies) if (d(e, crab) < 900) { contested = true; break; }
     if (contested) continue;
-    const started = crab.aggroId >= 0 && snap.allies.some((a) => a.id === crab.aggroId);
+    let started = false; if (crab.aggroId >= 0) for (const a of snap.allies) if (a.id === crab.aggroId) { started = true; break; }
     if (!started) { let closest = true; for (const a of snap.allies) if (d(a, crab) < dist - 50) { closest = false; break; } if (!closest) continue; }
     // a crab that would win the trade is left for later (a weak hero against a grown crab)
     if (crab.hp > me.hp * 2.2 && !started) continue;
@@ -31,10 +31,10 @@ function pearlIntent(world, me, snap, out) {
   const p = world.state.pearl; if (!p) return null;
   const soon = p.phase === 'up' || (p.phase === 'warn' && p.until - world.tick < sec(8));
   if (!soon || hpr(me) < 0.4) return null;
-  const pt = { x: p.x, y: p.y }, dist = d(me, pt); if (dist > 2800) return null;
+  const dist = d(me, p); if (dist > 2800) return null; // the pearl state has x, y
   let theirs = 0, ours = dist < RULES.PEARL_RADIUS + 400 ? 1 : 0;
-  for (const e of snap.enemies) if (d(e, pt) < RULES.PEARL_RADIUS + 400) theirs++;
-  for (const a of snap.allies) if (d(a, pt) < RULES.PEARL_RADIUS + 400) ours++;
+  for (const e of snap.enemies) if (d(e, p) < RULES.PEARL_RADIUS + 400) theirs++;
+  for (const a of snap.allies) if (d(a, p) < RULES.PEARL_RADIUS + 400) ours++;
   if (theirs > ours + 1) return null;
   // spread out inside the circle by seat so the team does not stack on one spot
   const seat = me.playerId % 3, ang = seat * 2.1 + (me.team ? Math.PI : 0), rr = RULES.PEARL_RADIUS * 0.45;
