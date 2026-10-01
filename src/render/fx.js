@@ -76,6 +76,7 @@ export class FX {
       case EV.STRUCTURE_DOWN: this.burst(x, z, 2, 70, 6, COL.stone, 1.4, 0.45, 0.1, { up: 3, gravity: 9, drag: 1, intensity: 0.9 }); this.burst(x, z, 1, 40, 3, COL.smoke, 2.2, 0.8, 1.6, { up: 1, drag: 1.2, intensity: 0.5 }); r.shake(0.9); break;
       case EV.WHALE_ROLL: r.shake(0.6); break;
       case EV.RELIC: if (e.a > 0 || e.v === 0) this.burst(x, z, 0.4, 20, 1.2, COL.heal, 0.9, 0.2, 0.04, { up: 2 }); break;
+      case EV.PICKUP: this.burst(x, z, 0.4, 18, 1.4, COL.gold, 0.8, 0.16, 0.03, { up: 2.5 }); break;
       case EV.FX: this.named(e, world, x, z, ent, r); break;
     }
   }

@@ -141,7 +141,7 @@ export class ZoneViews {
     this.nv = 0; this.nd = 0; this.nDome = 0;
     if (this.hook) this.hook(world, now);
     for (let i = this.nDome; i < this.domes.length; i++) this.domes[i].visible = false;
-    for (const p of world.pickups) this.disc(p.x, p.y, 70, DISC.RELIC, 0, 1, 0, p.id % 5);
+    for (const p of world.pickups) this.disc(p.x, p.y, p.kind === 'loot' ? 75 : 70, p.kind === 'loot' ? DISC.LOOT : DISC.RELIC, 0, p.until ? Math.min(1, (p.until - world.tick) / 30) : 1, 0, p.id % 5);
     // Sky Pearl circle: faint while announced; while up it fills with the holding team's colour
     const pearl = world.state.pearl;
     if (pearl && pearl.phase !== 'idle') this.disc(pearl.x, pearl.y, RULES.PEARL_RADIUS, DISC.PEARL, pearl.phase === 'up' ? pearl.prog : 0, pearl.phase === 'up' ? 1 : 0.45, pearl.holder < 0 ? 2 : pearl.holder, 0);

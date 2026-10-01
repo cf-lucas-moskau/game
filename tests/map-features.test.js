@@ -113,3 +113,23 @@ describe('Sky Pearl', () => {
     expect(w.state.pearl.phase).toBe('idle');
   });
 });
+
+describe('whale-roll loot', () => {
+  it('washes up in mirrored pairs on the edge the whale rolls toward, pays the hero who grabs it, and drifts away', () => {
+    const w = match(); w.events.drain(() => {});
+    steps(w, sec(RULES.WHALE_FIRST + RULES.WHALE_WARN) + 1);
+    const wh = w.state.whale; expect(wh.phase).toBe('roll');
+    const loot = w.pickups.filter((p) => p.kind === 'loot');
+    expect(loot).toHaveLength(RULES.LOOT_X.length * 2);
+    const xs = loot.map((p) => p.x).sort((a, b) => a - b);
+    for (let i = 0; i < xs.length; i++) expect(xs[i] + xs[xs.length - 1 - i]).toBe(LANE.W);
+    for (const p of loot) expect(wh.dir > 0 ? p.y > LANE.EDGE_MAX : p.y < LANE.EDGE_MIN).toBe(true);
+    const h = w.heroes[0], g = h.gold; place(h, loot[0].x, loot[0].y); w.events.drain(() => {});
+    steps(w, 1);
+    expect(h.gold - g).toBeGreaterThanOrEqual(RULES.LOOT_GOLD);
+    expect(events(w, EV.PICKUP).some((e) => e.a === h.id && e.s === 'loot')).toBe(true);
+    expect(w.pickups.filter((p) => p.kind === 'loot')).toHaveLength(loot.length - 1);
+    steps(w, sec(RULES.WHALE_DURATION + RULES.LOOT_LINGER), () => { place(h, 300, 450); return []; });
+    expect(w.pickups.some((p) => p.kind === 'loot')).toBe(false);
+  });
+});

@@ -119,6 +119,7 @@ export class Bot {
       case 'objective': {
         const it = this.intent;
         if (it.kind === 'camp') { const crab = world.get(it.id); if (alive(crab)) return attackCmd(this.p, crab.id); }
+        else if (it.kind === 'loot') return moveCmd(this.p, it.x, it.y);
         else if (it.kind === 'pearl') { if (Math.abs(me.x - it.x) + Math.abs(me.y - it.y) < 40) return null; return moveCmd(this.p, it.x, it.y); }
         break;
       }

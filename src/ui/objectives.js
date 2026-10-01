@@ -12,7 +12,7 @@ export class ObjectiveHud {
     this.buffs = h('div', { class: 'buffs', 'aria-label': 'Active buffs' });
     this.sig = '';
     this.chips = [];
-    this.campsAnnounced = false;
+    this.campsAnnounced = false; this.lootAnnounced = false;
     // Sky Pearl bar (a row of the top bar): countdown while announced, capture progress in the holder's colour
     this.pFill = h('i'); this.pText = h('span', { class: 'st' });
     this.bar = h('div', { class: 'objective hidden', 'aria-label': 'Sky Pearl' }, h('span', { class: 'lbl' }, 'Sky Pearl'), h('div', { class: 'track' }, this.pFill), this.pText);
@@ -65,6 +65,7 @@ export class ObjectiveHud {
         hud.feedLine([h('span', { class: `t${e.b}` }, TEAM_NAME[e.b]), h('span', { class: 'x' }, 'claimed the'), h('span', { class: 'neutral' }, 'Sky Pearl')], ours);
         break;
       }
+      case 'loot-up': if (!this.lootAnnounced) { this.lootAnnounced = true; hud.showBanner('Treasure washed up', 'Grab it from the edge while the whale rolls, if you dare', 'warn', 2600); } break;
       case 'pearl-sank': hud.feedLine([h('span', { class: 'neutral' }, 'Sky Pearl'), h('span', { class: 'x' }, 'sank unclaimed')]); break;
       case 'camp-slain': {
         if (e.b < 0) break;

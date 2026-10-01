@@ -71,8 +71,11 @@ export class LaneStrip {
       }
       ctx.fillStyle = DIM[team]; ctx.fill();
     }
-    // relics
-    if (world.pickups.length) { ctx.beginPath(); for (const p of world.pickups) { const x = this.sx(p.x), y = this.sy(p.y); ctx.moveTo(x + mr * 1.4, y); ctx.arc(x, y, mr * 1.4, 0, Math.PI * 2); } ctx.fillStyle = '#7ee07a'; ctx.fill(); }
+    // relics (green) and whale-roll loot (gold)
+    for (let pass = 0; pass < 2 && world.pickups.length; pass++) {
+      ctx.beginPath(); for (const p of world.pickups) { if ((p.kind === 'loot') !== (pass === 1)) continue; const x = this.sx(p.x), y = this.sy(p.y); ctx.moveTo(x + mr * 1.4, y); ctx.arc(x, y, mr * 1.4, 0, Math.PI * 2); }
+      ctx.fillStyle = pass ? '#f2c14e' : '#7ee07a'; ctx.fill();
+    }
     // Sky Pearl: a pale disc at the centre while up (ring in the holder's colour), a blinking outline while announced
     const pearl = world.state.pearl;
     if (pearl && pearl.phase !== 'idle' && (pearl.phase === 'up' || ((now / 300) | 0) % 2 === 0)) {

@@ -41,8 +41,16 @@ function pearlIntent(world, me, snap, out) {
   return set(out, 'pearl', -1, p.x + Math.cos(ang) * rr, p.y + Math.sin(ang) * rr);
 }
 
+/** Whale-roll loot close by, when healthy enough to brave the edge. */
+function lootIntent(world, me, snap, out) {
+  if (hpr(me) < 0.5) return null;
+  let best = null, bd = 520;
+  for (const p of world.pickups) { if (p.kind !== 'loot') continue; const dd = d(me, p); if (dd < bd) { bd = dd; best = p; } }
+  return best ? set(out, 'loot', -1, best.x, best.y) : null;
+}
+
 /** What map objective this bot should work on, if any (called only when no fight or retreat is going on). */
 export function objectiveIntent(world, me, snap, out) {
   for (const e of snap.enemies) if (d(e, me) < 700) return null; // stay with the fight first
-  return pearlIntent(world, me, snap, out) || campIntent(world, me, snap, out);
+  return pearlIntent(world, me, snap, out) || lootIntent(world, me, snap, out) || campIntent(world, me, snap, out);
 }

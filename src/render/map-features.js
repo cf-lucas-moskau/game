@@ -77,6 +77,10 @@ export class MapFeatureViews {
       vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }`,
       fragmentShader: `uniform float uTime, uAlpha; varying vec2 vUv; void main(){ float a = (1. - vUv.y) * (0.6 + 0.4 * sin(vUv.y * 20. - uTime * 6.)) * uAlpha; gl_FragColor = vec4(vec3(.8, .92, 1.) * a, a); }` });
     this.beam = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.7, 9, 20, 1, true).translate(0, 4.5, 0), this.beamMat); this.beam.visible = false; this.beam.renderOrder = 9; parent.add(this.beam);
+    // whale-roll loot: spinning gold coins over their glow (one instanced draw)
+    const coin = lib.merged('prop-coin', 0.45);
+    this.coins = new THREE.InstancedMesh(coin.geometry, new THREE.MeshStandardMaterial({ color: '#f2c14e', emissive: '#7a5410', roughness: 0.25, metalness: 0.7 }), 12);
+    this.coins.instanceMatrix.setUsage(THREE.DynamicDrawUsage); this.coins.count = 0; this.coins.frustumCulled = false; this.coins.castShadow = true; parent.add(this.coins);
     this.pearlY = -1.2; this.teamTint = [new THREE.Color('#45c4e6'), new THREE.Color('#f0476e')]; this.white = new THREE.Color('#ffffff');
     this.anim = new Map(); // crab id -> { attack: start time, flash, dying }
     this.corpses = [];     // crabs that just died: tip over and sink
@@ -119,6 +123,13 @@ export class MapFeatureViews {
     this.corpses.length = w;
     this.finish(this.bodies, this.nb); this.finish(this.claws, this.nc);
     this.updatePearl(world, dt, now);
+    let n = 0;
+    for (const p of world.pickups) {
+      if (p.kind !== 'loot' || n >= 12) continue;
+      tmp.position.set(p.x * S, 0.45 + Math.sin(now * 3 + p.id) * 0.1, p.y * S); tmp.rotation.set(0, now * 3 + p.id, 0.25); tmp.scale.setScalar(1); tmp.updateMatrix();
+      this.coins.setMatrixAt(n++, tmp.matrix);
+    }
+    this.coins.count = n; this.coins.visible = n > 0; if (n) this.coins.instanceMatrix.needsUpdate = true;
   }
   /** The pearl rises while announced, floats while up (tinted toward the holding team), sinks when idle. */
   updatePearl(world, dt, now) {

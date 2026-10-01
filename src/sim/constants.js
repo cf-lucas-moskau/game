@@ -48,6 +48,8 @@ export const RULES = {
   // seconds it is captured: Pearl's Blessing for the team, gold for the holders, a Pearl Golem in the next waves
   PEARL_FIRST: 180, PEARL_INTERVAL: 180, PEARL_WARN: 15, PEARL_RADIUS: 200, PEARL_CAPTURE: 5, PEARL_LIFETIME: 75,
   PEARL_GOLD: 100, PEARL_WAVES: 2, PEARL_GOLEM_HP: 2.2, PEARL_GOLEM_AD: 1.8,
+  // whale-roll loot: treasure washes up in the endangered edge band when the whale rolls (mirrored x pairs)
+  LOOT_X: [250, 750, 1250], LOOT_GOLD: 45, LOOT_XP: 50, LOOT_LINGER: 3, LOOT_RADIUS: 60,
 };
 /** xp needed to go from level L to L+1: cheap up to level 6 (the ultimate arrives in about a minute and a half), then
  *  the old curve (3 -> 6 costs 780 xp instead of 1440) */

@@ -15,6 +15,7 @@ import { sq } from '../core/dmath.js';
 import { expireBuffs } from './buffs.js';
 import { setupCamps, campSystem } from './camps.js';
 import { setupPearl, pearlSystem } from './pearl.js';
+import { pickupSystem, spawnRollLoot } from './pickups.js';
 
 /**
  * Build a ready-to-run match.
@@ -149,6 +150,7 @@ function clockSystem(w) {
     w.events.push(EV.WHALE_WARN, t, 0, 0, 0, 0, wh.dir);
   } else if (wh.phase === 'warn' && t >= wh.until) {
     wh.phase = 'roll'; wh.until = t + sec(RULES.WHALE_DURATION); w.events.push(EV.WHALE_ROLL, t, 0, 0, 0, 0, wh.dir);
+    spawnRollLoot(w, wh.dir); // treasure washes up on the edge it rolls toward
   } else if (wh.phase === 'roll') {
     if (t % 6 === 0) for (const e of w.entities) {
       if (!e.alive || e.dead || e.kind === KIND.TOWER || e.kind === KIND.HEART) continue;
@@ -156,23 +158,7 @@ function clockSystem(w) {
     }
     if (t >= wh.until) { wh.phase = 'idle'; wh.next = t + sec(RULES.WHALE_INTERVAL); w.events.push(EV.WHALE_END, t); }
   }
-  // health relics
-  if (t >= st.nextRelic) {
-    for (const [x, y] of MAP.RELICS) if (!w.pickups.some((p) => p.x === x && p.y === y)) w.pickups.push({ id: t * 10 + w.pickups.length, x, y, born: t });
-    st.nextRelic = t + sec(RULES.RELIC_INTERVAL);
-    w.events.push(EV.RELIC, t, 0, 0, 0, 0, 1);
-  }
-  for (let i = w.pickups.length - 1; i >= 0; i--) {
-    const p = w.pickups[i], nh = w.heroes.length;
-    for (let k = 0; k < nh; k++) {
-      const h = w.heroes[t & 1 ? nh - 1 - k : k]; // alternate who reaches a contested relic first
-      if (h.dead) continue;
-      if (sq(h.x - p.x) + sq(h.y - p.y) <= sq(RULES.RELIC_RADIUS + h.radius)) {
-        heal(w, h, h, h.maxHp * RULES.RELIC_HEAL); h.mana = Math.min(h.maxMana, h.mana + h.maxMana * 0.15);
-        w.events.push(EV.RELIC, t, h.id, 0, p.x, p.y, 0); w.pickups.splice(i, 1); break;
-      }
-    }
-  }
+  pickupSystem(w); // health relics and whale-roll loot
   if (!st.suddenDeath && t >= sec(RULES.SUDDEN_DEATH)) { st.suddenDeath = true; w.events.push(EV.FX, t, 0, 0, 0, 0, 0, 'sudden-death'); }
   // sudden death: both Heartstones crack and lose health every second, so every match ends
   if (st.suddenDeath && t % TICK_HZ === 0) suddenDeathDecay(w, t);
