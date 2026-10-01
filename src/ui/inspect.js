@@ -52,7 +52,7 @@ export class InspectPanel {
       const note = (e.kind === KIND.TOWER || e.kind === KIND.HEART) && !e.vulnerable ? 'Protected: destroy the tower in front of it first.' : e.kind === KIND.TOWER ? 'Shoots enemy heroes that attack its allies, otherwise the nearest minion.'
         : e.kind === KIND.CRAB ? `Neutral. Fights whoever hits it and returns to its nest if pulled away. The killing blow earns ${RULES.CAMP_GOLD} gold and Barnacle Fury (+10% damage for 60 s).` : '';
       clear(this.body).append(
-        h('div', { class: 'ins-head' }, h('div', {}, h('div', { class: `ins-name ${tcls}` }, KIND_NAME[e.kind] || 'Unit'), h('div', { class: 'ins-sub' }, e.team === TEAM.NEUTRAL ? 'Neutral camp' : mine ? 'Allied' : 'Enemy'))),
+        h('div', { class: 'ins-head' }, h('div', {}, h('div', { class: `ins-name ${tcls}` }, e.empowered ? 'Pearl Golem' : KIND_NAME[e.kind] || 'Unit'), h('div', { class: 'ins-sub' }, e.team === TEAM.NEUTRAL ? 'Neutral camp' : mine ? 'Allied' : 'Enemy'))),
         hp, h('div', { class: 'ins-stats' }, rows.map(([k, v]) => [h('span', {}, k), h('b', {}, String(v))])), note ? h('div', { class: 'ins-note' }, note) : null);
     }
   }

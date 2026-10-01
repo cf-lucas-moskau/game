@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { createMatch } from '../src/sim/match.js';
 import { attackCmd, moveCmd } from '../src/sim/commands.js';
-import { KIND, TEAM, MAP, RULES, LANE, sec } from '../src/sim/constants.js';
+import { KIND, TEAM, MAP, RULES, LANE, STRUCT, NEUTRAL, sec } from '../src/sim/constants.js';
 import { addBuff, hasBuff, BUFFS } from '../src/sim/buffs.js';
 import { EV } from '../src/core/events.js';
 import { testContent, roster3v3 } from './helpers.js';
@@ -14,12 +14,20 @@ const place = (e, x, y) => { e.x = e.px = x; e.y = e.py = y; };
 const events = (w, type) => { const out = []; w.events.drain((e) => { if (e.type === type) out.push({ ...e }); }); return out; };
 
 describe('neutral camps', () => {
-  it('crabs surface on the centre line, neutral to both teams, at CAMP_FIRST', () => {
+  it('crabs surface symmetric through the centre, neutral to both teams, at CAMP_FIRST', () => {
     const w = match();
     steps(w, sec(RULES.CAMP_FIRST) - 2); expect(crabs(w)).toHaveLength(0);
     steps(w, 3);
     const cs = crabs(w); expect(cs).toHaveLength(MAP.CAMPS.length);
-    for (const c of cs) { expect(c.team).toBe(TEAM.NEUTRAL); expect(c.x).toBe(LANE.W / 2); }
+    for (const c of cs) expect(c.team).toBe(TEAM.NEUTRAL);
+    // the two nests are symmetric through the centre of the lane: each team is equally far from one of them
+    const [a, b] = MAP.CAMPS; expect(a[0] + b[0]).toBe(LANE.W); expect(a[1] + b[1]).toBe(LANE.H);
+    // and outside every tower's reach, and outside the Sky Pearl's circle
+    const reach = STRUCT.TOWER.range + STRUCT.TOWER.radius + NEUTRAL[KIND.CRAB].radius;
+    for (const [x, y] of MAP.CAMPS) {
+      expect(Math.min(x, LANE.W - x) - MAP.TOWER_OUTER_X).toBeGreaterThan(reach);
+      expect(Math.hypot(x - MAP.PEARL[0], y - MAP.PEARL[1])).toBeGreaterThan(RULES.PEARL_RADIUS + 100);
+    }
   });
   it('minions walk past a crab; a crab chases whoever hits it and walks home past its leash', () => {
     const w = match(); steps(w, sec(RULES.CAMP_FIRST) + 1);
@@ -66,5 +74,42 @@ describe('buffs', () => {
     steps(w, sec(BUFFS.tailwind.duration) + 1);
     expect(hasBuff(h, 'tailwind')).toBe(false); expect(h.speed).toBeCloseTo(ms0, 4); expect(h.dmgTaken).toBe(0);
     addBuff(w, h, 'barnacle-fury'); h.dead = true; steps(w, 1); expect(h.buffs).toHaveLength(0);
+  });
+});
+
+describe('Sky Pearl', () => {
+  const toUp = (w) => { steps(w, sec(RULES.PEARL_FIRST) + 1); expect(w.state.pearl.phase).toBe('up'); };
+  const parkAll = (w) => w.heroes.forEach((h, i) => place(h, h.team === 0 ? 300 : LANE.W - 300, 300 + (i % 3) * 120));
+  it('is announced, surfaces at the centre, and a team holding it alone claims it', () => {
+    const w = match(); steps(w, sec(RULES.PEARL_FIRST - RULES.PEARL_WARN) + 1); expect(w.state.pearl.phase).toBe('warn');
+    steps(w, sec(RULES.PEARL_WARN)); expect(w.state.pearl.phase).toBe('up'); parkAll(w);
+    const [px, py] = MAP.PEARL, h0 = w.heroes[0], h1 = w.heroes[1];
+    w.events.drain(() => {});
+    const g0 = h0.gold, g1 = h1.gold;
+    const hold = () => { place(h0, px, py); place(h1, px + 60, py); return []; };
+    steps(w, sec(RULES.PEARL_CAPTURE) - 5, hold); expect(w.state.pearl.phase).toBe('up');
+    steps(w, 10, hold);
+    const taken = events(w, EV.OBJECTIVE).find((e) => e.s === 'pearl-taken');
+    expect(taken.b).toBe(0); expect(taken.c).toBe((1 << h0.playerId) | (1 << h1.playerId));
+    expect(h0.gold - g0).toBeGreaterThanOrEqual(RULES.PEARL_GOLD); expect(h1.gold - g1).toBeGreaterThanOrEqual(RULES.PEARL_GOLD);
+    for (const h of w.heroes) expect(hasBuff(h, 'pearl-blessing')).toBe(h.team === 0);
+    expect(w.state.pearlWaves[0]).toBe(RULES.PEARL_WAVES);
+    // the next blue wave brings a Pearl Golem
+    const next = w.state.nextWave; steps(w, next - w.tick + 1);
+    const golems = w.entities.filter((e) => e.alive && e.empowered);
+    expect(golems).toHaveLength(1); expect(golems[0].team).toBe(0); expect(golems[0].kind).toBe(KIND.SIEGE);
+    expect(w.state.pearlWaves[0]).toBe(RULES.PEARL_WAVES - 1);
+  });
+  it('freezes while contested and sinks when nobody claims it', () => {
+    const w = match(); toUp(w); parkAll(w);
+    const [px, py] = MAP.PEARL, b = w.heroes[0], r = w.heroes[3];
+    steps(w, sec(2), () => { place(b, px, py); return []; });
+    const prog = w.state.pearl.prog; expect(prog).toBeGreaterThan(0.3);
+    steps(w, sec(3), () => { place(b, px, py); place(r, px + 50, py); return []; });
+    expect(w.state.pearl.prog).toBeCloseTo(prog, 5); expect(w.state.pearl.phase).toBe('up');
+    w.events.drain(() => {});
+    steps(w, sec(RULES.PEARL_LIFETIME), () => { parkAll(w); return []; });
+    expect(events(w, EV.OBJECTIVE).some((e) => e.s === 'pearl-sank')).toBe(true);
+    expect(w.state.pearl.phase).toBe('idle');
   });
 });

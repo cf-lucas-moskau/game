@@ -32,6 +32,10 @@ export const SOUNDS = {
   // map features
   campUp: (e, b, t, p, g) => [0, 0.09, 0.2].forEach((dt, i) => tone(e, b, { type: 'sine', f0: 300 + i * 140, f1: 520 + i * 160, t: t + dt, dur: 0.12, gain: 0.05 * g, pan: p })), // bubbles
   campSlain: (e, b, t, p, g) => { noise(e, b, { type: 'bandpass', f0: 2600, f1: 900, t, dur: 0.18, gain: 0.22 * g, q: 2, pan: p }); tone(e, b, { type: 'triangle', f0: 160, f1: 60, t, dur: 0.35, gain: 0.2 * g, pan: p }); [0, 4, 7].forEach((d, i) => tone(e, b, { f0: mtof(degree(d, 69)), t: t + 0.12 + i * 0.06, dur: 0.25, gain: 0.05 * g, pan: p })); },
+  pearlWarn: (e, b, t) => [0, 4, 7, 11, 14].forEach((d, i) => tone(e, b, { type: 'sine', f0: mtof(degree(d, 64)), t: t + i * 0.16, dur: 1.4, gain: 0.05, attack: 0.25, vibrato: 0.01 })),
+  pearlUp: (e, b, t, p, g) => { [0, 7].forEach((d) => tone(e, b, { type: 'triangle', f0: mtof(degree(d, 76)), t, dur: 2.2, gain: 0.08 * g, attack: 0.005, pan: p })); tone(e, b, { type: 'sine', f0: mtof(degree(14, 76)), t: t + 0.02, dur: 1.6, gain: 0.04 * g, pan: p }); },
+  pearlOurs: (e, b, t) => [[0, 4, 7], [2, 5, 9], [4, 7, 11]].forEach((c, i) => c.forEach((d) => tone(e, b, { type: 'triangle', f0: mtof(degree(d, 67)), t: t + i * 0.16, dur: i === 2 ? 1.2 : 0.3, gain: 0.07, attack: 0.01 }))),
+  pearlTheirs: (e, b, t) => [[4, 7], [3, 6], [1, 5]].forEach((c, i) => c.forEach((d) => tone(e, b, { type: 'sine', f0: mtof(degree(d, 55)), t: t + i * 0.22, dur: i === 2 ? 1.4 : 0.4, gain: 0.07, attack: 0.03, filter: 1600 }))),
   buff: (e, b, t) => [0, 7, 12].forEach((d, i) => tone(e, b, { type: 'triangle', f0: mtof(degree(d, 72)), t: t + i * 0.04, dur: 0.4, gain: 0.06, attack: 0.02 })),
   ui: (e, b, t) => tone(e, b, { type: 'triangle', f0: 1100, f1: 900, t, dur: 0.05, gain: 0.05 }),
   victory: (e, b, t) => [[0, 2, 4], [3, 5, 7], [4, 6, 8], [7, 9, 11]].forEach((c, i) => c.forEach((d) => tone(e, b, { type: 'triangle', f0: mtof(degree(d, 62)), t: t + i * 0.28, dur: i === 3 ? 1.8 : 0.5, gain: 0.08, attack: 0.02 }))),

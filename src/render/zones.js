@@ -3,7 +3,7 @@
 // by the presentation packs through render/hero-fx.js (hook in update); relics and telegraphs are drawn here.
 import * as THREE from 'three';
 import { S } from './palette.js';
-import { TICK_HZ } from '../sim/constants.js';
+import { TICK_HZ, RULES } from '../sim/constants.js';
 
 const RIBBON_CAP = 6000; // vertices
 import { DISC } from '../presentation/kit.js';
@@ -142,6 +142,9 @@ export class ZoneViews {
     if (this.hook) this.hook(world, now);
     for (let i = this.nDome; i < this.domes.length; i++) this.domes[i].visible = false;
     for (const p of world.pickups) this.disc(p.x, p.y, 70, DISC.RELIC, 0, 1, 0, p.id % 5);
+    // Sky Pearl circle: faint while announced; while up it fills with the holding team's colour
+    const pearl = world.state.pearl;
+    if (pearl && pearl.phase !== 'idle') this.disc(pearl.x, pearl.y, RULES.PEARL_RADIUS, DISC.PEARL, pearl.phase === 'up' ? pearl.prog : 0, pearl.phase === 'up' ? 1 : 0.45, pearl.holder < 0 ? 2 : pearl.holder, 0);
     // camp nests; a downed camp shows its return as a filling arc during the last 15 seconds
     const camps = world.state.camps;
     if (camps) for (let i = 0; i < camps.length; i++) {

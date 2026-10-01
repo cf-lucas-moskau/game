@@ -73,6 +73,14 @@ export class LaneStrip {
     }
     // relics
     if (world.pickups.length) { ctx.beginPath(); for (const p of world.pickups) { const x = this.sx(p.x), y = this.sy(p.y); ctx.moveTo(x + mr * 1.4, y); ctx.arc(x, y, mr * 1.4, 0, Math.PI * 2); } ctx.fillStyle = '#7ee07a'; ctx.fill(); }
+    // Sky Pearl: a pale disc at the centre while up (ring in the holder's colour), a blinking outline while announced
+    const pearl = world.state.pearl;
+    if (pearl && pearl.phase !== 'idle' && (pearl.phase === 'up' || ((now / 300) | 0) % 2 === 0)) {
+      const x = this.sx(pearl.x), y = this.sy(pearl.y), r = Math.max(3, h * 0.16);
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+      if (pearl.phase === 'up') { ctx.fillStyle = '#eef6ff'; ctx.fill(); if (pearl.holder >= 0) { ctx.beginPath(); ctx.arc(x, y, r + 2, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * pearl.prog); ctx.strokeStyle = COL[pearl.holder]; ctx.lineWidth = 2; ctx.stroke(); } }
+      else { ctx.strokeStyle = '#eef6ff'; ctx.lineWidth = 1.5; ctx.stroke(); }
+    }
     // neutral camps: a gold diamond while the crab is up, a faint ring while it is down
     const camps = world.state.camps;
     if (camps) for (const c of camps) {

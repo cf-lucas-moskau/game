@@ -22,8 +22,9 @@ export const MAP = {
   SPAWN_X: 640,
   RELIC_X: 1500, RELIC_Y: [300, 600], // per side: measured from the own end, mirrored for red
 };
-/** Neutral middle features. Everything here sits on the centre line or in mirrored pairs (fairness: see PR #41). */
-MAP.CAMPS = [[LANE.W / 2, 190], [LANE.W / 2, 710]]; // Barnacle Crab nests on the top and bottom flank of the middle
+/** Neutral middle features. Everything sits on the centre point or in pairs symmetric through it (fairness: PR #41). */
+MAP.CAMPS = [[LANE.W / 2 - 200, 200], [LANE.W / 2 + 200, LANE.H - 200]]; // Barnacle Crab nests: blue's nearer one top, red's bottom
+MAP.PEARL = [LANE.W / 2, 450]; // the Sky Pearl surfaces at the exact centre
 /** Relic spots, mirrored for both sides (absolute x broke the symmetry when the lane grew). */
 MAP.RELICS = [TEAM.BLUE, TEAM.RED].flatMap((t) => MAP.RELIC_Y.map((y) => [sideX(t, MAP.RELIC_X), y]));
 
@@ -43,6 +44,10 @@ export const RULES = {
   MAX_ITEMS: 6, SELL_RATIO: 0.7,
   // neutral camps
   CAMP_FIRST: 75, CAMP_RESPAWN: 70, CAMP_LEASH: 520, CAMP_GOLD: 90, CAMP_SHARE_GOLD: 40, CAMP_XP: 220,
+  // Sky Pearl: surfaces at PEARL_FIRST, then PEARL_INTERVAL after it was taken or sank; held alone for PEARL_CAPTURE
+  // seconds it is captured: Pearl's Blessing for the team, gold for the holders, a Pearl Golem in the next waves
+  PEARL_FIRST: 180, PEARL_INTERVAL: 180, PEARL_WARN: 15, PEARL_RADIUS: 200, PEARL_CAPTURE: 5, PEARL_LIFETIME: 75,
+  PEARL_GOLD: 100, PEARL_WAVES: 2, PEARL_GOLEM_HP: 2.2, PEARL_GOLEM_AD: 1.8,
 };
 /** xp needed to go from level L to L+1: cheap up to level 6 (the ultimate arrives in about a minute and a half), then
  *  the old curve (3 -> 6 costs 780 xp instead of 1440) */

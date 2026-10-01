@@ -14,6 +14,7 @@ import { StateHasher } from '../core/hash.js';
 import { sq } from '../core/dmath.js';
 import { expireBuffs } from './buffs.js';
 import { setupCamps, campSystem } from './camps.js';
+import { setupPearl, pearlSystem } from './pearl.js';
 
 /**
  * Build a ready-to-run match.
@@ -32,8 +33,9 @@ export function createMatch({ seed = 1, roster, content }) {
   w.state.nextRelic = sec(20);
   setupStructures(w);
   setupCamps(w);
+  setupPearl(w);
   roster.forEach((r, i) => spawnHero(w, r, i));
-  w.systems = [commandSystem, clockSystem, campSystem, heroSystem, movementSystem, combatSystem, projectileSystem, zoneSystem, economySystem, winSystem];
+  w.systems = [commandSystem, clockSystem, campSystem, pearlSystem, heroSystem, movementSystem, combatSystem, projectileSystem, zoneSystem, economySystem, winSystem];
   return w;
 }
 
@@ -210,16 +212,22 @@ function spawnWave(w) {
   const kinds = [KIND.MELEE, KIND.MELEE, KIND.MELEE, KIND.RANGED, KIND.RANGED, KIND.RANGED];
   if (st.waveCount % RULES.SIEGE_EVERY === 0) kinds.splice(3, 0, KIND.SIEGE);
   for (const team of (st.waveCount & 1 ? WAVE_ORDER_A : WAVE_ORDER_B)) { // alternate which side spawns (and gets ids) first
-    kinds.forEach((kind, i) => {
-      const spec = MINION[kind]; const g = 1 + spec.growth * minutes;
-      const row = kind === KIND.MELEE ? 0 : kind === KIND.SIEGE ? 1 : 2;
-      const col = i % 3;
-      const e = w.spawn(kind, team, sideX(team, MAP.SPAWN_X - row * 70), 360 + col * 90);
-      e.maxHp = e.hp = Math.round(spec.hp * g); e.baseAd = spec.ad * g; e.armor = e.baseArmor = spec.armor; e.mr = spec.mr;
-      e.baseAs = spec.as; e.range = spec.range; e.baseSpeed = spec.speed; e.radius = spec.radius; e.projectileSpeed = spec.projectile;
-      e.laneOffset = (col - 1) * 70; e.order = ORDER.MOVE; e.moveX = sideX(team, LANE.W - 300); e.moveY = 450;
-    });
+    const golem = st.pearlWaves && st.pearlWaves[team] > 0; if (golem) st.pearlWaves[team]--;
+    if (golem) spawnMinion(w, team, KIND.SIEGE, 4, 1, minutes, true); // the Pearl Golem walks in the middle of the siege row
+    kinds.forEach((kind, i) => spawnMinion(w, team, kind, i, kind === KIND.MELEE ? 0 : kind === KIND.SIEGE ? 1 : 2, minutes, false));
   }
+}
+
+/** One wave minion in formation slot i of row `row`; empowered = the Pearl Golem (Sky Pearl reward). */
+function spawnMinion(w, team, kind, i, row, minutes, empowered) {
+  const spec = MINION[kind]; const g = 1 + spec.growth * minutes;
+  const col = i % 3;
+  const e = w.spawn(kind, team, sideX(team, MAP.SPAWN_X - row * 70), 360 + col * 90);
+  e.maxHp = e.hp = Math.round(spec.hp * g * (empowered ? RULES.PEARL_GOLEM_HP : 1)); e.baseAd = spec.ad * g * (empowered ? RULES.PEARL_GOLEM_AD : 1);
+  e.armor = e.baseArmor = spec.armor; e.mr = spec.mr;
+  e.baseAs = spec.as; e.range = spec.range; e.baseSpeed = spec.speed; e.radius = spec.radius * (empowered ? 1.25 : 1); e.projectileSpeed = spec.projectile;
+  e.laneOffset = (col - 1) * 70; e.order = ORDER.MOVE; e.moveX = sideX(team, LANE.W - 300); e.moveY = 450; e.empowered = empowered ? 1 : 0;
+  return e;
 }
 
 function heroSystem(w) {

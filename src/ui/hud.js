@@ -31,6 +31,7 @@ export class Hud {
     this.s = session; this.tip = tooltip; this.touch = touch;
     const w = session.world, me = session.me, def = w.registry.heroes[me.heroKey];
     this.def = def;
+    this.objectives = new ObjectiveHud(this); // map features: buff chips (dock), Sky Pearl bar (top bar), banners
     // ---- top
     this.blue = h('div', { class: 'score blue', title: 'Blue team kills' }, '0');
     this.red = h('div', { class: 'score red', title: 'Red team kills' }, '0');
@@ -61,7 +62,6 @@ export class Hud {
     }
     this.gold = h('span', {}, '0');
     this.goldBtn = h('button', { class: 'gold-btn interactive', onclick: onShop, 'aria-label': 'Open shop', 'data-act': 'shop' }, h('i', { class: 'coin' }), this.gold);
-    this.objectives = new ObjectiveHud(this);
     this.dock = h('div', { class: 'dock' }, portrait,
       h('div', { class: 'mid' }, this.objectives.buffs,
         h('div', { class: 'abilities' }, this.slots.map((s) => s.el), h('div', { class: 'gap' }), this.spells.map((s) => s.el)),
@@ -71,7 +71,7 @@ export class Hud {
       h('button', { onclick: onScoreboard, 'aria-label': 'Scoreboard', 'data-act': 'score' }, touch ? 'Score' : 'Tab'),
       h('button', { onclick: onMenu, 'aria-label': 'Menu', 'data-act': 'menu' }, touch ? 'Menu' : 'Esc'));
     this.el = h('div', { class: 'hud' },
-      h('div', { class: 'topbar' }, this.blue, h('div', { class: 'strip-wrap' }, canvas, this.clock), this.red),
+      h('div', { class: 'topbar' }, this.blue, h('div', { class: 'strip-wrap' }, canvas, this.clock), this.red, this.objectives.bar),
       this.lock, this.feed, this.banner, this.respawn, this.dock, quick);
     root.append(this.el);
     this.cdTotal = [1, 1, 1, 1]; this.prevCd = [0, 0, 0, 0]; this.prevRanks = { Q: -1, W: -1, E: -1, R: -1 }; this.prevLevel = me.level;

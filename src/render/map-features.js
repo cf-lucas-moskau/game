@@ -1,4 +1,5 @@
-// Map features in the neutral middle: Barnacle Crabs (procedural, instanced: body and claws are one draw each).
+// Map features in the neutral middle: Barnacle Crabs (procedural, instanced: body and claws are one draw each) and the
+// Sky Pearl (an iridescent sphere and, while it is announced, a beam of light).
 // Reads world state and events, never writes them. Ground markings (nests, rings) are drawn by render/zones.js.
 import * as THREE from 'three';
 import { S, WHITE_RGB } from './palette.js';
@@ -64,6 +65,19 @@ export class MapFeatureViews {
       m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(m.count * 3), 3);
       m.castShadow = true; m.frustumCulled = false; m.count = 0; parent.add(m);
     }
+    // Sky Pearl: fresnel-iridescent sphere; the beam marks the spot while it is announced
+    this.pearlMat = new THREE.ShaderMaterial({ uniforms: { uTime: { value: 0 }, uTint: { value: new THREE.Color('#ffffff') }, uGlow: { value: 1 } },
+      vertexShader: `varying vec3 vN; varying vec3 vV; void main(){ vec4 wp = modelMatrix * vec4(position, 1.); vN = normalize(mat3(modelMatrix) * normal); vV = normalize(cameraPosition - wp.xyz); gl_Position = projectionMatrix * viewMatrix * wp; }`,
+      fragmentShader: `uniform float uTime, uGlow; uniform vec3 uTint; varying vec3 vN; varying vec3 vV;
+        void main(){ float f = 1. - max(0., dot(vN, vV)); float band = 0.5 + 0.5 * sin(f * 9. + uTime * 1.6 + vN.y * 4.);
+          vec3 iri = mix(vec3(.95, .9, 1.), mix(vec3(.55, .85, 1.), vec3(1., .7, .9), band), smoothstep(0.15, 0.9, f));
+          vec3 c = mix(iri, uTint, 0.35) * (0.9 + 0.6 * pow(f, 2.)) * uGlow; gl_FragColor = vec4(c, 1.); }` });
+    this.pearl = new THREE.Mesh(new THREE.SphereGeometry(0.42, 28, 18), this.pearlMat); this.pearl.visible = false; parent.add(this.pearl);
+    this.beamMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, uniforms: { uTime: { value: 0 }, uAlpha: { value: 0 } },
+      vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }`,
+      fragmentShader: `uniform float uTime, uAlpha; varying vec2 vUv; void main(){ float a = (1. - vUv.y) * (0.6 + 0.4 * sin(vUv.y * 20. - uTime * 6.)) * uAlpha; gl_FragColor = vec4(vec3(.8, .92, 1.) * a, a); }` });
+    this.beam = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.7, 9, 20, 1, true).translate(0, 4.5, 0), this.beamMat); this.beam.visible = false; this.beam.renderOrder = 9; parent.add(this.beam);
+    this.pearlY = -1.2; this.teamTint = [new THREE.Color('#45c4e6'), new THREE.Color('#f0476e')]; this.white = new THREE.Color('#ffffff');
     this.anim = new Map(); // crab id -> { attack: start time, flash, dying }
     this.corpses = [];     // crabs that just died: tip over and sink
   }
@@ -104,5 +118,26 @@ export class MapFeatureViews {
     for (const c of this.corpses) { const age = now - c.start; if (age > 2.4) continue; this.corpses[w++] = c; this.put(c.x, c.z, c.yaw, Math.min(1, age * 3) * 2.6, Math.max(0, age - 1.2) * 0.6, false, null, 0); }
     this.corpses.length = w;
     this.finish(this.bodies, this.nb); this.finish(this.claws, this.nc);
+    this.updatePearl(world, dt, now);
+  }
+  /** The pearl rises while announced, floats while up (tinted toward the holding team), sinks when idle. */
+  updatePearl(world, dt, now) {
+    const p = world.state.pearl; if (!p) return;
+    const warnLeft = p.phase === 'warn' ? Math.max(0, (p.until - world.tick) / 30) : 0;
+    const target = p.phase === 'up' ? 1.25 : p.phase === 'warn' ? -0.9 + 1.4 * (1 - Math.min(1, warnLeft / 15)) : -1.4;
+    this.pearlY += (target - this.pearlY) * Math.min(1, dt * (p.phase === 'idle' ? 1.5 : 3));
+    const vis = this.pearlY > -1.3;
+    this.pearl.visible = vis;
+    if (vis) {
+      this.pearl.position.set(p.x * S, this.pearlY + (p.phase === 'up' ? Math.sin(now * 1.4) * 0.08 : 0), p.y * S);
+      this.pearl.rotation.y = now * 0.4;
+      this.pearlMat.uniforms.uTime.value = now;
+      this.pearlMat.uniforms.uTint.value.copy(p.holder >= 0 ? this.teamTint[p.holder] : this.white).lerp(this.white, 1 - p.prog);
+      this.pearlMat.uniforms.uGlow.value = 1 + (p.phase === 'up' ? p.prog * 0.4 : 0);
+    }
+    const beamA = p.phase === 'warn' ? 0.55 : p.phase === 'up' ? 0.12 : 0;
+    this.beamMat.uniforms.uAlpha.value += (beamA - this.beamMat.uniforms.uAlpha.value) * Math.min(1, dt * 3);
+    this.beam.visible = this.beamMat.uniforms.uAlpha.value > 0.01;
+    if (this.beam.visible) { this.beam.position.set(p.x * S, 0, p.y * S); this.beamMat.uniforms.uTime.value = now; }
   }
 }
