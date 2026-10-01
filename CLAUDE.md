@@ -55,7 +55,7 @@ input path), `skip=<seconds>` (fast-forward the sim), `seed=`, `touch=1`, `cpu=1
   animations and effects up close (frame-exact, no match needed); use full-game screenshots for scene-level checks.
 
 ## Current state
-- The repository now lives on GitHub (`cf-lucas-moskau/game`); `main` holds PRs 1-40. Earlier notes: PRs 1-11: PR #10 (VFX) merged after a gate rerun in the new container (see docs/prs/0010-vfx.md), and
+- The repository now lives on GitHub (`cf-lucas-moskau/game`); `main` holds PRs 1-41. Earlier notes: PRs 1-11: PR #10 (VFX) merged after a gate rerun in the new container (see docs/prs/0010-vfx.md), and
   PR #11 (UI) adds the full playable loop: hero select -> match -> end screen -> hero select.
 - Playwright in this container: `PW_PATH=/opt/node22/lib/node_modules/playwright` (Chromium in /opt/pw-browsers).
 - `src/app/app.js` owns the flow (menu with a bot-match backdrop, match, end screen) and tears each match
@@ -117,7 +117,9 @@ input path), `skip=<seconds>` (fast-forward the sim), `seed=`, `touch=1`, `cpu=1
    hit harder (minion attack x1.5, `RULES.MINION_VS_STRUCTURE`/`SIEGE_VS_STRUCTURE`), bots wait mid-lane between
    waves, rebalance for the new map (40-58% on two seeds). Ideas offered to the owner: neutral camps in the middle,
    a mid-lane objective, whale-roll events with pickups.
-11. Next: online join sometimes hangs past 30 s (seen on main too, docs/prs/0039); Wisp is at the low edge (40-42%); predictor modelling of attack-move engagements and short hops (Saffi
+11. Done (PR #41): relics mirrored per side; combat, movement, hero upkeep and relic pickups alternate their order
+   every tick; waves alternate spawn side; bot think phase from the seat within the team. Blue 51.6% (z 1.9) remains.
+12. Next: residual blue edge (~1.5 points, docs/prs/0041); online join sometimes hangs past 30 s (seen on main too, docs/prs/0039); Wisp is at the low edge (40-42%); predictor modelling of attack-move engagements and short hops (Saffi
    corrects ~1 per 10 s at 100 ms ping); desync resync (replay the command log), optional self-hosted broker, more skins.
 
 ## Architecture map
@@ -167,6 +169,8 @@ input path), `skip=<seconds>` (fast-forward the sim), `seed=`, `touch=1`, `cpu=1
 - Balance levers are few and not obvious: most kit numbers have no measurable effect on bot win rates. Run a
   sensitivity sweep first (one hard-pushed lever per `--focus X --set ... --ab`, 480 matches), then scale only the
   levers with |z| > 2, and verify on a fresh seed with 1920 matches. Put passive constants in the hero's `tuning` block.
+- Never iterate units in a fixed order when it decides who acts first: alternate per tick (ids are not team-neutral).
+  Map positions are per side (`sideX`), never absolute x.
 - Bench runs must pin their match seed: the roster alone swings prediction corrections and load.
 - Kenney rigs face +z at yaw 0 (`faceToRotY = PI/2 - a`); verified by close-up, don't "fix" it.
 - Background processes do not survive between tool calls in some environments; keep each gate step short.
