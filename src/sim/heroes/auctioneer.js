@@ -6,7 +6,7 @@ import { recomputeHero } from '../stats.js';
 import { hypot } from '../../core/dmath.js';
 
 // Ability numbers: one declaration used by the cast and by tooltips (kit.amount).
-const Q_VAL1 = { label: 'Magic damage', type: 'magic', base: [70, 110, 150, 190, 230], ratio: 0.6, stat: 'ap' };
+const Q_VAL1 = { label: 'Magic damage', type: 'magic', base: [84, 132, 180, 228, 276], ratio: 0.6, stat: 'ap' };
 const W_VAL1 = { label: 'Magic damage', type: 'magic', base: [30, 45, 60, 75, 90], ratio: 0.25, stat: 'ap' };
 const E_VAL1 = { label: 'Magic damage', type: 'magic', base: [60, 90, 120, 150, 180], ratio: 0.45, stat: 'ap' };
 
@@ -15,7 +15,7 @@ export default {
   rankOrder: ['Q', 'W', 'E'],
   build: ['lanternfish-lens', 'stormstep-sandals', 'kelp-crown', 'deepwater-codex', 'borrowed-seconds', 'stillwater-pendant'], // recommended items: shop highlights and bot purchase order
   passive: { name: 'Everything Has a Price', desc: 'Abilities cost gold instead of mana. Unspent gold earns interest (0.5% per second, up to 6 gold/s) and every assist pays 25 bonus gold.' },
-  base: { hp: 560, hpL: 90, ad: 50, adL: 3, armor: 24, armorL: 4.2, mr: 30, mrL: 1.3, as: 0.65, asL: 0.02, range: 500, speed: 335, projectile: 1500, radius: 34 },
+  base: { hp: 620, hpL: 90, ad: 50, adL: 3, armor: 24, armorL: 4.2, mr: 30, mrL: 1.3, as: 0.65, asL: 0.02, range: 500, speed: 335, projectile: 1500, radius: 34 },
   init(world, e) { e.heroState = { repo: null }; },
   onTick(world, e) { // interest on unspent gold: 0.5% per second, max 6 gold/s
     if (world.tick % 30 === 0) e.gold += Math.min(6, e.gold * 0.005);

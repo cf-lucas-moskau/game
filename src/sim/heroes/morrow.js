@@ -5,7 +5,7 @@ import { addShield, haste } from '../damage.js';
 import { hypot } from '../../core/dmath.js';
 
 // Ability numbers: one declaration used by the cast and by tooltips (kit.amount).
-const Q_VAL1 = { label: 'Magic damage', type: 'magic', base: [40, 62, 84, 105, 127], ratio: 0.55, stat: 'ap', bonus: { ratio: 0.2, stat: 'ad' } };
+const Q_VAL1 = { label: 'Magic damage', type: 'magic', base: [36, 56, 76, 95, 114], ratio: 0.55, stat: 'ap', bonus: { ratio: 0.2, stat: 'ad' } };
 const W_VAL1 = { label: 'Shield', type: 'shield', base: [64, 92, 120, 148, 176], ratio: 0.5, stat: 'ap' };
 const E_VAL1 = { label: 'Magic damage', type: 'magic', base: [60, 95, 130, 165, 200], ratio: 0.5, stat: 'ap' };
 
