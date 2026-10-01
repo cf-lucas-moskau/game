@@ -158,8 +158,9 @@ function clockSystem(w) {
     w.events.push(EV.RELIC, t, 0, 0, 0, 0, 1);
   }
   for (let i = w.pickups.length - 1; i >= 0; i--) {
-    const p = w.pickups[i];
-    for (const h of w.heroes) {
+    const p = w.pickups[i], nh = w.heroes.length;
+    for (let k = 0; k < nh; k++) {
+      const h = w.heroes[t & 1 ? nh - 1 - k : k]; // alternate who reaches a contested relic first
       if (h.dead) continue;
       if (sq(h.x - p.x) + sq(h.y - p.y) <= sq(RULES.RELIC_RADIUS + h.radius)) {
         heal(w, h, h, h.maxHp * RULES.RELIC_HEAL); h.mana = Math.min(h.maxMana, h.mana + h.maxMana * 0.15);
@@ -199,12 +200,13 @@ export function tiebreakLoser(w, heartHp) {
   return w.rng.chance(0.5) ? TEAM.BLUE : TEAM.RED;
 }
 
+const WAVE_ORDER_A = [TEAM.BLUE, TEAM.RED], WAVE_ORDER_B = [TEAM.RED, TEAM.BLUE];
 function spawnWave(w) {
   const st = w.state; st.waveCount++;
   const minutes = w.tick / TICK_HZ / 60;
   const kinds = [KIND.MELEE, KIND.MELEE, KIND.MELEE, KIND.RANGED, KIND.RANGED, KIND.RANGED];
   if (st.waveCount % RULES.SIEGE_EVERY === 0) kinds.splice(3, 0, KIND.SIEGE);
-  for (const team of [TEAM.BLUE, TEAM.RED]) {
+  for (const team of (st.waveCount & 1 ? WAVE_ORDER_A : WAVE_ORDER_B)) { // alternate which side spawns (and gets ids) first
     kinds.forEach((kind, i) => {
       const spec = MINION[kind]; const g = 1 + spec.growth * minutes;
       const row = kind === KIND.MELEE ? 0 : kind === KIND.SIEGE ? 1 : 2;
@@ -218,9 +220,9 @@ function spawnWave(w) {
 }
 
 function heroSystem(w) {
-  const t = w.tick;
-  for (let i = 0; i < w.heroes.length; i++) {
-    const e = w.heroes[i];
+  const t = w.tick, nh = w.heroes.length;
+  for (let k = 0; k < nh; k++) {
+    const i = t & 1 ? nh - 1 - k : k, e = w.heroes[i]; // alternate the order every tick (team-neutral)
     const def = w.registry.heroes[e.heroKey];
     for (let s = 0; s < 4; s++) if (e.cds[s] > 0) e.cds[s]--;
     if (e.spellCds[0] > 0) e.spellCds[0]--; if (e.spellCds[1] > 0) e.spellCds[1]--;

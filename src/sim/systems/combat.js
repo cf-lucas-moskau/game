@@ -49,9 +49,11 @@ function releaseAttack(world, e) {
 
 const autoHit = (w, p, t) => { const s = w.get(p.owner); if (s) basicHit(w, s, t); };
 export function combatSystem(world) {
-  const es = world.entities, t = world.tick;
-  for (let i = 0; i < es.length; i++) {
-    const e = es[i];
+  const es = world.entities, t = world.tick, n = es.length;
+  // alternate the order every tick: whoever is processed first strikes first in an even trade, and entity ids
+  // are not team-neutral (a fixed order gave one side's waves the first hit)
+  for (let k = 0; k < n; k++) {
+    const e = es[t & 1 ? n - 1 - k : k];
     if (!e.alive || e.dead || e.kind === KIND.HEART) continue;
     if (e.attackCd > 0) e.attackCd--;
     if (!canAct(world, e) || e.channelUntil > t || e.dashUntil > t) { e.windup = 0; continue; }

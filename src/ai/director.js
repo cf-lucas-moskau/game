@@ -8,7 +8,8 @@ export class BotDirector {
   constructor(world, difficulty = 'medium', opts = {}) {
     const diff = typeof difficulty === 'function' ? difficulty : () => difficulty;
     const builds = opts.builds || {};
-    this.bots = world.heroes.filter((h) => h.isBot).map((h) => new Bot(h.playerId, diff(h.playerId), world.seed, { build: builds[h.playerId] }));
+    const slot = (h) => world.heroes.filter((o) => o.team === h.team && o.playerId < h.playerId).length; // seat within the team
+    this.bots = world.heroes.filter((h) => h.isBot).map((h) => new Bot(h.playerId, diff(h.playerId), world.seed, { build: builds[h.playerId], slot: slot(h) }));
   }
   /** A human left an online match: a bot plays their hero from now on (host only). */
   addBot(world, playerId, difficulty = 'medium') {
