@@ -12,7 +12,8 @@ const NOISE = /* glsl */`
   float fbm(vec2 p){ float v=0., a=.5; for(int i=0;i<5;i++){ v+=a*noise(p); p*=2.03; a*=.5; } return v; }`;
 
 // Whale body shape, shared by mesh generation and scenery placement.
-const X0 = -16, X1 = 52, SUPER = 3.2;
+// The whale grows with the lane: tail 16 units behind the blue end, head 12 beyond the red end.
+const LW = LANE.W * S, X0 = -16, X1 = LW + 12, SUPER = 3.2;
 export function whaleProfile(x) {
   const t = (x - X0) / (X1 - X0);
   const body = Math.sin(Math.min(1, t * 1.06) * Math.PI * 0.94 + 0.12) ** 0.55;
@@ -138,7 +139,7 @@ export class Environment {
           vec2 f = fract(vec2(vObj.x*1.6, vObj.y*2.4)) - 0.5; spot *= smoothstep(0.32, 0.05, length(f));
           totalEmissiveRadiance += vec3(.3,.95,1.)*spot*(0.9+0.4*sin(uTime*1.7 + cell.x));
           // eyes, painted into the body (no extra draw): dark iris with a soft cyan catchlight
-          vec2 ed = vec2(vObj.x - 46.5, vObj.y + 4.2); float eye = smoothstep(0.62, 0.5, length(ed)) * step(4.8, abs(vObj.z - ${(LANE.H * S / 2).toFixed(2)}));
+          vec2 ed = vec2(vObj.x - ${(X1 - 5.5).toFixed(2)}, vObj.y + 4.2); float eye = smoothstep(0.62, 0.5, length(ed)) * step(4.8, abs(vObj.z - ${(LANE.H * S / 2).toFixed(2)}));
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.03,.04,.08), eye);
           totalEmissiveRadiance += vec3(.35,.7,1.) * eye * smoothstep(0.22, 0.05, length(ed - vec2(0.15, 0.18)));`);
     };
@@ -148,7 +149,7 @@ export class Environment {
       const eg = new THREE.ExtrudeGeometry(sh, { depth: 0.35, bevelEnabled: true, bevelSize: 0.15, bevelThickness: 0.12, bevelSegments: 2, curveSegments: 10 });
       eg.rotateX(Math.PI / 2); eg.rotateY(dir); eg.translate(cx, 0, cz); return eg; };
     const flukes = [fin(X0 + 1, CZ, Math.PI / 2 + 0.25, 9, 3), fin(X0 + 1, CZ, -Math.PI / 2 - 0.25, 9, 3)];
-    const fins = [fin(30, CZ + 6.2, -Math.PI / 2 + 0.5, 8, 2.2), fin(30, CZ - 6.2, Math.PI / 2 - 0.5, 8, 2.2)];
+    const finX = LW * 0.75, fins = [fin(finX, CZ + 6.2, -Math.PI / 2 + 0.5, 8, 2.2), fin(finX, CZ - 6.2, Math.PI / 2 - 0.5, 8, 2.2)];
     const tailY = -3.2;
     for (const f of flukes) f.translate(0, tailY, 0);
     for (const f of fins) f.translate(0, -5.2, 0);
@@ -212,12 +213,12 @@ export class Environment {
     // instanced barnacle rocks along both flanks, moss trees on the far side, lamps by the bases
     const rnd = mulberry(99);
     const rockLook = [this.assets.merged(SCENERY.rocks[1], 1)];
-    const perRock = 150;
+    const perRock = Math.round(150 * LW / 40); // same density along any lane length
     rockLook.forEach(({ geometry, material }, ri) => {
       const mat = new THREE.MeshStandardMaterial({ color: '#e3d6bd', roughness: 0.9, flatShading: true });
       const im = new THREE.InstancedMesh(geometry, mat, perRock); const d = new THREE.Object3D();
       for (let i = 0; i < perRock; i++) {
-        const far = true; const x = rnd() * 44 - 2; const z = 0.25 - rnd() * 1.1;
+        const far = true; const x = rnd() * (LW + 4) - 2; const z = 0.25 - rnd() * 1.1;
         d.position.set(x, whaleTopY(x, z) - 0.04, z); d.rotation.set(0, rnd() * 6.28, 0); const s = 0.15 + rnd() * (far ? 0.35 : 0.2); d.scale.set(s, s * (0.5 + rnd() * 0.5), s);
         d.updateMatrix(); im.setMatrixAt(i, d.matrix);
       }
@@ -226,8 +227,8 @@ export class Environment {
     // glowing crystal outcrops on the far flank (instanced, team-neutral dusk cyan)
     const cr = this.assets.merged('crystal-small', 0.8);
     const crMat = new THREE.MeshStandardMaterial({ color: '#7fe3ff', emissive: '#3ad0ff', emissiveIntensity: 0.9, roughness: 0.2, flatShading: true });
-    const crys = new THREE.InstancedMesh(cr.geometry, crMat, 26); const dc = new THREE.Object3D();
-    for (let i = 0; i < 26; i++) { const x = 1 + rnd() * 38, z = 0.1 - rnd() * 1.2; dc.position.set(x, whaleTopY(x, z) - 0.05, z); dc.rotation.set(rnd() * 0.3, rnd() * 6.28, rnd() * 0.3); dc.scale.setScalar(0.5 + rnd() * 0.9); dc.updateMatrix(); crys.setMatrixAt(i, dc.matrix); }
+    const nCrys = Math.round(26 * LW / 40), crys = new THREE.InstancedMesh(cr.geometry, crMat, nCrys); const dc = new THREE.Object3D();
+    for (let i = 0; i < nCrys; i++) { const x = 1 + rnd() * (LW - 2), z = 0.1 - rnd() * 1.2; dc.position.set(x, whaleTopY(x, z) - 0.05, z); dc.rotation.set(rnd() * 0.3, rnd() * 6.28, rnd() * 0.3); dc.scale.setScalar(0.5 + rnd() * 0.9); dc.updateMatrix(); crys.setMatrixAt(i, dc.matrix); }
     this.root.add(crys);
 
   }

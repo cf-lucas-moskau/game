@@ -117,8 +117,9 @@ export class Bot {
         return attackCmd(this.p, t.id);
       }
     }
-    // lane: farm behind the front line
-    const front = snap.allyFront ? snap.allyFront.x : sideX(me.team, MAP.TOWER_INNER_X);
+    // lane: farm behind the front line. Between waves (no allied minion out), wait on our side of the neutral middle
+    // where the next waves meet, not back at the base: that is where trades and pickoffs happen.
+    const front = snap.allyFront ? snap.allyFront.x : LANE.W / 2 - f * WAIT_BEFORE_MID;
     let hold = front - f * (me.range < 250 ? 110 : 200);
     // never hold inside the enemy tower's reach while farming (sieging it is the siege state's job)
     const et = snap.enemyTower; if (et) { const edge = et.x - f * (et.range + et.radius + 60); if ((hold - edge) * f > 0) hold = edge; }
@@ -134,6 +135,7 @@ export class Bot {
   }
 }
 const EMPTY = [];
+const WAIT_BEFORE_MID = 250; // between waves: hold this far short of the lane's centre
 /** The most expensive component of `key` the bot can buy now and does not already hold (walking down the build tree). */
 function componentToBuy(world, me, key) {
   const items = world.registry.items, free = me.items.map(() => true);

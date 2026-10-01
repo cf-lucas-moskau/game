@@ -8,8 +8,8 @@ import { hypot } from '../../core/dmath.js';
 
 // Ability numbers: one declaration used by the cast and by tooltips (kit.amount).
 const Q_VAL1 = { label: 'Magic damage over 3 s', type: 'magic', base: [104, 150, 196, 242, 288], ratio: 0.6, stat: 'ap' };
-const W_VAL1 = { label: 'Shield', type: 'shield', base: [104, 143, 182, 221, 260], ratio: 0.6, stat: 'ap' };
-const R_VAL1 = { label: 'Heal per second', type: 'heal', base: [72, 108, 144], ratio: 0.2, stat: 'ap' };
+const W_VAL1 = { label: 'Shield', type: 'shield', base: [88, 122, 155, 188, 221], ratio: 0.6, stat: 'ap' };
+const R_VAL1 = { label: 'Heal per second', type: 'heal', base: [50, 76, 101], ratio: 0.2, stat: 'ap' };
 
 const MAX_BEES = 20;
 function addBee(world, e, n = 1) { e.resource = Math.min(MAX_BEES, e.resource + n); e.heroState.lastGain = world.tick; }

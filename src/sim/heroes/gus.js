@@ -8,8 +8,8 @@ import { knockUp, knock, stun, giveGold } from '../damage.js';
 import { sin, cos, atan2, hypot } from '../../core/dmath.js';
 
 // Ability numbers: one declaration used by the cast and by tooltips (kit.amount).
-const Q_VAL1 = { label: 'Slam damage (mounted)', type: 'phys', base: [70, 110, 150, 190, 230], ratio: 0.5, stat: 'ad', bonus: { ratio: 0.04, stat: 'maxHp' } };
-const Q_VAL2 = { label: 'Rock damage (on foot)', type: 'phys', base: [80, 125, 170, 215, 260], ratio: 0.7, stat: 'ad' };
+const Q_VAL1 = { label: 'Slam damage (mounted)', type: 'phys', base: [42, 66, 90, 114, 138], ratio: 0.5, stat: 'ad', bonus: { ratio: 0.04, stat: 'maxHp' } };
+const Q_VAL2 = { label: 'Rock damage (on foot)', type: 'phys', base: [48, 75, 102, 129, 156], ratio: 0.7, stat: 'ad' };
 const E_VAL1 = { label: 'Magic damage', type: 'magic', base: [60, 95, 130, 165, 200], ratio: 0.4, stat: 'ad', bonus: { ratio: 0.03, stat: 'maxHp' } };
 const R_VAL1 = { label: 'Magic damage', type: 'magic', base: [150, 250, 350], ratio: 0.8, stat: 'ad', bonus: { ratio: 0.06, stat: 'maxHp' } };
 
@@ -34,7 +34,7 @@ export default {
   rankOrder: ['Q', 'E', 'W'],
   build: ['barnacle-plate', 'anchor-boots', 'molted-shell', 'coral-aegis', 'storm-cutlass', 'stillwater-pendant'], // recommended items: shop highlights and bot purchase order
   passive: { name: 'Pebble', desc: 'Gus rides Pebble, a rock golem that fights beside him and absorbs hits. His spells change when he dismounts; if Pebble crumbles it rebuilds after a while.' },
-  base: { hp: 690, hpL: 108, ad: 62, adL: 3.6, armor: 38, armorL: 4.8, mr: 32, mrL: 2, as: 0.62, asL: 0.02, range: 170, speed: 330, mana: 360, manaL: 40, radius: 46, projectile: 0 },
+  base: { hp: 650, hpL: 108, ad: 62, adL: 3.6, armor: 38, armorL: 4.8, mr: 32, mrL: 2, as: 0.62, asL: 0.02, range: 170, speed: 330, mana: 360, manaL: 40, radius: 46, projectile: 0 },
   init(world, e) { e.heroState = { mounted: true, pebbleId: -1, pebbleHp: 1, rebuildAt: 0 }; },
   modifyStats(world, e) {
     if (!e.heroState || e.heroState.mounted) return { range: 170, projectile: 0, radius: 46 };

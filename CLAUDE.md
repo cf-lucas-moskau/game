@@ -55,7 +55,7 @@ input path), `skip=<seconds>` (fast-forward the sim), `seed=`, `touch=1`, `cpu=1
   animations and effects up close (frame-exact, no match needed); use full-game screenshots for scene-level checks.
 
 ## Current state
-- The repository now lives on GitHub (`cf-lucas-moskau/game`); `main` holds PRs 1-38. Earlier notes: PRs 1-11: PR #10 (VFX) merged after a gate rerun in the new container (see docs/prs/0010-vfx.md), and
+- The repository now lives on GitHub (`cf-lucas-moskau/game`); `main` holds PRs 1-40. Earlier notes: PRs 1-11: PR #10 (VFX) merged after a gate rerun in the new container (see docs/prs/0010-vfx.md), and
   PR #11 (UI) adds the full playable loop: hero select -> match -> end screen -> hero select.
 - Playwright in this container: `PW_PATH=/opt/node22/lib/node_modules/playwright` (Chromium in /opt/pw-browsers).
 - `src/app/app.js` owns the flow (menu with a bot-match backdrop, match, end screen) and tears each match
@@ -112,7 +112,12 @@ input path), `skip=<seconds>` (fast-forward the sim), `seed=`, `touch=1`, `cpu=1
 9. Done (PRs #35-#38): kill credit (last hero damage within 15 s), level 6 sooner, 40-item build tree, and a balance
    pass (docs/prs/0038-balance-pass.md): every hero within 41-58% on two seeds (sd 12.3 -> 4.9 points). Passive numbers
    live in a patchable `tuning` block per hero (Saffi, Dredge, Coralie so far). Bench scenarios pin `seed=7`.
-10. Next: Auctioneer is slightly low (41-43%); predictor modelling of attack-move engagements and short hops (Saffi
+10. Done (PRs #39-#40, owner request "a bigger part in the middle where turrets can't attack you; bots shouldn't go back
+   and wait"): lane 4800 (560 units of open ground between the outer towers), whale scales with `LANE.W`, waves
+   hit harder (minion attack x1.5, `RULES.MINION_VS_STRUCTURE`/`SIEGE_VS_STRUCTURE`), bots wait mid-lane between
+   waves, rebalance for the new map (40-58% on two seeds). Ideas offered to the owner: neutral camps in the middle,
+   a mid-lane objective, whale-roll events with pickups.
+11. Next: Wisp is at the low edge (40-42%); predictor modelling of attack-move engagements and short hops (Saffi
    corrects ~1 per 10 s at 100 ms ping); desync resync (replay the command log), optional self-hosted broker, more skins.
 
 ## Architecture map

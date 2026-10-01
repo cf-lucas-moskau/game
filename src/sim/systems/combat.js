@@ -1,5 +1,5 @@
 import { EV } from '../../core/events.js';
-import { KIND, TICK_HZ, sec, isMinion, isStructure, STRUCT, LANE } from '../constants.js';
+import { KIND, TICK_HZ, sec, isMinion, isStructure, STRUCT, LANE, RULES } from '../constants.js';
 import { ORDER, isTargetable } from '../entity.js';
 import { dealDamage, DMG } from '../damage.js';
 import { canAct } from '../stats.js';
@@ -17,8 +17,7 @@ export function basicHit(world, src, target) {
   if (!src.alive || src.dead || !target.alive || target.dead) return;
   let dmg = src.kind === KIND.HERO || src.kind === KIND.PEBBLE ? src.ad : src.baseAd;
   if (src.kind === KIND.TOWER) dmg = src.baseAd + STRUCT.TOWER.adPerMin * (world.tick / TICK_HZ / 60);
-  if (isMinion(src.kind) && isStructure(target.kind)) dmg *= src.kind === KIND.SIEGE ? 3 : 1.3;
-  if (src.kind === KIND.HERO && isStructure(target.kind)) dmg *= 1.0;
+  if (isMinion(src.kind) && isStructure(target.kind)) dmg *= src.kind === KIND.SIEGE ? RULES.SIEGE_VS_STRUCTURE : RULES.MINION_VS_STRUCTURE;
   if (src.kind === KIND.TOWER && isMinion(target.kind)) dmg = target.maxHp * (target.kind === KIND.SIEGE ? 0.14 : target.kind === KIND.MELEE ? 0.45 : 0.7);
   const opts = BASIC;
   const hero = src.kind === KIND.HERO ? world.registry.heroes[src.heroKey] : null;
