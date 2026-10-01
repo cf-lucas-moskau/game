@@ -49,8 +49,21 @@ function lootIntent(world, me, snap, out) {
   return best ? set(out, 'loot', -1, best.x, best.y) : null;
 }
 
+/** A ready Gale Shrine nearby, when no enemy hero is close enough to punish the channel. */
+function shrineIntent(world, me, snap, out) {
+  if (hpr(me) < 0.5 || !world.state.shrines) return null;
+  for (const s of world.state.shrines) {
+    if (world.tick < s.readyAt || (s.heroId >= 0 && s.heroId !== me.id)) continue;
+    if (d(me, s) > 700) continue;
+    let danger = false; for (const e of snap.enemies) if (d(e, s) < 900) { danger = true; break; }
+    if (danger) continue;
+    return set(out, 'shrine', s.i, s.x, s.y);
+  }
+  return null;
+}
+
 /** What map objective this bot should work on, if any (called only when no fight or retreat is going on). */
 export function objectiveIntent(world, me, snap, out) {
   for (const e of snap.enemies) if (d(e, me) < 700) return null; // stay with the fight first
-  return pearlIntent(world, me, snap, out) || lootIntent(world, me, snap, out) || campIntent(world, me, snap, out);
+  return pearlIntent(world, me, snap, out) || lootIntent(world, me, snap, out) || shrineIntent(world, me, snap, out) || campIntent(world, me, snap, out);
 }

@@ -84,6 +84,12 @@ export class LaneStrip {
       if (pearl.phase === 'up') { ctx.fillStyle = '#eef6ff'; ctx.fill(); if (pearl.holder >= 0) { ctx.beginPath(); ctx.arc(x, y, r + 2, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * pearl.prog); ctx.strokeStyle = COL[pearl.holder]; ctx.lineWidth = 2; ctx.stroke(); } }
       else { ctx.strokeStyle = '#eef6ff'; ctx.lineWidth = 1.5; ctx.stroke(); }
     }
+    // Gale Shrines: pale triangles, faint while recharging
+    const shrines = world.state.shrines;
+    if (shrines) for (const s of shrines) {
+      const x = this.sx(s.x), y = this.sy(s.y), r = mr * 1.7; ctx.beginPath(); ctx.moveTo(x, y - r); ctx.lineTo(x + r, y + r * 0.8); ctx.lineTo(x - r, y + r * 0.8); ctx.closePath();
+      ctx.fillStyle = world.tick >= s.readyAt ? '#9ff0e6' : 'rgba(159,240,230,.3)'; ctx.fill();
+    }
     // neutral camps: a gold diamond while the crab is up, a faint ring while it is down
     const camps = world.state.camps;
     if (camps) for (const c of camps) {

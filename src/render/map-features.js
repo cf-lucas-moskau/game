@@ -85,6 +85,17 @@ export class MapFeatureViews {
     const star = lib.merged('prop-star', 0.42);
     this.stars = new THREE.InstancedMesh(star.geometry, new THREE.MeshStandardMaterial({ color: '#f2c14e', emissive: '#a8720f', emissiveIntensity: 0.9, roughness: 0.3, metalness: 0.5, flatShading: true }), 6);
     this.stars.instanceMatrix.setUsage(THREE.DynamicDrawUsage); this.stars.count = 0; this.stars.frustumCulled = false; parent.add(this.stars);
+    // Gale Shrines: a stone cairn (instanced rocks) crowned by a crystal that glows while the shrine is ready
+    const n = world.state.shrines.length, rock = lib.merged('rock-c', 1.1), crys = lib.merged('crystal-small', 0.7);
+    this.cairns = new THREE.InstancedMesh(rock.geometry, new THREE.MeshStandardMaterial({ color: '#d9cdb5', roughness: 0.9, flatShading: true }), n * 3); this.cairns.castShadow = this.cairns.receiveShadow = true;
+    this.shrineGlow = new THREE.InstancedMesh(crys.geometry, new THREE.MeshStandardMaterial({ color: '#bff6ef', emissive: '#58e0d2', emissiveIntensity: 1, roughness: 0.2, flatShading: true }), n);
+    this.shrineGlow.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(n * 3), 3); this.shrineGlow.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    // three flattened stones stacked into a cairn, each turned a little
+    const STACK = [[0, 1.15, 0.55], [0.42, 0.85, 0.5], [0.76, 0.6, 0.48]];
+    world.state.shrines.forEach((s, i) => STACK.forEach(([y, k, sy], j) => {
+      tmp.position.set(s.x * S, y, s.y * S); tmp.rotation.set(0, i * 2.4 + j * 1.3, 0); tmp.scale.set(k, sy * k * 1.4, k); tmp.updateMatrix(); this.cairns.setMatrixAt(i * 3 + j, tmp.matrix);
+    }));
+    parent.add(this.cairns); parent.add(this.shrineGlow);
     this.pearlY = -1.2; this.teamTint = [new THREE.Color('#45c4e6'), new THREE.Color('#f0476e')]; this.white = new THREE.Color('#ffffff');
     this.anim = new Map(); // crab id -> { attack: start time, flash, dying }
     this.corpses = [];     // crabs that just died: tip over and sink
@@ -116,6 +127,7 @@ export class MapFeatureViews {
   }
   state(id) { let a = this.anim.get(id); if (!a) { a = { attack: -9, flash: 0 }; this.anim.set(id, a); } return a; }
   update(world, alpha, dt, now) {
+    this.world = world;
     this.nb = 0; this.nc = 0; this.now = now; this.dt = dt;
     for (const camp of world.state.camps) {
       const e = camp.crabId >= 0 ? world.entities[camp.crabId] : null;
@@ -134,6 +146,12 @@ export class MapFeatureViews {
       this.coins.setMatrixAt(n++, tmp.matrix);
     }
     this.coins.count = n; this.coins.visible = n > 0; if (n) this.coins.instanceMatrix.needsUpdate = true;
+    world.state.shrines.forEach(this._shrine || (this._shrine = (s, i) => {
+      const ready = this.world.tick >= s.readyAt, spin = this.now * (ready ? 1.5 + s.prog * 6 : 0.3);
+      tmp.position.set(s.x * S, 1.35 + (ready ? Math.sin(this.now * 2 + i) * 0.08 : -0.15), s.y * S); tmp.rotation.set(0, spin, 0); tmp.scale.setScalar(ready ? 1 + s.prog * 0.3 : 0.8); tmp.updateMatrix();
+      this.shrineGlow.setMatrixAt(i, tmp.matrix); this.shrineGlow.setColorAt(i, tmpC.setScalar(ready ? 1 : 0.25));
+    }));
+    this.shrineGlow.instanceMatrix.needsUpdate = true; this.shrineGlow.instanceColor.needsUpdate = true;
     let ns = 0;
     for (const h of world.heroes) {
       if (h.dead || h.streak < RULES.SHUTDOWN_FROM || ns >= 6) continue;

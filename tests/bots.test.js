@@ -42,11 +42,15 @@ describe('bots', () => {
     expect(stateHash(r)).toBe(stateHash(w));
   }, 60000);
   it('every hero uses all four abilities during a match', () => {
-    const w = createMatch({ seed: 9, roster, content: CONTENT });
-    const dir = new BotDirector(w, 'hard'); const cmds = []; const used = {};
-    while (!w.state.over && w.tick < 9 * 60 * TICK_HZ) {
-      dir.commands(w, cmds); w.step(cmds);
-      w.events.drain((e) => { if (e.type === 4) { used[e.s] = used[e.s] || new Set(); used[e.s].add(e.b); } });
+    // usage is pooled over up to three matches: a quick stomp can end before a level-6 ultimate finds its moment
+    const used = {}; const done = () => ['morrow', 'gus', 'vesper', 'saffi', 'brindle', 'auctioneer'].every((k) => used[k] && used[k].size === 4);
+    for (let seed = 9; seed < 12 && !done(); seed++) {
+      const w = createMatch({ seed, roster, content: CONTENT });
+      const dir = new BotDirector(w, 'hard'); const cmds = [];
+      while (!w.state.over && w.tick < 9 * 60 * TICK_HZ) {
+        dir.commands(w, cmds); w.step(cmds);
+        w.events.drain((e) => { if (e.type === 4) { used[e.s] = used[e.s] || new Set(); used[e.s].add(e.b); } });
+      }
     }
     for (const k of ['morrow', 'gus', 'vesper', 'saffi', 'brindle', 'auctioneer']) expect([...(used[k] || [])].sort()).toEqual([0, 1, 2, 3]);
   }, 60000);

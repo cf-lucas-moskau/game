@@ -9,7 +9,7 @@ import { spatial, Throttle } from './theory.js';
 
 const RING = 64;
 const PER_FRAME = 3; // graphs built per frame; the rest of a burst is dropped (the ear cannot separate them anyway)
-const GAPS = { auto: 0.06, towerLock: 1, towerHit: 0.2, hitDealt: 0.05, hitTaken: 0.09, melee: 0.07, tower: 0.25, gold: 0.08, cast: 0.03, blink: 0.05, heroDeath: 0.2, relic: 0.3, campUp: 1, campSlain: 0.5, buff: 0.5, pearlWarn: 2, pearlUp: 2, pearlOurs: 2, pearlTheirs: 2, loot: 0.1, streak: 1 };
+const GAPS = { auto: 0.06, towerLock: 1, towerHit: 0.2, hitDealt: 0.05, hitTaken: 0.09, melee: 0.07, tower: 0.25, gold: 0.08, cast: 0.03, blink: 0.05, heroDeath: 0.2, relic: 0.3, campUp: 1, campSlain: 0.5, buff: 0.5, pearlWarn: 2, pearlUp: 2, pearlOurs: 2, pearlTheirs: 2, loot: 0.1, streak: 1, shrine: 0.5 };
 export class SfxDirector {
   constructor(engine, session) {
     this.e = engine; this.s = session;
@@ -52,6 +52,7 @@ export class SfxDirector {
       case EV.OBJECTIVE:
         if (ev.s === 'camp-slain') this.push('campSlain', ev.x);
         else if (ev.s === 'camp-up') this.push('campUp', ev.x);
+        else if (ev.s === 'shrine') this.push('shrine', ev.x, '', ev.a === me.id);
         else if (ev.s === 'streak') this.push('streak', 0, '', true);
         else if (ev.s === 'pearl-warn') this.push('pearlWarn', 0, '', true);
         else if (ev.s === 'pearl-up') this.push('pearlUp', ev.x);

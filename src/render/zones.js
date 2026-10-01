@@ -145,6 +145,9 @@ export class ZoneViews {
     // Sky Pearl circle: faint while announced; while up it fills with the holding team's colour
     const pearl = world.state.pearl;
     if (pearl && pearl.phase !== 'idle') this.disc(pearl.x, pearl.y, RULES.PEARL_RADIUS, DISC.PEARL, pearl.phase === 'up' ? pearl.prog : 0, pearl.phase === 'up' ? 1 : 0.45, pearl.holder < 0 ? 2 : pearl.holder, 0);
+    // Gale Shrines: bright when ready (channel progress fills it), dim while recharging
+    const shrines = world.state.shrines;
+    if (shrines) for (let i = 0; i < shrines.length; i++) { const s = shrines[i], ready = world.tick >= s.readyAt; this.disc(s.x, s.y, RULES.SHRINE_RADIUS, DISC.SHRINE, s.prog, ready ? 1 : 0.3, 0, i); }
     // camp nests; a downed camp shows its return as a filling arc during the last 15 seconds
     const camps = world.state.camps;
     if (camps) for (let i = 0; i < camps.length; i++) {

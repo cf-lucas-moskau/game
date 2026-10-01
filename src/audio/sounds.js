@@ -38,6 +38,7 @@ export const SOUNDS = {
   pearlTheirs: (e, b, t) => [[4, 7], [3, 6], [1, 5]].forEach((c, i) => c.forEach((d) => tone(e, b, { type: 'sine', f0: mtof(degree(d, 55)), t: t + i * 0.22, dur: i === 2 ? 1.4 : 0.4, gain: 0.07, attack: 0.03, filter: 1600 }))),
   shutdown: (e, b, t) => { [0, 4, 7, 12].forEach((d, i) => tone(e, b, { type: 'triangle', f0: mtof(degree(d, 64)), t: t + i * 0.06, dur: 0.5, gain: 0.1 })); noise(e, b, { type: 'highpass', f0: 5000, t: t + 0.2, dur: 0.3, gain: 0.05 }); },
   streak: (e, b, t) => [0, 0.14].forEach((dt, i) => tone(e, b, { type: 'sawtooth', f0: mtof(degree(i ? 7 : 4, 57)), t: t + dt, dur: 0.35, gain: 0.06, filter: 1800, attack: 0.01 })),
+  shrine: (e, b, t, p, g) => { noise(e, b, { type: 'bandpass', f0: 500, f1: 2400, t, dur: 0.9, gain: 0.14 * g, q: 1.5, attack: 0.2, pan: p }); tone(e, b, { type: 'sine', f0: mtof(degree(4, 72)), f1: mtof(degree(11, 72)), t: t + 0.15, dur: 0.6, gain: 0.05 * g, pan: p }); },
   loot: (e, b, t, p, g) => [0, 0.05, 0.11].forEach((dt, i) => tone(e, b, { f0: 2093 + i * 330, t: t + dt, dur: 0.12, gain: 0.06 * g, pan: p })), // coins
   buff: (e, b, t) => [0, 7, 12].forEach((d, i) => tone(e, b, { type: 'triangle', f0: mtof(degree(d, 72)), t: t + i * 0.04, dur: 0.4, gain: 0.06, attack: 0.02 })),
   ui: (e, b, t) => tone(e, b, { type: 'triangle', f0: 1100, f1: 900, t, dur: 0.05, gain: 0.05 }),

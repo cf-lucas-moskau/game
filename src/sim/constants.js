@@ -25,6 +25,7 @@ export const MAP = {
 /** Neutral middle features. Everything sits on the centre point or in pairs symmetric through it (fairness: PR #41). */
 MAP.CAMPS = [[LANE.W / 2 - 200, 200], [LANE.W / 2 + 200, LANE.H - 200]]; // Barnacle Crab nests: blue's nearer one top, red's bottom
 MAP.PEARL = [LANE.W / 2, 450]; // the Sky Pearl surfaces at the exact centre
+MAP.SHRINES = [[LANE.W / 2 + 200, 215], [LANE.W / 2 - 200, LANE.H - 215]]; // Gale Shrines: the corners the camps leave free
 /** Relic spots, mirrored for both sides (absolute x broke the symmetry when the lane grew). */
 MAP.RELICS = [TEAM.BLUE, TEAM.RED].flatMap((t) => MAP.RELIC_Y.map((y) => [sideX(t, MAP.RELIC_X), y]));
 
@@ -52,6 +53,8 @@ export const RULES = {
   PEARL_GOLD: 100, PEARL_WAVES: 2, PEARL_GOLEM_HP: 2.2, PEARL_GOLEM_AD: 1.8,
   // whale-roll loot: treasure washes up in the endangered edge band when the whale rolls (mirrored x pairs)
   LOOT_X: [250, 750, 1250], LOOT_GOLD: 45, LOOT_XP: 50, LOOT_LINGER: 3, LOOT_RADIUS: 60,
+  // Gale Shrines: stand in one for SHRINE_CHANNEL seconds without fighting (and with no enemy inside) for Tailwind
+  SHRINE_FIRST: 60, SHRINE_COOLDOWN: 40, SHRINE_CHANNEL: 1.5, SHRINE_RADIUS: 95,
 };
 /** xp needed to go from level L to L+1: cheap up to level 6 (the ultimate arrives in about a minute and a half), then
  *  the old curve (3 -> 6 costs 780 xp instead of 1440) */

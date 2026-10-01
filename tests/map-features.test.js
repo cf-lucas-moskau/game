@@ -152,3 +152,25 @@ describe('comeback bounties', () => {
     a.dead = false; a.hp = a.maxHp; kill(w, y, a); expect(events(w, EV.KILL).pop().s).toBe('');
   });
 });
+
+describe('Gale Shrines', () => {
+  it('a calm hero alone in a ready shrine gets Tailwind; an enemy inside or fighting stops it; then it recharges', () => {
+    const w = match(); steps(w, sec(RULES.SHRINE_FIRST) + 1);
+    const [sx, sy] = MAP.SHRINES[0], a = w.heroes[0], foe = w.heroes[3];
+    const park = () => w.heroes.forEach((h, i) => { if (h !== a && h !== foe) place(h, h.team === 0 ? 300 : LANE.W - 300, 300 + (i % 3) * 120); });
+    // an enemy in the shrine blocks the channel
+    steps(w, sec(RULES.SHRINE_CHANNEL) + 5, () => { park(); place(a, sx, sy); place(foe, sx + 40, sy); return []; });
+    expect(hasBuff(a, 'tailwind') || hasBuff(foe, 'tailwind')).toBe(false);
+    // alone and calm: Tailwind after the channel
+    w.events.drain(() => {});
+    steps(w, sec(RULES.SHRINE_CHANNEL) + 2, () => { park(); place(a, sx, sy); place(foe, 300, 600); return []; });
+    expect(hasBuff(a, 'tailwind')).toBe(true);
+    expect(events(w, EV.OBJECTIVE).some((e) => e.s === 'shrine' && e.a === a.id)).toBe(true);
+    const shrine = w.state.shrines[0]; expect(shrine.readyAt - w.tick).toBeGreaterThan(sec(RULES.SHRINE_COOLDOWN) - sec(RULES.SHRINE_CHANNEL) - 5);
+    // fighting interrupts a channel: the other shrine, with damage taken half way
+    const [tx, ty] = MAP.SHRINES[1], b = w.heroes[1];
+    steps(w, sec(RULES.SHRINE_CHANNEL / 2), () => { place(b, tx, ty); return []; });
+    b.lastCombatTick = w.tick; steps(w, 1, () => { place(b, tx, ty); return []; });
+    expect(w.state.shrines[1].prog).toBeLessThan(0.1);
+  });
+});

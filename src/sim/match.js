@@ -16,6 +16,7 @@ import { expireBuffs } from './buffs.js';
 import { setupCamps, campSystem } from './camps.js';
 import { setupPearl, pearlSystem } from './pearl.js';
 import { pickupSystem, spawnRollLoot } from './pickups.js';
+import { setupShrines, shrineSystem } from './shrines.js';
 
 /**
  * Build a ready-to-run match.
@@ -35,8 +36,9 @@ export function createMatch({ seed = 1, roster, content }) {
   setupStructures(w);
   setupCamps(w);
   setupPearl(w);
+  setupShrines(w);
   roster.forEach((r, i) => spawnHero(w, r, i));
-  w.systems = [commandSystem, clockSystem, campSystem, pearlSystem, heroSystem, movementSystem, combatSystem, projectileSystem, zoneSystem, economySystem, winSystem];
+  w.systems = [commandSystem, clockSystem, campSystem, pearlSystem, shrineSystem, heroSystem, movementSystem, combatSystem, projectileSystem, zoneSystem, economySystem, winSystem];
   return w;
 }
 
