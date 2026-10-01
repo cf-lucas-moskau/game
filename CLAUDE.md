@@ -117,7 +117,7 @@ input path), `skip=<seconds>` (fast-forward the sim), `seed=`, `touch=1`, `cpu=1
    hit harder (minion attack x1.5, `RULES.MINION_VS_STRUCTURE`/`SIEGE_VS_STRUCTURE`), bots wait mid-lane between
    waves, rebalance for the new map (40-58% on two seeds). Ideas offered to the owner: neutral camps in the middle,
    a mid-lane objective, whale-roll events with pickups.
-11. Next: Wisp is at the low edge (40-42%); predictor modelling of attack-move engagements and short hops (Saffi
+11. Next: online join sometimes hangs past 30 s (seen on main too, docs/prs/0039); Wisp is at the low edge (40-42%); predictor modelling of attack-move engagements and short hops (Saffi
    corrects ~1 per 10 s at 100 ms ping); desync resync (replay the command log), optional self-hosted broker, more skins.
 
 ## Architecture map
